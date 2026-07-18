@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { createDemoFollowUp, createDemoLesson } from "@/lib/ai/demo";
-import { createProviderFollowUp, createProviderLesson } from "@/lib/ai/provider";
+import { createDemoEvaluation, createDemoFollowUp, createDemoLesson } from "@/lib/ai/demo";
+import { createProviderEvaluation, createProviderFollowUp, createProviderLesson } from "@/lib/ai/provider";
 import type { TeachingMode, TutorAction, TutorConversationMessage, TutorLessonSummary, TutorRequest } from "@/lib/ai/types";
 import { learningDimensions, type LearningDimension, type LearningScores } from "@/lib/learning-dna";
 
-const actions: TutorAction[] = ["initial", "simpler", "different", "example", "challenge", "followup"];
+const actions: TutorAction[] = ["initial", "simpler", "different", "example", "challenge", "followup", "evaluate"];
 const teachingModes: TeachingMode[] = ["adaptive", "visual", "example", "analogy", "story", "challenge"];
 
 function isLearningScores(value: unknown): value is LearningScores {
@@ -59,12 +59,17 @@ function parseRequest(value: unknown): TutorRequest | null {
   const question = typeof record.question === "string" ? record.question.trim() : "";
   const currentLesson = record.currentLesson;
   const conversation = record.conversation;
+  const learnerAnswer = typeof record.learnerAnswer === "string" ? record.learnerAnswer.trim() : "";
+  const checkQuestion = typeof record.checkQuestion === "string" ? record.checkQuestion.trim() : "";
+  const lessonCoreIdea = typeof record.lessonCoreIdea === "string" ? record.lessonCoreIdea.trim() : "";
+  const lessonContext = typeof record.lessonContext === "string" ? record.lessonContext.trim() : "";
   if (!topic || topic.length > 160 || subject.length > 50 || level.length > 50 || !isLearningScores(record.scores) || typeof action !== "string" || !actions.includes(action as TutorAction) || typeof teachingMode !== "string" || !teachingModes.includes(teachingMode as TeachingMode) || (previousStyles !== undefined && !isLearningDimensionArray(previousStyles)) || (previousTeachingMode !== undefined && (typeof previousTeachingMode !== "string" || !teachingModes.includes(previousTeachingMode as TeachingMode))) || (previousTitle !== undefined && (typeof previousTitle !== "string" || previousTitle.length > 160)) || (previousExplanation !== undefined && (typeof previousExplanation !== "string" || previousExplanation.length > 360))) return null;
   if (action === "followup" && (!question || question.length > 500 || !isLessonSummary(currentLesson) || (conversation !== undefined && !isConversation(conversation)))) return null;
-  return { topic, subject: subject || "General learning", level: level || "General", scores: record.scores, action: action as TutorAction, teachingMode: teachingMode as TeachingMode, previousStyles, previousTeachingMode: previousTeachingMode as TeachingMode | undefined, previousTitle, previousExplanation, question: question || undefined, currentLesson: currentLesson as TutorLessonSummary | undefined, conversation: conversation as TutorConversationMessage[] | undefined };
+  if (action === "evaluate" && (!learnerAnswer || learnerAnswer.length > 1000 || !checkQuestion || checkQuestion.length > 500 || !lessonCoreIdea || lessonCoreIdea.length > 500 || lessonContext.length > 500)) return null;
+  return { topic, subject: subject || "General learning", level: level || "General", scores: record.scores, action: action as TutorAction, teachingMode: teachingMode as TeachingMode, previousStyles, previousTeachingMode: previousTeachingMode as TeachingMode | undefined, previousTitle, previousExplanation, question: question || undefined, currentLesson: currentLesson as TutorLessonSummary | undefined, conversation: conversation as TutorConversationMessage[] | undefined, learnerAnswer: learnerAnswer || undefined, checkQuestion: checkQuestion || undefined, lessonCoreIdea: lessonCoreIdea || undefined, lessonContext: lessonContext || undefined };
 }
 
-function lessonMatchesAction(action: Exclude<TutorAction, "followup">, lesson: { challenge?: string; practicePrompt?: string }): boolean {
+function lessonMatchesAction(action: Exclude<TutorAction, "followup" | "evaluate">, lesson: { challenge?: string; practicePrompt?: string }): boolean {
   if (action === "challenge") return Boolean(lesson.challenge);
   if (action === "example") return Boolean(lesson.practicePrompt);
   return true;
@@ -102,6 +107,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status: 502 });
     }
   }
+  if (tutorRequest.action === "evaluate") { try { const evaluation = await createProviderEvaluation(tutorRequest); if (evaluation) return NextResponse.json({ evaluation, source: "provider", teachingMode: tutorRequest.teachingMode, action: "evaluate" }); if (process.env.NODE_ENV === "development") { const demo = createDemoEvaluation(tutorRequest); if (demo) return NextResponse.json({ evaluation: demo, source: "demo", teachingMode: tutorRequest.teachingMode, action: "evaluate" }); } return NextResponse.json({ error: "The tutor is not configured yet. Add an AI provider or try a supported demo topic in development." }, { status: 503 }); } catch (error) { if (process.env.NODE_ENV === "development") { const demo = createDemoEvaluation(tutorRequest); if (demo) return NextResponse.json({ evaluation: demo, source: "demo", teachingMode: tutorRequest.teachingMode, action: "evaluate" }); } return NextResponse.json({ error: error instanceof Error ? error.message : "The tutor could not evaluate this answer." }, { status: 502 }); } }
 
   try {
     const providerLesson = await createProviderLesson(tutorRequest);

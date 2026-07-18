@@ -2,11 +2,11 @@ import type { TutorAction } from "@/lib/ai/types";
 
 interface LessonActionsProps {
   isLoading: boolean;
-  onAction: (action: Exclude<TutorAction, "initial" | "followup">) => void;
+  onAction: (action: Exclude<TutorAction, "initial" | "followup" | "evaluate">) => void;
   onNewLesson: () => void;
 }
 
-const actions: Array<{ action: Exclude<TutorAction, "initial" | "followup">; label: string }> = [
+const actions: Array<{ action: Exclude<TutorAction, "initial" | "followup" | "evaluate">; label: string }> = [
   { action: "different", label: "Explain differently" },
   { action: "simpler", label: "Make it simpler" },
   { action: "example", label: "Give me an example" },

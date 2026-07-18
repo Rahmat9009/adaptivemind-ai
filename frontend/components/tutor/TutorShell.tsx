@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { TeachingMode, TutorAction, TutorApiResponse, TutorConversationMessage, TutorConversationTurn, TutorFollowUpApiResponse, TutorFollowUpResponse, TutorLesson } from "@/lib/ai/types";
+import type { TeachingMode, TutorAction, TutorApiResponse, TutorConversationMessage, TutorConversationTurn, TutorFollowUpApiResponse, TutorFollowUpResponse, TutorLesson, UnderstandingEvaluation, UnderstandingEvaluationApiResponse } from "@/lib/ai/types";
 import { learningDimensions, type LearningDimension, type LearningScores } from "@/lib/learning-dna";
 import { isTutorHandoff, tutorHandoffStorageKey } from "@/lib/tutor-handoff";
-import { addLessonToHistory, historyRestoreStorageKey, readLearningHistory, saveHistoryConversation, startNewTopicStorageKey } from "@/lib/dashboard-storage";
+import { addLessonToHistory, historyRestoreStorageKey, readLearningHistory, saveHistoryConversation, saveHistoryEvaluation, startNewTopicStorageKey } from "@/lib/dashboard-storage";
+import { updateTopicMastery } from "@/lib/mastery";
 import { AppNavigation } from "@/components/layout/AppNavigation";
 import { LearningDNACompact } from "./LearningDNACompact";
 import { LessonActions } from "./LessonActions";
@@ -14,6 +15,8 @@ import { TopicForm } from "./TopicForm";
 import { TutorEmptyState } from "./TutorEmptyState";
 import { TutorErrorState } from "./TutorErrorState";
 import { TutorLoadingState } from "./TutorLoadingState";
+import { UnderstandingCheck } from "./UnderstandingCheck";
+import { UnderstandingFeedback } from "./UnderstandingFeedback";
 
 const profileStorageKey = "adaptivemind-learning-dna";
 const lessonStorageKey = "adaptivemind-current-lesson";
@@ -44,7 +47,7 @@ function isTeachingMode(value: unknown): value is TeachingMode {
   return value === "adaptive" || value === "visual" || value === "example" || value === "analogy" || value === "story" || value === "challenge";
 }
 
-function isLessonAction(value: unknown): value is Exclude<TutorAction, "followup"> {
+function isLessonAction(value: unknown): value is Exclude<TutorAction, "followup" | "evaluate"> {
   return value === "initial" || value === "simpler" || value === "different" || value === "example" || value === "challenge";
 }
 
@@ -65,6 +68,7 @@ function isFollowUpApiResponse(value: unknown): value is TutorFollowUpApiRespons
   const record = value as Record<string, unknown>;
   return isFollowUpResponse(record.followUp) && (record.source === "provider" || record.source === "demo") && isTeachingMode(record.teachingMode) && record.action === "followup";
 }
+function isEvaluationApiResponse(value: unknown): value is UnderstandingEvaluationApiResponse { if (typeof value !== "object" || value === null) return false; const record = value as Record<string, unknown>; const evaluation = record.evaluation as Record<string, unknown> | undefined; return record.action === "evaluate" && (record.source === "provider" || record.source === "demo") && typeof evaluation === "object" && evaluation !== null && (evaluation.status === "correct" || evaluation.status === "partial" || evaluation.status === "misconception" || evaluation.status === "uncertain") && typeof evaluation.score === "number" && typeof evaluation.feedback === "string" && Array.isArray(evaluation.stylesUsed); }
 
 function isMessage(value: unknown): value is TutorConversationMessage {
   if (typeof value !== "object" || value === null) return false;
@@ -120,6 +124,10 @@ export function TutorShell() {
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [handoffMessage, setHandoffMessage] = useState<string | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
+  const [evaluation, setEvaluation] = useState<UnderstandingEvaluation | null>(null);
+  const [evaluationSource, setEvaluationSource] = useState<"provider" | "demo">("provider");
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [evaluationError, setEvaluationError] = useState<string | null>(null);
   const latestTurnRef = useRef<HTMLDivElement>(null);
 
   function clearConversation() {
@@ -175,13 +183,14 @@ export function TutorShell() {
 
   useEffect(() => { if (conversation.length) latestTurnRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [conversation.length]);
 
-  async function requestLesson(action: Exclude<TutorAction, "followup">) {
+  async function requestLesson(action: Exclude<TutorAction, "followup" | "evaluate">) {
     if (!profile || !topic.trim()) return;
     setIsLoading(true);
     setError(null);
     try {
       const previousLesson = response?.lesson;
-      const apiResponse = await fetch("/api/tutor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: topic.trim(), subject, level, scores: profile.scores, action, teachingMode, previousStyles: previousLesson?.stylesUsed, previousTeachingMode: response?.teachingMode, previousTitle: previousLesson?.title, previousExplanation: previousLesson?.explanation.slice(0, 360) }) });
+      const evaluationContext = evaluation ? ` Latest understanding check: ${evaluation.status}; focus: ${evaluation.needsReview.join(", ")}.` : "";
+      const apiResponse = await fetch("/api/tutor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: topic.trim(), subject, level, scores: profile.scores, action, teachingMode, previousStyles: previousLesson?.stylesUsed, previousTeachingMode: response?.teachingMode, previousTitle: previousLesson?.title, previousExplanation: `${previousLesson?.explanation.slice(0, 250) ?? ""}${evaluationContext}`.slice(0, 360) }) });
       const payload: unknown = await apiResponse.json();
       if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
       if (!isTutorResponse(payload)) throw new Error("The tutor returned an incomplete lesson. Please try again.");
@@ -216,11 +225,14 @@ export function TutorShell() {
     } finally { setIsFollowUpLoading(false); }
   }
 
+  async function evaluateUnderstanding(answer: string) { if (!profile || !response || !topic.trim()) return; setIsEvaluating(true); setEvaluationError(null); try { const apiResponse = await fetch("/api/tutor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: topic.trim(), subject, level, scores: profile.scores, action: "evaluate", teachingMode, learnerAnswer: answer, checkQuestion: response.lesson.checkQuestion, lessonCoreIdea: response.lesson.coreIdea, lessonContext: response.lesson.explanation.slice(0, 500) }) }); const payload: unknown = await apiResponse.json(); if (!apiResponse.ok) throw new Error(getErrorMessage(payload)); if (!isEvaluationApiResponse(payload)) throw new Error("Ada returned an incomplete understanding check."); setEvaluation(payload.evaluation); setEvaluationSource(payload.source); const mastery = updateTopicMastery(topic.trim(), subject, payload.evaluation.score, payload.evaluation.status); if (historyId) saveHistoryEvaluation(historyId, { score: payload.evaluation.score, status: payload.evaluation.status, masteryLevel: mastery.masteryLevel, evaluatedAt: new Date().toISOString() }); } catch (requestError) { setEvaluationError(requestError instanceof Error ? requestError.message : "Please try again."); } finally { setIsEvaluating(false); } }
+
   function startNewLesson() {
     setResponse(null);
     setError(null);
     setTopic("");
     setHistoryId(null);
+    setEvaluation(null);
     clearConversation();
     localStorage.removeItem(lessonStorageKey);
   }
@@ -232,7 +244,7 @@ export function TutorShell() {
     <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_15%,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_85%_85%,rgba(99,102,241,0.14),transparent_32%)]" />
     <div className="mx-auto max-w-6xl">
       <header className="max-w-3xl"><p className="text-sm font-semibold uppercase tracking-wider text-teal-700">Adaptive AI tutor</p><h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">A lesson shaped around your current preferences.</h1><p className="mt-4 text-lg leading-8 text-slate-600">Ask Ada about a topic, then choose how you would like to be taught.</p>{handoffMessage ? <p className="mt-5 rounded-2xl border border-teal-100 bg-teal-50/80 px-4 py-3 text-sm font-medium leading-6 text-teal-900" role="status">{handoffMessage}</p> : null}</header>
-      <div className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)] lg:items-start"><div className="space-y-5"><LearningDNACompact scores={profile.scores} isBalanced={profile.isBalanced} /><TopicForm topic={topic} subject={subject} level={level} scores={profile.scores} teachingMode={teachingMode} isLoading={isLoading} onTopicChange={setTopic} onSubjectChange={setSubject} onLevelChange={setLevel} onTeachingModeChange={setTeachingMode} onSubmit={() => requestLesson("initial")} /></div><div>{error ? <TutorErrorState message={error} /> : null}{isLoading ? <TutorLoadingState /> : null}{!isLoading && response ? <><LessonCard response={response} /><LessonActions isLoading={isLoading} onAction={requestLesson} onNewLesson={startNewLesson} />{topic.trim() ? <LessonFollowUp lesson={response.lesson} conversation={conversation} isLoading={isFollowUpLoading} error={followUpError} onAsk={requestFollowUp} latestTurnRef={latestTurnRef} /> : null}</> : null}{!isLoading && !response && !error ? <section className="rounded-3xl border border-dashed border-slate-300 bg-white/50 p-10 text-center text-slate-500"><p className="font-medium text-slate-700">Ada will build your focused lesson here.</p><p className="mt-2 text-sm leading-6">Choose a suggested topic or enter one of your own to begin.</p></section> : null}</div></div>
+      <div className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)] lg:items-start"><div className="space-y-5"><LearningDNACompact scores={profile.scores} isBalanced={profile.isBalanced} /><TopicForm topic={topic} subject={subject} level={level} scores={profile.scores} teachingMode={teachingMode} isLoading={isLoading} onTopicChange={setTopic} onSubjectChange={setSubject} onLevelChange={setLevel} onTeachingModeChange={setTeachingMode} onSubmit={() => requestLesson("initial")} /></div><div>{error ? <TutorErrorState message={error} /> : null}{isLoading ? <TutorLoadingState /> : null}{!isLoading && response ? <><LessonCard response={response} /><LessonActions isLoading={isLoading} onAction={requestLesson} onNewLesson={startNewLesson} /><UnderstandingCheck question={response.lesson.checkQuestion} isLoading={isEvaluating} error={evaluationError} onSubmit={evaluateUnderstanding} />{evaluation ? <UnderstandingFeedback evaluation={evaluation} source={evaluationSource} onAction={(nextStep) => { if (nextStep === "simplify") void requestLesson("simpler"); else if (nextStep === "example") void requestLesson("example"); else if (nextStep === "clarify") void requestLesson("different"); }} /> : null}{topic.trim() ? <LessonFollowUp lesson={response.lesson} conversation={conversation} isLoading={isFollowUpLoading} error={followUpError} onAsk={requestFollowUp} latestTurnRef={latestTurnRef} /> : null}</> : null}{!isLoading && !response && !error ? <section className="rounded-3xl border border-dashed border-slate-300 bg-white/50 p-10 text-center text-slate-500"><p className="font-medium text-slate-700">Ada will build your focused lesson here.</p><p className="mt-2 text-sm leading-6">Choose a suggested topic or enter one of your own to begin.</p></section> : null}</div></div>
     </div>
   </main></>;
 }

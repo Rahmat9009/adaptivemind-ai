@@ -1,5 +1,6 @@
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
 import { learningDimensionLabels, type LearningScores } from "@/lib/learning-dna";
+import { LearningDNAConstellation } from "@/components/three/LearningDNAConstellation";
 
 interface LearningDNACompactProps {
   scores: LearningScores;
@@ -21,6 +22,7 @@ export function LearningDNACompact({ scores, isBalanced = false }: LearningDNACo
           ? "A balanced explanation will be used until you complete the assessment."
           : `Personalized using ${learningDimensionLabels[primary]} + ${learningDimensionLabels[secondary]}.`}
       </p>
+      <div className="mt-4"><LearningDNAConstellation scores={scores} activeDimension={primary} compact /></div>
     </aside>
   );
 }

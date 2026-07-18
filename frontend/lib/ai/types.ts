@@ -1,6 +1,6 @@
 import type { LearningDimension, LearningScores } from "@/lib/learning-dna";
 
-export type TutorAction = "initial" | "simpler" | "different" | "example" | "challenge" | "followup";
+export type TutorAction = "initial" | "simpler" | "different" | "example" | "challenge" | "followup" | "evaluate";
 
 export type TeachingMode =
   | "adaptive"
@@ -24,6 +24,32 @@ export interface TutorRequest {
   question?: string;
   currentLesson?: TutorLessonSummary;
   conversation?: TutorConversationMessage[];
+  learnerAnswer?: string;
+  checkQuestion?: string;
+  lessonCoreIdea?: string;
+  lessonContext?: string;
+}
+
+export type UnderstandingStatus = "correct" | "partial" | "misconception" | "uncertain";
+export type UnderstandingNextStep = "continue" | "clarify" | "simplify" | "example" | "retry";
+
+export interface UnderstandingEvaluation {
+  status: UnderstandingStatus;
+  score: number;
+  feedback: string;
+  whatWasUnderstood: string[];
+  needsReview: string[];
+  misconception?: string;
+  nextStep: UnderstandingNextStep;
+  followUpQuestion?: string;
+  stylesUsed: LearningDimension[];
+}
+
+export interface UnderstandingEvaluationApiResponse {
+  evaluation: UnderstandingEvaluation;
+  source: "provider" | "demo";
+  teachingMode: TeachingMode;
+  action: "evaluate";
 }
 
 export interface TutorLessonSummary {
@@ -58,7 +84,7 @@ export interface TutorApiResponse {
   lesson: TutorLesson;
   source: "provider" | "demo";
   teachingMode: TeachingMode;
-  action: Exclude<TutorAction, "followup">;
+  action: Exclude<TutorAction, "followup" | "evaluate">;
 }
 
 export interface TutorFollowUpResponse {

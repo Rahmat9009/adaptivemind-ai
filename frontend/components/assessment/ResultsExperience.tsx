@@ -11,6 +11,8 @@ import {
 import { LearningDNAChart } from "./LearningDNAChart";
 import { LearningStyleSummary } from "./LearningStyleSummary";
 import { AppNavigation } from "@/components/layout/AppNavigation";
+import { LearningDNAConstellation } from "@/components/three/LearningDNAConstellation";
+import { motion, useReducedMotion } from "motion/react";
 
 const storageKey = "adaptivemind-learning-dna";
 
@@ -43,6 +45,7 @@ export function ResultsExperience() {
   const [result, setResult] = useState<StoredResult | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -75,7 +78,8 @@ export function ResultsExperience() {
           <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">Your AdaptiveMind Learning DNA</h1>
           <p className="mt-5 text-lg leading-8 text-slate-600">Based on your current assessment preferences, this profile highlights the approaches that feel most useful right now. It will evolve from future learning interactions.</p>
         </header>
-        <div className="mt-10 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+        <motion.div initial={reducedMotion ? false : { opacity: 0, y: 14, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: reducedMotion ? 0.12 : 0.5 }} className="mt-8"><LearningDNAConstellation scores={result.scores} activeDimension={result.primaryLearningStyle} /></motion.div>
+        <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <LearningStyleSummary primaryStyle={result.primaryLearningStyle} scores={result.scores} />
           <LearningDNAChart scores={result.scores} isVisible={isVisible} />
         </div>

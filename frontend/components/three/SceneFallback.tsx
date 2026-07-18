@@ -1,0 +1,6 @@
+import { learningDimensionLabels, learningDimensions, type LearningScores } from "@/lib/learning-dna";
+import { learningDNAVisuals } from "@/lib/learning-dna-visuals";
+
+export function SceneFallback({ scores, compact = false }: { scores: LearningScores; compact?: boolean }) {
+  return <div className={`relative overflow-hidden rounded-3xl border border-white/15 bg-[#0b1020] ${compact ? "min-h-44" : "min-h-80"}`} aria-label="Learning DNA constellation fallback"><div className="absolute inset-0 opacity-70 [background-image:radial-gradient(circle_at_center,rgba(99,102,241,0.24),transparent_56%)]" />{learningDimensions.map((dimension, index) => <div key={dimension} className="absolute flex -translate-x-1/2 -translate-y-1/2 items-center gap-2" style={{ left: `${[22, 76, 78, 46, 18][index]}%`, top: `${[26, 30, 71, 80, 65][index]}%` }}><span className="rounded-full border border-white/60" style={{ width: `${18 + scores[dimension] / 7}px`, height: `${18 + scores[dimension] / 7}px`, backgroundColor: learningDNAVisuals[dimension].color, boxShadow: `0 0 22px ${learningDNAVisuals[dimension].color}` }} /><span className="text-xs font-semibold text-white">{learningDimensionLabels[dimension]} {scores[dimension]}%</span></div>)}</div>;
+}

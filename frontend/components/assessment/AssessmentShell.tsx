@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { motion, useReducedMotion } from "motion/react";
 import { AppNavigation } from "@/components/layout/AppNavigation";
 import {
   assessmentQuestions,
@@ -41,6 +42,7 @@ export function AssessmentShell() {
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [showRequiredMessage, setShowRequiredMessage] = useState(false);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -124,7 +126,9 @@ export function AssessmentShell() {
           <div className="mt-8"><ProgressBar current={questionIndex + 1} total={assessmentQuestions.length} /></div>
 
           <form className="mt-10" onSubmit={(event) => { event.preventDefault(); handleContinue(); }}>
-            <QuestionCard questionIndex={questionIndex} selectedAnswer={answers[questionIndex]} onSelect={handleSelect} />
+            <motion.div key={questionIndex} initial={reducedMotion ? false : { opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={reducedMotion ? undefined : { opacity: 0, x: -18 }} transition={{ duration: reducedMotion ? 0.12 : 0.24 }}>
+              <QuestionCard questionIndex={questionIndex} selectedAnswer={answers[questionIndex]} onSelect={handleSelect} />
+            </motion.div>
             <p className="mt-4 min-h-6 text-sm font-medium text-rose-600" role="alert">{showRequiredMessage ? "Choose an answer before continuing." : ""}</p>
 
             <div className="mt-7 flex items-center justify-between gap-4 border-t border-slate-200 pt-6">

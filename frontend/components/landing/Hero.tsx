@@ -1,3 +1,7 @@
+import { LearningDNAConstellation } from "@/components/three/LearningDNAConstellation";
+
+const previewScores = { visual: 62, examples: 74, analogies: 92, stories: 58, challenges: 48 };
+
 export function Hero() {
   return (
     <section
@@ -34,8 +38,9 @@ export function Hero() {
         </div>
 
         <div className="relative mx-auto w-full max-w-xl">
-          <div className="rounded-[2rem] border border-white/70 bg-white/55 p-3 shadow-2xl shadow-slate-900/12 backdrop-blur-xl">
-            <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-950">
+          <div className="relative min-h-[28rem]">
+            <LearningDNAConstellation scores={previewScores} activeDimension="analogies" />
+            <div className="absolute inset-x-4 bottom-4 overflow-hidden rounded-2xl border border-white/15 bg-slate-950/85 shadow-2xl backdrop-blur-xl">
               <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
                 <div>
                   <p className="text-sm font-medium text-white">

@@ -1,5 +1,5 @@
-import type { TutorFollowUpResponse, TutorLesson, TutorRequest } from "./types";
-import { buildFollowUpSystemPrompt, buildTutorSystemPrompt } from "@/lib/adaptive-prompt";
+import type { TutorFollowUpResponse, TutorLesson, TutorRequest, UnderstandingEvaluation } from "./types";
+import { buildEvaluationSystemPrompt, buildFollowUpSystemPrompt, buildTutorSystemPrompt } from "@/lib/adaptive-prompt";
 import { learningDimensions, type LearningDimension } from "@/lib/learning-dna";
 
 interface ProviderResponse {
@@ -62,6 +62,8 @@ export function parseTutorFollowUp(value: unknown): TutorFollowUpResponse | null
   };
 }
 
+export function parseUnderstandingEvaluation(value: unknown): UnderstandingEvaluation | null { if (typeof value !== "object" || value === null) return null; const record = value as Record<string, unknown>; const validStatus = record.status === "correct" || record.status === "partial" || record.status === "misconception" || record.status === "uncertain"; const validNext = record.nextStep === "continue" || record.nextStep === "clarify" || record.nextStep === "simplify" || record.nextStep === "example" || record.nextStep === "retry"; if (!validStatus || !validNext || typeof record.score !== "number" || !Number.isInteger(record.score) || record.score < 0 || record.score > 100 || typeof record.feedback !== "string" || !Array.isArray(record.whatWasUnderstood) || !record.whatWasUnderstood.every((item) => typeof item === "string") || !Array.isArray(record.needsReview) || !record.needsReview.every((item) => typeof item === "string") || !Array.isArray(record.stylesUsed) || !record.stylesUsed.every(isLearningDimension)) return null; return { status: record.status as UnderstandingEvaluation["status"], score: record.score, feedback: record.feedback, whatWasUnderstood: record.whatWasUnderstood.slice(0, 4), needsReview: record.needsReview.slice(0, 4), misconception: typeof record.misconception === "string" ? record.misconception : undefined, nextStep: record.nextStep as UnderstandingEvaluation["nextStep"], followUpQuestion: typeof record.followUpQuestion === "string" ? record.followUpQuestion : undefined, stylesUsed: record.stylesUsed }; }
+
 function extractJson(content: string): unknown {
   const fenced = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   const candidate = fenced?.[1] ?? content;
@@ -69,7 +71,7 @@ function extractJson(content: string): unknown {
 }
 
 export async function createProviderLesson(request: TutorRequest): Promise<TutorLesson | null> {
-  if (request.action === "followup") return null;
+  if (request.action === "followup" || request.action === "evaluate") return null;
   const apiKey = process.env.AI_API_KEY;
   const baseUrl = process.env.AI_BASE_URL;
   const model = process.env.AI_MODEL;
@@ -84,7 +86,7 @@ export async function createProviderLesson(request: TutorRequest): Promise<Tutor
     body: JSON.stringify({
       model,
       messages: [
-        { role: "system", content: buildTutorSystemPrompt({ ...request, action: request.action as Exclude<TutorRequest["action"], "followup"> }) },
+        { role: "system", content: buildTutorSystemPrompt({ ...request, action: request.action as Exclude<TutorRequest["action"], "followup" | "evaluate"> }) },
         { role: "user", content: `Teach me: ${request.topic}` },
       ],
       response_format: { type: "json_object" },
@@ -137,3 +139,5 @@ export async function createProviderFollowUp(request: TutorRequest): Promise<Tut
     throw new Error("The lesson provider returned malformed follow-up data.");
   }
 }
+
+export async function createProviderEvaluation(request: TutorRequest): Promise<UnderstandingEvaluation | null> { const apiKey = process.env.AI_API_KEY; const baseUrl = process.env.AI_BASE_URL; const model = process.env.AI_MODEL; if (!apiKey || !baseUrl || !model) return null; const response = await fetch(`${baseUrl.replace(/\/$/, "")}/chat/completions`, { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model, messages: [{ role: "system", content: buildEvaluationSystemPrompt(request) }], response_format: { type: "json_object" }, temperature: 0.2 }) }); if (!response.ok) throw new Error("The lesson provider could not evaluate this answer."); const providerResponse = await response.json() as ProviderResponse; const content = providerResponse.choices?.[0]?.message?.content; if (typeof content !== "string") throw new Error("The lesson provider returned an unexpected evaluation."); try { return parseUnderstandingEvaluation(extractJson(content)); } catch { throw new Error("The lesson provider returned malformed evaluation data."); } }

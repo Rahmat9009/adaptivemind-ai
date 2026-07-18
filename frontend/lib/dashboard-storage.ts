@@ -1,4 +1,5 @@
-import type { TeachingMode, TutorApiResponse, TutorConversationTurn } from "@/lib/ai/types";
+import type { TeachingMode, TutorApiResponse, TutorConversationTurn, UnderstandingEvaluation } from "@/lib/ai/types";
+import type { MasteryLevel } from "@/lib/mastery";
 import { learningDimensions, type LearningDimension } from "@/lib/learning-dna";
 
 export const learningHistoryStorageKey = "adaptivemind-learning-history";
@@ -16,6 +17,7 @@ export interface LessonHistoryEntry {
   stylesUsed: LearningDimension[];
   response: TutorApiResponse;
   conversation?: TutorConversationTurn[];
+  evaluation?: { score: number; status: UnderstandingEvaluation["status"]; masteryLevel: MasteryLevel; evaluatedAt: string };
 }
 
 function isTeachingMode(value: unknown): value is TeachingMode {
@@ -59,6 +61,8 @@ export function addLessonToHistory(entry: Omit<LessonHistoryEntry, "id" | "date"
 export function saveHistoryConversation(id: string, conversation: TutorConversationTurn[]) {
   writeLearningHistory(readLearningHistory().map((entry) => entry.id === id ? { ...entry, conversation } : entry));
 }
+
+export function saveHistoryEvaluation(id: string, evaluation: LessonHistoryEntry["evaluation"]) { writeLearningHistory(readLearningHistory().map((entry) => entry.id === id ? { ...entry, evaluation } : entry)); }
 
 export function readDashboardState(): { lastVisitedAt?: string } {
   try {
