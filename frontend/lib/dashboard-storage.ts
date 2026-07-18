@@ -1,0 +1,74 @@
+import type { TeachingMode, TutorApiResponse, TutorConversationTurn } from "@/lib/ai/types";
+import { learningDimensions, type LearningDimension } from "@/lib/learning-dna";
+
+export const learningHistoryStorageKey = "adaptivemind-learning-history";
+export const dashboardStorageKey = "adaptivemind-dashboard";
+export const historyRestoreStorageKey = "adaptivemind-history-restore";
+export const startNewTopicStorageKey = "adaptivemind-start-new-topic";
+
+export interface LessonHistoryEntry {
+  id: string;
+  topic: string;
+  subject: string;
+  level: string;
+  date: string;
+  teachingMode: TeachingMode;
+  stylesUsed: LearningDimension[];
+  response: TutorApiResponse;
+  conversation?: TutorConversationTurn[];
+}
+
+function isTeachingMode(value: unknown): value is TeachingMode {
+  return value === "adaptive" || value === "visual" || value === "example" || value === "analogy" || value === "story" || value === "challenge";
+}
+
+function isStyles(value: unknown): value is LearningDimension[] {
+  return Array.isArray(value) && value.every((style) => typeof style === "string" && learningDimensions.includes(style as LearningDimension));
+}
+
+function isLessonResponse(value: unknown): value is TutorApiResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  const lesson = record.lesson as Record<string, unknown> | undefined;
+  return typeof lesson === "object" && lesson !== null && typeof lesson.title === "string" && typeof lesson.coreIdea === "string" && typeof lesson.explanation === "string" && Array.isArray(lesson.keyPoints) && typeof lesson.checkQuestion === "string" && isStyles(lesson.stylesUsed) && (record.source === "provider" || record.source === "demo") && isTeachingMode(record.teachingMode) && ["initial", "simpler", "different", "example", "challenge"].includes(record.action as string);
+}
+
+function isHistoryEntry(value: unknown): value is LessonHistoryEntry {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.id === "string" && typeof record.topic === "string" && typeof record.subject === "string" && typeof record.level === "string" && typeof record.date === "string" && isTeachingMode(record.teachingMode) && isStyles(record.stylesUsed) && isLessonResponse(record.response) && (record.conversation === undefined || Array.isArray(record.conversation));
+}
+
+export function readLearningHistory(): LessonHistoryEntry[] {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(learningHistoryStorageKey) ?? "[]");
+    return Array.isArray(value) ? value.filter(isHistoryEntry).slice(0, 30) : [];
+  } catch { return []; }
+}
+
+export function writeLearningHistory(entries: LessonHistoryEntry[]) {
+  localStorage.setItem(learningHistoryStorageKey, JSON.stringify(entries.slice(0, 30)));
+}
+
+export function addLessonToHistory(entry: Omit<LessonHistoryEntry, "id" | "date" | "conversation">): LessonHistoryEntry {
+  const historyEntry: LessonHistoryEntry = { ...entry, id: `lesson-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, date: new Date().toISOString() };
+  writeLearningHistory([historyEntry, ...readLearningHistory()]);
+  return historyEntry;
+}
+
+export function saveHistoryConversation(id: string, conversation: TutorConversationTurn[]) {
+  writeLearningHistory(readLearningHistory().map((entry) => entry.id === id ? { ...entry, conversation } : entry));
+}
+
+export function readDashboardState(): { lastVisitedAt?: string } {
+  try {
+    const value: unknown = JSON.parse(localStorage.getItem(dashboardStorageKey) ?? "{}");
+    if (typeof value !== "object" || value === null) return {};
+    const lastVisitedAt = (value as Record<string, unknown>).lastVisitedAt;
+    return typeof lastVisitedAt === "string" ? { lastVisitedAt } : {};
+  } catch { return {}; }
+}
+
+export function markDashboardVisited() {
+  localStorage.setItem(dashboardStorageKey, JSON.stringify({ ...readDashboardState(), lastVisitedAt: new Date().toISOString() }));
+}

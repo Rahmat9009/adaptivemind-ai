@@ -10,6 +10,7 @@ import {
 } from "@/lib/learning-dna";
 import { LearningDNAChart } from "./LearningDNAChart";
 import { LearningStyleSummary } from "./LearningStyleSummary";
+import { AppNavigation } from "@/components/layout/AppNavigation";
 
 const storageKey = "adaptivemind-learning-dna";
 
@@ -66,24 +67,23 @@ export function ResultsExperience() {
   if (!isReady || !result) return <main className="min-h-screen bg-[#f7f9fc]" aria-busy="true" />;
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f7f9fc] px-5 py-8 sm:px-6 sm:py-12 lg:px-8">
+    <><AppNavigation /><main className="relative min-h-[calc(100vh-65px)] overflow-hidden bg-[#f7f9fc] px-5 py-8 sm:px-6 sm:py-12 lg:px-8">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_10%_10%,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_90%_90%,rgba(99,102,241,0.14),transparent_32%)]" />
       <div className="mx-auto max-w-4xl">
-        <Link href="/" className="inline-flex items-center text-sm font-semibold text-slate-700 transition hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4"><span aria-hidden="true" className="mr-2">←</span> AdaptiveMind AI</Link>
-        <header className="mt-12 max-w-2xl">
+        <header className="max-w-2xl">
           <p className="text-sm font-semibold uppercase tracking-wider text-teal-700">Initial learning profile</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">Your Learning DNA</h1>
-          <p className="mt-5 text-lg leading-8 text-slate-600">This first profile is based on your assessment answers. It will evolve as AdaptiveMind observes your learning behaviour over time.</p>
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">Your AdaptiveMind Learning DNA</h1>
+          <p className="mt-5 text-lg leading-8 text-slate-600">Based on your current assessment preferences, this profile highlights the approaches that feel most useful right now. It will evolve from future learning interactions.</p>
         </header>
         <div className="mt-10 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <LearningStyleSummary primaryStyle={result.primaryLearningStyle} scores={result.scores} />
           <LearningDNAChart scores={result.scores} isVisible={isVisible} />
         </div>
         <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-          <Link href="/tutor" className="rounded-full bg-slate-950 px-6 py-3.5 text-center text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4">Start your first lesson</Link>
+          <Link href="/dashboard" className="rounded-full bg-slate-950 px-6 py-3.5 text-center text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4">Start your first lesson</Link>
           <button type="button" onClick={handleRetake} className="rounded-full border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4">Retake assessment</button>
         </div>
       </div>
-    </main>
+    </main></>
   );
 }

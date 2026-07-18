@@ -1,6 +1,6 @@
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
-import { learningDimensionLabels } from "@/lib/learning-dna";
-import type { TutorLesson, TutorRequest } from "./types";
+import { learningDimensionLabels, type LearningDimension } from "@/lib/learning-dna";
+import type { TeachingMode, TutorFollowUpResponse, TutorLesson, TutorRequest } from "./types";
 
 interface DemoTopic {
   title: string;
@@ -50,33 +50,148 @@ function findDemoTopic(topic: string): DemoTopic | null {
   return null;
 }
 
+const teachingModeDimensions: Record<Exclude<TeachingMode, "adaptive">, LearningDimension> = {
+  visual: "visual",
+  example: "examples",
+  analogy: "analogies",
+  story: "stories",
+  challenge: "challenges",
+};
+
+function getBaseStyles(request: TutorRequest, profile: ReturnType<typeof buildTeachingProfile>): LearningDimension[] {
+  if (request.teachingMode === "adaptive") {
+    return [profile.primaryDimension, profile.secondaryDimension];
+  }
+  return [teachingModeDimensions[request.teachingMode]];
+}
+
+function getDifferentStyles(request: TutorRequest, profile: ReturnType<typeof buildTeachingProfile>): LearningDimension[] {
+  const previousStyles = new Set(request.previousStyles ?? []);
+  const previousModeDimension = request.previousTeachingMode && request.previousTeachingMode !== "adaptive"
+    ? teachingModeDimensions[request.previousTeachingMode]
+    : undefined;
+  const alternatives = profile.dominantDimensions.filter((dimension) => dimension !== previousModeDimension && !previousStyles.has(dimension));
+  const fallback = profile.dominantDimensions.filter((dimension) => dimension !== previousModeDimension);
+  return (alternatives.length >= 2 ? alternatives : fallback).slice(0, 2);
+}
+
+function getReframedExplanation(topic: DemoTopic, styles: LearningDimension[]): string {
+  const primaryStyle = styles[0];
+  if (primaryStyle === "analogies") return `${topic.analogy} The comparison is useful because it preserves the same relationship without repeating the original explanation.`;
+  if (primaryStyle === "stories") return `Picture a short moment where this idea matters: a situation changes, the concept explains why, and the outcome makes the rule easier to remember. ${topic.coreIdea}`;
+  if (primaryStyle === "visual") return `Visual structure: first identify the inputs or starting conditions. Next trace the change. Finally notice the outcome. ${topic.coreIdea}`;
+  if (primaryStyle === "challenges") return `Before reading further, make a prediction about what should happen. Then test that prediction against this core idea: ${topic.coreIdea}`;
+  return `Start with a real situation, identify the important detail, and then connect it to the rule: ${topic.example}`;
+}
+
 export function createDemoLesson(request: TutorRequest): TutorLesson | null {
   const topic = findDemoTopic(request.topic);
   if (!topic) return null;
 
   const profile = buildTeachingProfile(request.scores);
-  const alternateStyles = [profile.dominantDimensions[2], profile.dominantDimensions[3]];
-  const stylesUsed = request.action === "different"
-    ? alternateStyles
-    : [profile.primaryDimension, profile.secondaryDimension];
-  const alternatePrimary = learningDimensionLabels[alternateStyles[0]].toLowerCase();
-  const alternateSecondary = learningDimensionLabels[alternateStyles[1]].toLowerCase();
-  const actionAdditions = {
-    initial: "",
-    simpler: " Here is the short version: focus on the main relationship first, then add details one at a time.",
-    different: ` This time, approach it through ${alternatePrimary} and ${alternateSecondary} rather than repeating the same path.`,
-    example: ` Let us keep the focus on this concrete example, then connect it back to the main idea.`,
-    challenge: " Start by making a prediction before you read the explanation, then use the check below to test your reasoning.",
-  } as const;
+  const baseStyles = getBaseStyles(request, profile);
+
+  if (request.action === "simpler") {
+    return {
+      title: `${topic.title}: the short version`,
+      coreIdea: topic.coreIdea,
+      explanation: `${topic.coreIdea} Think of the main change first. Then add the details only when you need them.`,
+      example: topic.example,
+      keyPoints: topic.keyPoints.slice(0, 3),
+      checkQuestion: `In one sentence, what is the main idea behind ${topic.title}?`,
+      stylesUsed: baseStyles,
+    };
+  }
+
+  if (request.action === "example") {
+    return {
+      title: `${topic.title}: worked example`,
+      coreIdea: topic.coreIdea,
+      explanation: `Step 1: identify the situation. Step 2: notice the important change or relationship. Step 3: connect that observation back to the core idea.`,
+      example: `Worked example: ${topic.example}`,
+      keyPoints: ["Start with the real situation.", "Name the important relationship.", "Use the concept to explain what happens."],
+      checkQuestion: "Which step in the example best shows the core idea?",
+      practicePrompt: `Try a similar situation of your own: ${topic.checkQuestion}`,
+      stylesUsed: baseStyles.includes("examples") ? baseStyles : ["examples", ...baseStyles],
+    };
+  }
+
+  if (request.action === "challenge") {
+    return {
+      title: `${topic.title}: reasoning challenge`,
+      coreIdea: topic.coreIdea,
+      explanation: `Use this one idea as your scaffold: ${topic.coreIdea}`,
+      keyPoints: ["Read the setup carefully.", "Make a prediction before choosing an answer."],
+      checkQuestion: "What is your prediction, and what part of the core idea supports it?",
+      challenge: topic.checkQuestion,
+      hint: "Start by identifying what is changing and what force, input, or relationship could explain it.",
+      stylesUsed: baseStyles.includes("challenges") ? baseStyles : ["challenges", ...baseStyles],
+    };
+  }
+
+  if (request.action === "different") {
+    const stylesUsed = getDifferentStyles(request, profile);
+    return {
+      title: `${topic.title}: a different lens`,
+      coreIdea: topic.coreIdea,
+      explanation: getReframedExplanation(topic, stylesUsed),
+      analogy: stylesUsed.includes("analogies") ? topic.analogy : undefined,
+      keyPoints: [`Reframed with ${learningDimensionLabels[stylesUsed[0]]}.`, `Supported by ${learningDimensionLabels[stylesUsed[1]]}.`, "Compare this approach with the previous lesson."],
+      checkQuestion: "Which part of this new approach made the topic easier to see?",
+      stylesUsed,
+    };
+  }
 
   return {
     ...topic,
-    explanation: `${topic.explanation}${actionAdditions[request.action]}`,
-    example: stylesUsed.includes("examples") || request.action === "example" ? topic.example : undefined,
-    analogy: stylesUsed.includes("analogies") ? topic.analogy : undefined,
-    checkQuestion: request.action === "challenge"
-      ? `Challenge: ${topic.checkQuestion} Work it out before checking any notes.`
-      : topic.checkQuestion,
-    stylesUsed,
+    example: baseStyles.includes("examples") ? topic.example : undefined,
+    analogy: baseStyles.includes("analogies") ? topic.analogy : undefined,
+    stylesUsed: baseStyles,
   };
+}
+
+function getFollowUpStyles(request: TutorRequest): LearningDimension[] {
+  const question = request.question?.toLowerCase() ?? "";
+  if (question.includes("analogy")) return ["analogies"];
+  if (question.includes("story")) return ["stories"];
+  if (question.includes("example")) return ["examples"];
+  if (question.includes("visual")) return ["visual"];
+  if (question.includes("challenge") || question.includes("test")) return ["challenges"];
+  return getBaseStyles(request, buildTeachingProfile(request.scores));
+}
+
+export function createDemoFollowUp(request: TutorRequest): TutorFollowUpResponse | null {
+  const topic = findDemoTopic(request.topic);
+  if (!topic || !request.question) return null;
+
+  const question = request.question.toLowerCase();
+  const stylesUsed = getFollowUpStyles(request);
+  const wantsSimple = question.includes("simpler") || question.includes("still do not understand");
+  const wantsExample = question.includes("example") || question.includes("football") || question.includes("worked");
+  const wantsChallenge = question.includes("challenge") || question.includes("test");
+  const wantsDifference = question.includes("different") || question.includes("comparison");
+
+  if (topic.title === "Photosynthesis") {
+    if (question.includes("night")) return { answer: "Photosynthesis needs light, so the light-dependent part stops at night. A plant still uses stored sugar through cellular respiration, which is a different process.", keyPoint: "Light is the energy source for photosynthesis.", checkQuestion: "Which process can continue at night: photosynthesis or cellular respiration?", stylesUsed };
+    if (question.includes("why") || question.includes("sunlight")) return { answer: "Sunlight provides the energy that lets a plant turn water and carbon dioxide into glucose. Without that energy, the plant cannot make new sugar through photosynthesis.", analogy: question.includes("analogy") ? "It is like a solar-powered kitchen: without sunlight, the kitchen has ingredients but no power to cook." : undefined, stylesUsed };
+    if (wantsExample) return { answer: "A plant near a sunny window receives the light energy it needs to make glucose. Moving it into a dark cupboard removes that energy source.", example: "Compare the same plant in bright light and in darkness for a day.", stylesUsed };
+    if (wantsDifference) return { answer: "Photosynthesis stores energy by making glucose, while cellular respiration releases energy from glucose for the plant to use.", keyPoint: "One process builds sugar; the other breaks it down for usable energy.", stylesUsed };
+    if (wantsChallenge) return { answer: "Use the core idea that light supplies energy for making glucose.", checkQuestion: "A plant has water and carbon dioxide but is kept in darkness. What ingredient is missing for photosynthesis?", stylesUsed };
+  }
+
+  if (topic.title === "Newton's First Law") {
+    if (question.includes("passenger") || question.includes("car")) return { answer: "When the car stops, your body keeps moving forward for a moment because it was already moving. The seat belt supplies the force that changes your motion.", keyPoint: "Inertia resists a change in motion.", stylesUsed };
+    if (question.includes("inertia") || wantsSimple) return { answer: "Inertia means objects resist changing what they are already doing. A still ball wants to stay still. A moving skateboard wants to keep moving until a force changes it.", example: "A seat belt is needed because your body keeps moving when a car stops.", stylesUsed };
+    if (wantsExample) return { answer: "A football on the grass stays still until a player kicks it. After the kick, friction and air resistance gradually slow it down.", example: "The kick starts the motion; friction changes the motion later.", stylesUsed };
+    if (wantsChallenge) return { answer: "Use the idea that motion changes only when an unbalanced force acts.", keyPoint: "Inertia helps predict the passenger's first movement.", checkQuestion: "A bus turns left. Which way does a standing passenger tend to move before holding on, and why?", stylesUsed };
+  }
+
+  if (topic.title === "The Pythagorean Theorem") {
+    if (question.includes("hypotenuse")) return { answer: "The hypotenuse is the longest side of a right triangle. It always sits opposite the right angle.", keyPoint: "Find the 90-degree angle first; the side across from it is the hypotenuse.", stylesUsed };
+    if (wantsExample) return { answer: "For sides 3 and 4, square each one: 3² is 9 and 4² is 16. Add them to get 25, then take the square root: the hypotenuse is 5.", example: "3² + 4² = 5².", stylesUsed };
+    if (question.includes("not use") || question.includes("when can")) return { answer: "You can only use the Pythagorean theorem with a right triangle. If there is no 90-degree angle, this formula does not apply.", keyPoint: "Check for a right angle before using a² + b² = c².", stylesUsed };
+    if (wantsChallenge) return { answer: "Identify the two shorter sides before calculating.", checkQuestion: "A right triangle has shorter sides 6 and 8. What equation would you write before finding the hypotenuse?", stylesUsed };
+  }
+
+  return { answer: "This follow-up needs the live AI provider.", stylesUsed };
 }

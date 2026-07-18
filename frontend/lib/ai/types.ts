@@ -1,6 +1,14 @@
 import type { LearningDimension, LearningScores } from "@/lib/learning-dna";
 
-export type TutorAction = "initial" | "simpler" | "different" | "example" | "challenge";
+export type TutorAction = "initial" | "simpler" | "different" | "example" | "challenge" | "followup";
+
+export type TeachingMode =
+  | "adaptive"
+  | "visual"
+  | "example"
+  | "analogy"
+  | "story"
+  | "challenge";
 
 export interface TutorRequest {
   topic: string;
@@ -8,6 +16,28 @@ export interface TutorRequest {
   level: string;
   scores: LearningScores;
   action: TutorAction;
+  teachingMode: TeachingMode;
+  previousStyles?: LearningDimension[];
+  previousTeachingMode?: TeachingMode;
+  previousTitle?: string;
+  previousExplanation?: string;
+  question?: string;
+  currentLesson?: TutorLessonSummary;
+  conversation?: TutorConversationMessage[];
+}
+
+export interface TutorLessonSummary {
+  title: string;
+  coreIdea: string;
+  explanation: string;
+  stylesUsed: LearningDimension[];
+}
+
+export interface TutorConversationMessage {
+  id: string;
+  role: "student" | "tutor";
+  content: string;
+  createdAt: string;
 }
 
 export interface TutorLesson {
@@ -16,6 +46,9 @@ export interface TutorLesson {
   explanation: string;
   example?: string;
   analogy?: string;
+  challenge?: string;
+  hint?: string;
+  practicePrompt?: string;
   keyPoints: string[];
   checkQuestion: string;
   stylesUsed: LearningDimension[];
@@ -24,4 +57,28 @@ export interface TutorLesson {
 export interface TutorApiResponse {
   lesson: TutorLesson;
   source: "provider" | "demo";
+  teachingMode: TeachingMode;
+  action: Exclude<TutorAction, "followup">;
+}
+
+export interface TutorFollowUpResponse {
+  answer: string;
+  keyPoint?: string;
+  example?: string;
+  analogy?: string;
+  checkQuestion?: string;
+  stylesUsed: LearningDimension[];
+}
+
+export interface TutorFollowUpApiResponse {
+  followUp: TutorFollowUpResponse;
+  source: "provider" | "demo";
+  teachingMode: TeachingMode;
+  action: "followup";
+}
+
+export interface TutorConversationTurn {
+  student: TutorConversationMessage;
+  tutor: TutorConversationMessage;
+  response: TutorFollowUpResponse;
 }

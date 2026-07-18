@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { AppNavigation } from "@/components/layout/AppNavigation";
 import {
   assessmentQuestions,
   calculateLearningDNA,
@@ -113,14 +113,10 @@ export function AssessmentShell() {
   const isLastQuestion = questionIndex === assessmentQuestions.length - 1;
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f7f9fc] px-5 py-8 sm:px-6 sm:py-12 lg:px-8">
+    <><AppNavigation /><main className="relative min-h-[calc(100vh-65px)] overflow-hidden bg-[#f7f9fc] px-5 py-8 sm:px-6 sm:py-12 lg:px-8">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_10%_10%,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_90%_90%,rgba(99,102,241,0.14),transparent_32%)]" />
       <div className="mx-auto max-w-3xl">
-        <Link href="/" className="inline-flex items-center text-sm font-semibold text-slate-700 transition hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4">
-          <span aria-hidden="true" className="mr-2">←</span> AdaptiveMind AI
-        </Link>
-
-        <section className="mt-10 rounded-[2rem] border border-white/80 bg-white/75 p-6 shadow-2xl shadow-slate-900/8 backdrop-blur-xl sm:p-10">
+        <section className="rounded-[2rem] border border-white/80 bg-white/75 p-6 shadow-2xl shadow-slate-900/8 backdrop-blur-xl sm:p-10">
           <p className="text-sm font-semibold uppercase tracking-wider text-teal-700">Learning DNA assessment</p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Find the approaches that help ideas click.</h1>
           <p className="mt-3 max-w-2xl leading-7 text-slate-600">Choose what feels most natural. Your first profile takes about two minutes and will evolve as you learn.</p>
@@ -138,6 +134,6 @@ export function AssessmentShell() {
           </form>
         </section>
       </div>
-    </main>
+    </main></>
   );
 }

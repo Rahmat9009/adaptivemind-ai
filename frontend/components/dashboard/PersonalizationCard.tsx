@@ -1,0 +1,7 @@
+import { buildTeachingProfile } from "@/lib/adaptive-prompt";
+import { learningDimensionLabels, type LearningScores } from "@/lib/learning-dna";
+
+export function PersonalizationCard({ scores }: { scores: LearningScores }) {
+  const profile = buildTeachingProfile(scores);
+  return <section aria-labelledby="personalization-title" className="rounded-3xl border border-slate-200 bg-slate-950 p-6 text-white shadow-xl shadow-slate-950/10 sm:p-7"><p className="text-sm font-semibold uppercase tracking-wider text-indigo-200">Your adaptive approach</p><h2 id="personalization-title" className="mt-2 text-2xl font-semibold">How Ada Personalizes Your Learning</h2><p className="mt-5 text-sm font-semibold text-white">Today&apos;s lessons are mainly adapted using:</p><ul className="mt-3 space-y-2 text-sm leading-6 text-slate-200"><li>✓ {learningDimensionLabels[profile.primaryDimension]}</li><li>✓ {learningDimensionLabels[profile.secondaryDimension]}</li></ul><div className="mt-6 border-t border-white/15 pt-5"><p className="text-sm font-semibold text-indigo-200">Reason</p><p className="mt-2 text-sm leading-6 text-slate-300">Based on your current Learning DNA assessment, Ada starts with {learningDimensionLabels[profile.primaryDimension].toLowerCase()} and uses {learningDimensionLabels[profile.secondaryDimension].toLowerCase()} when it helps make the idea clearer. These are current preferences, not fixed labels.</p></div></section>;
+}
