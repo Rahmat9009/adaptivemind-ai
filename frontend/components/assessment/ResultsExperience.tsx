@@ -80,7 +80,7 @@ export function ResultsExperience() {
           <LearningDNAChart scores={result.scores} isVisible={isVisible} />
         </div>
         <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-          <Link href="/" className="rounded-full bg-slate-950 px-6 py-3.5 text-center text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4">Start your first lesson</Link>
+          <Link href="/tutor" className="rounded-full bg-slate-950 px-6 py-3.5 text-center text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4">Start your first lesson</Link>
           <button type="button" onClick={handleRetake} className="rounded-full border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4">Retake assessment</button>
         </div>
       </div>
