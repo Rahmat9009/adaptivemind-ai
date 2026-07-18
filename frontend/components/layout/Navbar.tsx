@@ -31,7 +31,7 @@ export function Navbar() {
         </div>
 
         <a
-          href="#cta"
+          href="/assessment"
           className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4"
         >
           Get Started

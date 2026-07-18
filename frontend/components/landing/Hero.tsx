@@ -19,7 +19,7 @@ export function Hero() {
           </p>
           <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
             <a
-              href="#cta"
+              href="/assessment"
               className="rounded-full bg-slate-950 px-7 py-3.5 text-center text-base font-semibold text-white shadow-xl shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4"
             >
               Start Learning

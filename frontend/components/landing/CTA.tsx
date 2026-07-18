@@ -9,7 +9,7 @@ export function CTA() {
           Ready to learn smarter?
         </h2>
         <a
-          href="#top"
+          href="/assessment"
           className="mt-8 inline-flex rounded-full bg-white px-7 py-3.5 text-base font-semibold text-slate-950 shadow-xl shadow-black/15 transition hover:-translate-y-0.5 hover:bg-teal-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-4 focus-visible:ring-offset-teal-900"
         >
           Start Free
