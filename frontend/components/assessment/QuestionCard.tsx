@@ -1,3 +1,5 @@
+"use client";
+
 import { motion } from "motion/react";
 import { assessmentQuestions } from "@/lib/learning-dna";
 import { AnswerOption } from "./AnswerOption";

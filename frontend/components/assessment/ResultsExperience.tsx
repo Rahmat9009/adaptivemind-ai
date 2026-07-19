@@ -145,9 +145,9 @@ export function ResultsExperience() {
             className="am-btn am-btn-primary"
           >
             Go to dashboard
-            <span aria-hidden="true" className="text-sm opacity-60">
-              →
-            </span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="opacity-60">
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
           </Link>
           <button
             type="button"

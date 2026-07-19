@@ -1,3 +1,4 @@
+import { motion } from "motion/react";
 import type { AssessmentAnswer } from "@/lib/learning-dna";
 
 interface AnswerOptionProps {
@@ -18,8 +19,9 @@ export function AnswerOption({
   const inputId = `${questionId}-answer-${index}`;
 
   return (
-    <label
+    <motion.label
       htmlFor={inputId}
+      whileTap={{ scale: 0.99 }}
       className={`group relative block cursor-pointer rounded-[var(--am-radius-xl)] border p-5 transition-all duration-[var(--am-duration-quick)] ${
         isSelected
           ? "border-[var(--am-primary)] bg-[var(--am-primary-light)] shadow-sm"
@@ -69,6 +71,6 @@ export function AnswerOption({
           aria-hidden="true"
         />
       )}
-    </label>
+    </motion.label>
   );
 }

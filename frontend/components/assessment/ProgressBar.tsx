@@ -1,3 +1,7 @@
+"use client";
+
+import { motion } from "motion/react";
+
 interface ProgressBarProps {
   current: number;
   total: number;
@@ -24,9 +28,11 @@ export function ProgressBar({ current, total }: ProgressBarProps) {
         aria-valuemax={total}
         aria-valuenow={current}
       >
-        <div
+        <motion.div
           className="am-progress-fill"
-          style={{ width: `${progress}%` }}
+          initial={{ width: 0 }}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         />
       </div>
     </div>

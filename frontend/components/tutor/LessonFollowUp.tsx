@@ -1,6 +1,8 @@
 "use client";
 
 import { type RefObject, useState } from "react";
+import { motion } from "motion/react";
+import { fadeIn, slideUp, staggerContainer, staggerItem } from "@/lib/motion";
 import type {
   TutorConversationTurn,
   TutorLesson,
@@ -44,11 +46,14 @@ export function LessonFollowUp({
   }
 
   return (
-    <section
+    <motion.section
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
       className="mt-8 border-t border-[var(--am-border-light)] pt-8"
       aria-labelledby="ada-follow-up-heading"
     >
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <motion.div variants={slideUp} className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
             Follow-up
@@ -63,13 +68,23 @@ export function LessonFollowUp({
         <p className="text-xs text-[var(--am-text-muted)]">
           Focused answers stay with this lesson.
         </p>
-      </div>
+      </motion.div>
 
       {/* Conversation history */}
       {conversation.length > 0 && (
-        <div className="mt-5 space-y-4" aria-live="polite">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="mt-5 space-y-4"
+          aria-live="polite"
+        >
           {conversation.map((turn) => (
-            <div key={turn.student.id} className="space-y-2">
+            <motion.div
+              key={turn.student.id}
+              variants={staggerItem}
+              className="space-y-2"
+            >
               <div className="ml-auto max-w-[88%] rounded-[var(--am-radius-xl)] rounded-br-sm bg-[var(--am-text-primary)] px-4 py-3 text-sm leading-6 text-white">
                 {turn.student.content}
               </div>
@@ -102,14 +117,18 @@ export function LessonFollowUp({
                   </p>
                 )}
               </div>
-            </div>
+            </motion.div>
           ))}
           <div ref={latestTurnRef} />
-        </div>
+        </motion.div>
       )}
 
       {/* Suggested questions */}
-      <div className="mt-5 flex flex-wrap gap-2" aria-label="Suggested questions">
+      <motion.div
+        variants={slideUp}
+        className="mt-5 flex flex-wrap gap-2"
+        aria-label="Suggested questions"
+      >
         {suggestions.map((suggestion) => (
           <button
             key={suggestion}
@@ -121,10 +140,11 @@ export function LessonFollowUp({
             {suggestion}
           </button>
         ))}
-      </div>
+      </motion.div>
 
       {/* Input */}
-      <form
+      <motion.form
+        variants={slideUp}
         className="mt-4"
         onSubmit={(event) => {
           event.preventDefault();
@@ -167,7 +187,7 @@ export function LessonFollowUp({
             {error}
           </p>
         )}
-      </form>
-    </section>
+      </motion.form>
+    </motion.section>
   );
 }

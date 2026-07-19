@@ -1,3 +1,6 @@
+"use client";
+
+import { motion } from "motion/react";
 import {
   learningDimensionLabels,
   learningDimensions,
@@ -85,7 +88,7 @@ export function LearningDNAChart({
       </div>
 
       <div className="mt-6 space-y-5">
-        {learningDimensions.map((dimension) => (
+        {learningDimensions.map((dimension, index) => (
           <div key={dimension}>
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 text-[var(--am-text-secondary)]">
@@ -111,10 +114,16 @@ export function LearningDNAChart({
             </div>
 
             <div className="mt-2 am-progress-track">
-              <div
+              <motion.div
                 className="am-progress-fill"
+                initial={{ width: 0 }}
+                animate={{ width: isVisible ? `${scores[dimension]}%` : "0%" }}
+                transition={{
+                  duration: 0.6,
+                  ease: [0.16, 1, 0.3, 1],
+                  delay: index * 0.1,
+                }}
                 style={{
-                  width: isVisible ? `${scores[dimension]}%` : "0%",
                   background: `linear-gradient(90deg, ${dnaColors[dimension]}, ${dnaColors[dimension]}88)`,
                 }}
               />

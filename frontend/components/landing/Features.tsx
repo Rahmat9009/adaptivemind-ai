@@ -1,3 +1,8 @@
+"use client";
+
+import { motion } from "motion/react";
+import { fadeIn, slideUp, staggerContainer, staggerItem } from "@/lib/motion";
+
 const features = [
   {
     title: "Learning DNA",
@@ -21,24 +26,37 @@ const features = [
 
 export function Features() {
   return (
-    <section className="relative isolate overflow-hidden bg-[var(--am-bg-reading)] px-5 py-24 sm:px-8 lg:px-10">
+    <motion.section
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, amount: 0.15 }}
+      variants={fadeIn}
+      className="relative isolate overflow-hidden bg-[var(--am-bg-reading)] px-5 py-24 sm:px-8 lg:px-10"
+    >
       {/* Subtle top boundary */}
       <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--am-primary)]/15 to-transparent" />
 
       <div className="mx-auto max-w-6xl">
-        <div className="max-w-xl">
+        <motion.div variants={slideUp} className="max-w-xl">
           <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
             How it works
           </p>
           <h2 className="mt-4 text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-tight text-[var(--am-text-primary)] leading-[1.12]">
             One concept, explained in the way that makes sense to you.
           </h2>
-        </div>
+        </motion.div>
 
-        <div className="mt-16 grid gap-8 md:grid-cols-3">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.1 }}
+          className="mt-16 grid gap-8 md:grid-cols-3"
+        >
           {features.map((feature, index) => (
-            <article
+            <motion.article
               key={feature.title}
+              variants={staggerItem}
               className="group relative"
             >
               {/* Accent line */}
@@ -65,10 +83,10 @@ export function Features() {
               <p className="mt-3 leading-7 text-[var(--am-text-secondary)]">
                 {feature.description}
               </p>
-            </article>
+            </motion.article>
           ))}
-        </div>
+        </motion.div>
       </div>
-    </section>
+    </motion.section>
   );
 }

@@ -194,7 +194,10 @@ export function AssessmentShell() {
                   disabled={questionIndex === 0}
                   className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold text-[var(--am-text-secondary)] transition-colors hover:bg-[var(--am-border-light)] disabled:cursor-not-allowed disabled:opacity-30"
                 >
-                  <span aria-hidden="true">←</span> Back
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M19 12H5M12 19l-7-7 7-7" />
+                  </svg>
+                  Back
                 </button>
 
                 <button
@@ -202,9 +205,9 @@ export function AssessmentShell() {
                   className="am-btn am-btn-primary"
                 >
                   {isLastQuestion ? "See my Learning DNA" : "Continue"}
-                  <span aria-hidden="true" className="text-sm opacity-60">
-                    →
-                  </span>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="opacity-60">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
                 </button>
               </div>
             </form>

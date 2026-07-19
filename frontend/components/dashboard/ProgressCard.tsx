@@ -1,3 +1,8 @@
+"use client";
+
+import { motion } from "motion/react";
+import { staggerContainer, staggerItem } from "@/lib/motion";
+
 interface ProgressCardProps {
   lessonsCompleted: number;
   topicsExplored: number;
@@ -23,24 +28,29 @@ export function ProgressCard({
         Your progress
       </h2>
 
-      <div className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5">
-        <div>
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5"
+      >
+        <motion.div variants={staggerItem}>
           <p className="text-xs font-medium text-[var(--am-text-muted)]">
             Lessons completed
           </p>
           <p className="mt-0.5 text-2xl font-semibold tabular-nums text-[var(--am-text-primary)]">
             {lessonsCompleted}
           </p>
-        </div>
-        <div>
+        </motion.div>
+        <motion.div variants={staggerItem}>
           <p className="text-xs font-medium text-[var(--am-text-muted)]">
             Topics explored
           </p>
           <p className="mt-0.5 text-2xl font-semibold tabular-nums text-[var(--am-text-primary)]">
             {topicsExplored}
           </p>
-        </div>
-        <div>
+        </motion.div>
+        <motion.div variants={staggerItem}>
           <p className="text-xs font-medium text-[var(--am-text-muted)]">
             Current streak
           </p>
@@ -50,16 +60,16 @@ export function ProgressCard({
               day{streak === 1 ? "" : "s"}
             </span>
           </p>
-        </div>
-        <div>
+        </motion.div>
+        <motion.div variants={staggerItem}>
           <p className="text-xs font-medium text-[var(--am-text-muted)]">
             Last lesson
           </p>
           <p className="mt-0.5 text-sm font-semibold text-[var(--am-text-secondary)]">
             {lastLessonDate ?? "Not yet started"}
           </p>
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
     </section>
   );
 }

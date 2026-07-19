@@ -1,3 +1,7 @@
+"use client";
+
+import { motion } from "motion/react";
+import { fadeIn, slideUp } from "@/lib/motion";
 import { learningDimensionLabels, type LearningDimension } from "@/lib/learning-dna";
 import type { TutorApiResponse } from "@/lib/ai/types";
 
@@ -25,12 +29,15 @@ export function LessonCard({ response }: LessonCardProps) {
   }[action];
 
   return (
-    <article
+    <motion.article
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
       className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-8"
       aria-labelledby="lesson-title"
     >
       {/* Header row */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <motion.div variants={slideUp} className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
           {actionLabel}
         </p>
@@ -57,28 +64,29 @@ export function LessonCard({ response }: LessonCardProps) {
             </span>
           )}
         </div>
-      </div>
+      </motion.div>
 
       {/* Title */}
-      <h2
+      <motion.h2
+        variants={slideUp}
         id="lesson-title"
         className="mt-4 text-2xl font-semibold tracking-tight text-[var(--am-text-primary)] sm:text-3xl"
       >
         {lesson.title}
-      </h2>
+      </motion.h2>
 
       {/* Core Idea */}
-      <section className="mt-7">
+      <motion.section variants={slideUp} className="mt-7">
         <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
           Core idea
         </h3>
         <p className="mt-2 text-lg font-medium leading-8 text-[var(--am-text-primary)]">
           {lesson.coreIdea}
         </p>
-      </section>
+      </motion.section>
 
       {/* Explanation */}
-      <section className="mt-6">
+      <motion.section variants={slideUp} className="mt-6">
         <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
           {action === "simpler"
             ? "Simplified explanation"
@@ -91,11 +99,14 @@ export function LessonCard({ response }: LessonCardProps) {
         <p className="mt-2 leading-7 text-[var(--am-text-secondary)]">
           {lesson.explanation}
         </p>
-      </section>
+      </motion.section>
 
       {/* Example */}
       {lesson.example && (
-        <section className="mt-6 rounded-[var(--am-radius-xl)] border border-[var(--am-dna-examples)]/20 bg-[var(--am-dna-examples)]/8 p-5">
+        <motion.section
+          variants={slideUp}
+          className="mt-6 rounded-[var(--am-radius-xl)] border border-[var(--am-dna-examples)]/20 bg-[var(--am-dna-examples)]/8 p-5"
+        >
           <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--am-text-primary)]">
             <span
               className="h-2 w-2 rounded-full"
@@ -106,12 +117,15 @@ export function LessonCard({ response }: LessonCardProps) {
           <p className="mt-2 leading-7 text-[var(--am-text-secondary)]">
             {lesson.example}
           </p>
-        </section>
+        </motion.section>
       )}
 
       {/* Analogy */}
       {lesson.analogy && (
-        <section className="mt-4 rounded-[var(--am-radius-xl)] border border-[var(--am-dna-analogies)]/20 bg-[var(--am-dna-analogies)]/8 p-5">
+        <motion.section
+          variants={slideUp}
+          className="mt-4 rounded-[var(--am-radius-xl)] border border-[var(--am-dna-analogies)]/20 bg-[var(--am-dna-analogies)]/8 p-5"
+        >
           <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--am-text-primary)]">
             <span
               className="h-2 w-2 rounded-full"
@@ -122,11 +136,11 @@ export function LessonCard({ response }: LessonCardProps) {
           <p className="mt-2 leading-7 text-[var(--am-text-secondary)]">
             {lesson.analogy}
           </p>
-        </section>
+        </motion.section>
       )}
 
       {/* Key Points */}
-      <section className="mt-6">
+      <motion.section variants={slideUp} className="mt-6">
         <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
           Key points
         </h3>
@@ -144,23 +158,29 @@ export function LessonCard({ response }: LessonCardProps) {
             </li>
           ))}
         </ul>
-      </section>
+      </motion.section>
 
       {/* Practice prompt */}
       {lesson.practicePrompt && (
-        <section className="mt-6 rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] p-5">
+        <motion.section
+          variants={slideUp}
+          className="mt-6 rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] p-5"
+        >
           <h3 className="text-sm font-semibold text-[var(--am-text-primary)]">
             Try a similar one
           </h3>
           <p className="mt-2 leading-7 text-[var(--am-text-secondary)]">
             {lesson.practicePrompt}
           </p>
-        </section>
+        </motion.section>
       )}
 
       {/* Challenge */}
       {lesson.challenge && (
-        <section className="mt-6 rounded-[var(--am-radius-xl)] border border-[var(--am-dna-challenges)]/20 bg-[var(--am-dna-challenges)]/8 p-5">
+        <motion.section
+          variants={slideUp}
+          className="mt-6 rounded-[var(--am-radius-xl)] border border-[var(--am-dna-challenges)]/20 bg-[var(--am-dna-challenges)]/8 p-5"
+        >
           <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--am-text-primary)]">
             <span
               className="h-2 w-2 rounded-full"
@@ -179,8 +199,8 @@ export function LessonCard({ response }: LessonCardProps) {
               <p className="mt-2 leading-6">{lesson.hint}</p>
             </details>
           )}
-        </section>
+        </motion.section>
       )}
-    </article>
+    </motion.article>
   );
 }

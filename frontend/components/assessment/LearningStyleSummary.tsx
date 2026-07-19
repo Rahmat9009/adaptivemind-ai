@@ -1,3 +1,7 @@
+"use client";
+
+import { motion } from "motion/react";
+import { fadeIn, slideUp, staggerContainer, staggerItem } from "@/lib/motion";
 import {
   learningDimensionLabels,
   type LearningDimension,
@@ -54,9 +58,14 @@ export function LearningStyleSummary({
   const secondaryStyle = sorted[2];
 
   return (
-    <section className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-8">
+    <motion.section
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
+      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-8"
+    >
       {/* Primary */}
-      <div className="flex items-start justify-between gap-4">
+      <motion.div variants={slideUp} className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
             Primary learning preference
@@ -74,29 +83,44 @@ export function LearningStyleSummary({
         >
           {scores[primaryStyle]}%
         </span>
-      </div>
+      </motion.div>
 
-      <p className="mt-4 leading-7 text-[var(--am-text-secondary)]">
+      <motion.p
+        variants={slideUp}
+        className="mt-4 leading-7 text-[var(--am-text-secondary)]"
+      >
         Based on your current assessment, you respond best to{" "}
         <strong className="text-[var(--am-text-primary)]">
           {guidance[primaryStyle]}
         </strong>
         .
-      </p>
+      </motion.p>
 
-      <div className="mt-6 rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] p-4">
+      <motion.div
+        variants={slideUp}
+        className="mt-6 rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] p-4"
+      >
         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
           Ada will teach you with
         </p>
         <p className="mt-2 text-sm leading-6 text-[var(--am-text-secondary)]">
           {approach[primaryStyle]}
         </p>
-      </div>
+      </motion.div>
 
       {/* Supporting preferences */}
-      <div className="mt-6 space-y-3">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="mt-6 space-y-3"
+      >
         {supportingStyle && (
-          <div className="flex items-center justify-between gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] px-4 py-3">
+          <motion.div
+            key={supportingStyle}
+            variants={staggerItem}
+            className="flex items-center justify-between gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] px-4 py-3"
+          >
             <span className="flex items-center gap-2 text-sm font-medium text-[var(--am-text-primary)]">
               <span
                 className="h-2 w-2 rounded-full"
@@ -110,10 +134,14 @@ export function LearningStyleSummary({
             >
               {scores[supportingStyle]}%
             </span>
-          </div>
+          </motion.div>
         )}
         {secondaryStyle && (
-          <div className="flex items-center justify-between gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] px-4 py-3">
+          <motion.div
+            key={secondaryStyle}
+            variants={staggerItem}
+            className="flex items-center justify-between gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] px-4 py-3"
+          >
             <span className="flex items-center gap-2 text-sm font-medium text-[var(--am-text-primary)]">
               <span
                 className="h-2 w-2 rounded-full"
@@ -127,9 +155,9 @@ export function LearningStyleSummary({
             >
               {scores[secondaryStyle]}%
             </span>
-          </div>
+          </motion.div>
         )}
-      </div>
-    </section>
+      </motion.div>
+    </motion.section>
   );
 }

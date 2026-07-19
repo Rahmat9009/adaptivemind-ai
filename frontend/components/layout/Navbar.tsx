@@ -25,40 +25,24 @@ export function Navbar() {
           : "bg-transparent"
       }`}
     >
-      <nav
-        aria-label="Primary"
-        className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10"
-      >
-        <Link
-          href="/"
-          className="text-[var(--am-text-primary)] transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--am-primary)]"
-        >
-          <Logo size={28} colored />
+      <nav aria-label="Primary" className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
+        <Link href="/" className="text-[var(--am-text-primary)] transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--am-primary)]">
+          <Logo size={26} colored />
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">
           {navItems.map((item) => (
-            <a
-              key={item.href}
-              href={item.href}
-              className="text-sm font-medium text-[var(--am-text-secondary)] transition-colors hover:text-[var(--am-text-primary)]"
-            >
+            <a key={item.href} href={item.href} className="text-sm font-medium text-[var(--am-text-secondary)] transition-colors hover:text-[var(--am-text-primary)]">
               {item.label}
             </a>
           ))}
         </div>
 
         <div className="flex items-center gap-3">
-          <Link
-            href="/tutor"
-            className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--am-text-secondary)] transition-colors hover:text-[var(--am-text-primary)]"
-          >
+          <Link href="/tutor" className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--am-text-secondary)] transition-colors hover:text-[var(--am-text-primary)]">
             Tutor
           </Link>
-          <Link
-            href="/assessment"
-            className="am-btn am-btn-primary text-sm"
-          >
+          <Link href="/assessment" className="am-btn am-btn-primary text-sm">
             Get started
           </Link>
         </div>

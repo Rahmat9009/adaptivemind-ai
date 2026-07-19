@@ -1,3 +1,7 @@
+"use client";
+
+import { motion } from "motion/react";
+import { fadeIn, slideUp, staggerContainer, staggerItem } from "@/lib/motion";
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
 import type { TeachingMode } from "@/lib/ai/types";
 import {
@@ -82,31 +86,36 @@ export function TopicForm({
   );
 
   return (
-    <form
+    <motion.form
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
       className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-5 shadow-[var(--am-shadow-sm)] sm:p-7"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
       }}
     >
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
-        What to learn
-      </p>
+      <motion.div variants={slideUp}>
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+          What to learn
+        </p>
 
-      <label htmlFor="topic" className="sr-only">
-        Ask Ada what you want to learn
-      </label>
-      <input
-        id="topic"
-        value={topic}
-        onChange={(event) => onTopicChange(event.target.value)}
-        maxLength={160}
-        placeholder="For example, explain Newton's First Law"
-        className="mt-3 w-full rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-4 py-3.5 text-base text-[var(--am-text-primary)] outline-none transition placeholder:text-[var(--am-text-muted)] focus:border-[var(--am-primary)] focus:bg-[var(--am-bg-elevated)] focus:ring-2 focus:ring-[var(--am-primary)]/15"
-        autoComplete="off"
-      />
+        <label htmlFor="topic" className="sr-only">
+          Ask Ada what you want to learn
+        </label>
+        <input
+          id="topic"
+          value={topic}
+          onChange={(event) => onTopicChange(event.target.value)}
+          maxLength={160}
+          placeholder="For example, explain Newton's First Law"
+          className="mt-3 w-full rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-4 py-3.5 text-base text-[var(--am-text-primary)] outline-none transition placeholder:text-[var(--am-text-muted)] focus:border-[var(--am-primary)] focus:bg-[var(--am-bg-elevated)] focus:ring-2 focus:ring-[var(--am-primary)]/15"
+          autoComplete="off"
+        />
+      </motion.div>
 
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+      <motion.div variants={slideUp} className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="text-sm font-medium text-[var(--am-text-secondary)]">
           Subject
           <select
@@ -134,19 +143,29 @@ export function TopicForm({
             <option>Beginner</option>
           </select>
         </label>
-      </div>
+      </motion.div>
 
       {/* Teaching mode selector */}
-      <fieldset className="mt-6 border-t border-[var(--am-border-light)] pt-6">
+      <motion.fieldset
+        variants={slideUp}
+        className="mt-6 border-t border-[var(--am-border-light)] pt-6"
+      >
         <legend className="text-sm font-semibold text-[var(--am-text-primary)]">
           Teaching mode
         </legend>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="mt-3 grid gap-2 sm:grid-cols-2"
+        >
           {teachingModes.map((mode) => {
             const isSelected = teachingMode === mode.value;
             return (
-              <label
+              <motion.label
                 key={mode.value}
+                variants={staggerItem}
+                whileTap={{ scale: 0.98 }}
                 className={`relative cursor-pointer rounded-[var(--am-radius-lg)] border p-3 transition-all ${
                   isSelected
                     ? "border-[var(--am-primary)] bg-[var(--am-primary-light)]"
@@ -167,10 +186,10 @@ export function TopicForm({
                 <span className="mt-0.5 block text-xs leading-5 text-[var(--am-text-secondary)]">
                   {mode.description}
                 </span>
-              </label>
+              </motion.label>
             );
           })}
-        </div>
+        </motion.div>
         <p className="mt-3 text-xs leading-5 text-[var(--am-text-muted)]">
           Your profile favors{" "}
           <span className="font-medium text-[var(--am-text-secondary)]">
@@ -182,10 +201,13 @@ export function TopicForm({
             ? "Ada will use both as a starting point."
             : `You chose ${selectedMode?.label}.`}
         </p>
-      </fieldset>
+      </motion.fieldset>
 
       {/* Bottom: suggestions + submit */}
-      <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <motion.div
+        variants={slideUp}
+        className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+      >
         <div className="flex flex-wrap gap-2" aria-label="Example topics">
           {suggestions.map((suggestion) => (
             <button
@@ -206,7 +228,7 @@ export function TopicForm({
         >
           {isLoading ? "Preparing lesson..." : "Teach me"}
         </button>
-      </div>
-    </form>
+      </motion.div>
+    </motion.form>
   );
 }

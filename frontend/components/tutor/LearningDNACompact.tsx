@@ -1,3 +1,7 @@
+"use client";
+
+import { motion } from "motion/react";
+import { fadeIn } from "@/lib/motion";
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
 import {
   learningDimensionLabels,
@@ -18,7 +22,10 @@ export function LearningDNACompact({
   const [primary, secondary] = profile.dominantDimensions;
 
   return (
-    <aside
+    <motion.aside
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
       className="rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-5 shadow-[var(--am-shadow-sm)]"
       aria-label="Current learning profile"
     >
@@ -42,6 +49,6 @@ export function LearningDNACompact({
           compact
         />
       </div>
-    </aside>
+    </motion.aside>
   );
 }

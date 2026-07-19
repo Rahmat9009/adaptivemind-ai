@@ -1,3 +1,8 @@
+"use client";
+
+import { motion } from "motion/react";
+import { slideUp } from "@/lib/motion";
+
 interface DashboardHeaderProps {
   streak: number;
   lessonsCompleted: number;
@@ -10,7 +15,10 @@ export function DashboardHeader({
   primaryLabel,
 }: DashboardHeaderProps) {
   return (
-    <header className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-8">
+    <motion.header
+      variants={slideUp}
+      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-8"
+    >
       <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
@@ -54,6 +62,6 @@ export function DashboardHeader({
           </div>
         </div>
       </div>
-    </header>
+    </motion.header>
   );
 }

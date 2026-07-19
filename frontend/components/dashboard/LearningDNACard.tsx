@@ -1,3 +1,7 @@
+"use client";
+
+import { motion } from "motion/react";
+import { staggerContainer, staggerItem } from "@/lib/motion";
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
 import {
   learningDimensionLabels,
@@ -46,9 +50,14 @@ export function LearningDNACard({ scores }: { scores: LearningScores }) {
       </div>
 
       {/* Dimension bars */}
-      <div className="mt-6 space-y-3">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="mt-6 space-y-3"
+      >
         {learningDimensions.map((dimension) => (
-          <div key={dimension}>
+          <motion.div key={dimension} variants={staggerItem}>
             <div className="flex justify-between gap-4 text-sm">
               <span className="font-medium text-[var(--am-text-secondary)]">
                 {learningDimensionLabels[dimension]}
@@ -61,17 +70,19 @@ export function LearningDNACard({ scores }: { scores: LearningScores }) {
               </span>
             </div>
             <div className="am-progress-track mt-1.5">
-              <div
-                className="h-full rounded-full transition-all duration-[var(--am-duration-reveal)]"
+              <motion.div
+                className="h-full rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${scores[dimension]}%` }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
                 style={{
-                  width: `${scores[dimension]}%`,
                   backgroundColor: dnaColors[dimension],
                 }}
               />
             </div>
-          </div>
+          </motion.div>
         ))}
-      </div>
+      </motion.div>
 
       <p className="mt-6 text-sm leading-6 text-[var(--am-text-secondary)] border-t border-[var(--am-border-light)] pt-5">
         You understand new ideas best through{" "}

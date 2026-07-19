@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { motion } from "motion/react";
+import { fadeIn, staggerContainer, staggerItem } from "@/lib/motion";
 import { PageShell } from "@/components/am/PageShell";
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
 import {
@@ -94,7 +96,12 @@ export function DashboardShell() {
   if (!scores)
     return (
       <PageShell>
-        <section className="mx-auto max-w-xl rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-8 text-center shadow-[var(--am-shadow-sm)]">
+        <motion.section
+          variants={fadeIn}
+          initial="hidden"
+          animate="visible"
+          className="mx-auto max-w-xl rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-8 text-center shadow-[var(--am-shadow-sm)]"
+        >
           <h1 className="text-2xl font-semibold text-[var(--am-text-primary)]">
             Start with your Learning DNA
           </h1>
@@ -107,7 +114,7 @@ export function DashboardShell() {
           >
             Take the assessment
           </Link>
-        </section>
+        </motion.section>
       </PageShell>
     );
 
@@ -120,22 +127,31 @@ export function DashboardShell() {
 
   return (
     <PageShell heading="" subheading="">
-      <div className="space-y-8">
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="space-y-8"
+      >
         {/* Header */}
-        <DashboardHeader
-          streak={streak}
-          lessonsCompleted={history.length}
-          primaryLabel={
-            profile.primaryDimension[0].toUpperCase() +
-            profile.primaryDimension.slice(1)
-          }
-        />
+        <motion.div variants={staggerItem}>
+          <DashboardHeader
+            streak={streak}
+            lessonsCompleted={history.length}
+            primaryLabel={
+              profile.primaryDimension[0].toUpperCase() +
+              profile.primaryDimension.slice(1)
+            }
+          />
+        </motion.div>
 
         {/* Quick actions — two-column layout */}
-        <QuickActions hasHistory={history.length > 0} />
+        <motion.div variants={staggerItem}>
+          <QuickActions hasHistory={history.length > 0} />
+        </motion.div>
 
         {/* Learning DNA + side column */}
-        <div className="grid gap-8 lg:grid-cols-[1.2fr_1fr]">
+        <motion.div variants={staggerItem} className="grid gap-8 lg:grid-cols-[1.2fr_1fr]">
           <LearningDNACard scores={scores} />
 
           <div className="space-y-6">
@@ -155,32 +171,38 @@ export function DashboardShell() {
               }
             />
           </div>
-        </div>
+        </motion.div>
 
         {/* Study Plan */}
-        <StudyPlanCard plan={studyPlan} />
+        <motion.div variants={staggerItem}>
+          <StudyPlanCard plan={studyPlan} />
+        </motion.div>
 
         {/* Mastery */}
-        <MasteryOverview
-          entries={mastery.entries}
-          mastered={mastery.mastered}
-          developing={mastery.developing}
-          needsReview={mastery.needsReview}
-          averageRecentScore={mastery.averageRecentScore}
-        />
+        <motion.div variants={staggerItem}>
+          <MasteryOverview
+            entries={mastery.entries}
+            mastered={mastery.mastered}
+            developing={mastery.developing}
+            needsReview={mastery.needsReview}
+            averageRecentScore={mastery.averageRecentScore}
+          />
+        </motion.div>
 
         {/* Recommendations + History or Empty */}
         {history.length > 0 ? (
-          <div className="grid gap-8 lg:grid-cols-[1fr_1fr]">
+          <motion.div variants={staggerItem} className="grid gap-8 lg:grid-cols-[1fr_1fr]">
             <RecommendationCard
               recommendation={getLessonRecommendation(latest.topic)}
             />
             <RecentLessons history={history} />
-          </div>
+          </motion.div>
         ) : (
-          <EmptyDashboard />
+          <motion.div variants={staggerItem}>
+            <EmptyDashboard />
+          </motion.div>
         )}
-      </div>
+      </motion.div>
     </PageShell>
   );
 }

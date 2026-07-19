@@ -1,3 +1,7 @@
+"use client";
+
+import { motion } from "motion/react";
+import { staggerContainer, staggerItem } from "@/lib/motion";
 import type { TopicMastery } from "@/lib/mastery";
 
 export function MasteryOverview({
@@ -14,7 +18,10 @@ export function MasteryOverview({
   averageRecentScore: number | null;
 }) {
   return (
-    <section
+    <motion.section
+      variants={staggerContainer}
+      initial="hidden"
+      animate="visible"
       className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)]"
       aria-labelledby="mastery-title"
     >
@@ -27,7 +34,10 @@ export function MasteryOverview({
 
       {entries.length > 0 ? (
         <>
-          <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
+          <motion.div
+            variants={staggerItem}
+            className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4"
+          >
             <div className="rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-4 py-3">
               <p className="text-xs text-[var(--am-text-muted)]">Mastered</p>
               <p className="text-2xl font-semibold text-[var(--am-success)]">
@@ -57,9 +67,9 @@ export function MasteryOverview({
                 {averageRecentScore !== null ? "%" : ""}
               </p>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="mt-5 space-y-2">
+          <motion.div variants={staggerItem} className="mt-5 space-y-2">
             {entries.slice(0, 5).map((entry) => (
               <div
                 key={entry.topicId}
@@ -73,14 +83,17 @@ export function MasteryOverview({
                 </span>
               </div>
             ))}
-          </div>
+          </motion.div>
         </>
       ) : (
-        <p className="mt-3 text-sm leading-6 text-[var(--am-text-secondary)]">
+        <motion.p
+          variants={staggerItem}
+          className="mt-3 text-sm leading-6 text-[var(--am-text-secondary)]"
+        >
           Complete an understanding check after a lesson to begin tracking
           mastery.
-        </p>
+        </motion.p>
       )}
-    </section>
+    </motion.section>
   );
 }
