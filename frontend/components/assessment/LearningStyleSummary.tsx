@@ -1,4 +1,8 @@
-import { learningDimensionLabels, type LearningDimension, type LearningScores } from "@/lib/learning-dna";
+import {
+  learningDimensionLabels,
+  type LearningDimension,
+  type LearningScores,
+} from "@/lib/learning-dna";
 
 interface LearningStyleSummaryProps {
   primaryStyle: LearningDimension;
@@ -6,33 +10,126 @@ interface LearningStyleSummaryProps {
 }
 
 const guidance: Record<LearningDimension, string> = {
-  visual: "clear visual structure and diagrams that make relationships easy to see",
-  examples: "concrete situations that show how an idea works in practice",
-  analogies: "familiar comparisons that connect new ideas to things you already know",
-  stories: "connected narratives that give concepts a memorable context",
-  challenges: "active practice that lets you test an idea and learn from feedback",
+  visual:
+    "clear visual structure and diagrams that make relationships easy to see",
+  examples:
+    "concrete situations that show how an idea works in practice",
+  analogies:
+    "familiar comparisons that connect new ideas to things you already know",
+  stories:
+    "connected narratives that give concepts a memorable context",
+  challenges:
+    "active practice that lets you test an idea and learn from feedback",
 };
 
 const approach: Record<LearningDimension, string> = {
-  visual: "Ada will begin by making the structure and relationships easy to see.",
-  examples: "Ada will begin with concrete situations before introducing abstract theory.",
-  analogies: "Ada will begin by connecting new ideas to familiar ones.",
-  stories: "Ada will begin with concise, contextual scenarios that make the idea memorable.",
-  challenges: "Ada will begin with a question that invites you to reason through the idea.",
+  visual:
+    "Ada will begin by making the structure and relationships easy to see.",
+  examples:
+    "Ada will begin with concrete situations before introducing abstract theory.",
+  analogies:
+    "Ada will begin by connecting new ideas to familiar ones.",
+  stories:
+    "Ada will begin with concise, contextual scenarios that make the idea memorable.",
+  challenges:
+    "Ada will begin with a question that invites you to reason through the idea.",
 };
 
-export function LearningStyleSummary({ primaryStyle, scores }: LearningStyleSummaryProps) {
-  const supportingStyle = (Object.keys(scores) as LearningDimension[])
-    .filter((dimension) => dimension !== primaryStyle)
-    .sort((first, second) => scores[second] - scores[first])[0];
+const dnaVisuals: Record<LearningDimension, { color: string }> = {
+  visual: { color: "#22d3ee" },
+  examples: { color: "#f59e0b" },
+  analogies: { color: "#8b5cf6" },
+  stories: { color: "#fb7185" },
+  challenges: { color: "#fb6a4a" },
+};
+
+export function LearningStyleSummary({
+  primaryStyle,
+  scores,
+}: LearningStyleSummaryProps) {
+  const sorted = (Object.keys(scores) as LearningDimension[]).sort(
+    (a, b) => scores[b] - scores[a],
+  );
+  const supportingStyle = sorted[1];
+  const secondaryStyle = sorted[2];
 
   return (
-    <section className="rounded-3xl border border-teal-100 bg-[linear-gradient(145deg,#ecfdf5,#eff6ff)] p-6 shadow-lg shadow-teal-950/5 sm:p-8">
-      <p className="text-sm font-semibold uppercase tracking-wider text-teal-700">Primary learning preference</p>
-      <div className="mt-3 flex items-end gap-3"><h2 className="text-3xl font-semibold tracking-tight text-slate-950">{learningDimensionLabels[primaryStyle]}</h2><span className="pb-1 text-lg font-semibold text-teal-800">{scores[primaryStyle]}%</span></div>
-      <p className="mt-4 leading-7 text-slate-700">Based on your current assessment preferences, you currently respond best to {guidance[primaryStyle]}.</p>
-      <div className="mt-6 border-t border-teal-200/80 pt-5"><p className="text-xs font-semibold uppercase tracking-wider text-teal-700">Recommended approach</p><p className="mt-2 text-sm leading-6 text-slate-700">{approach[primaryStyle]}</p></div>
-      {supportingStyle ? <p className="mt-5 text-sm leading-6 text-slate-600"><span className="font-semibold text-slate-800">Strongest supporting preference:</span> {learningDimensionLabels[supportingStyle]} ({scores[supportingStyle]}%).</p> : null}
+    <section className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-8">
+      {/* Primary */}
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+            Primary learning preference
+          </p>
+          <h2
+            className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl"
+            style={{ color: dnaVisuals[primaryStyle].color }}
+          >
+            {learningDimensionLabels[primaryStyle]}
+          </h2>
+        </div>
+        <span
+          className="text-2xl font-bold tabular-nums"
+          style={{ color: dnaVisuals[primaryStyle].color }}
+        >
+          {scores[primaryStyle]}%
+        </span>
+      </div>
+
+      <p className="mt-4 leading-7 text-[var(--am-text-secondary)]">
+        Based on your current assessment, you respond best to{" "}
+        <strong className="text-[var(--am-text-primary)]">
+          {guidance[primaryStyle]}
+        </strong>
+        .
+      </p>
+
+      <div className="mt-6 rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
+          Ada will teach you with
+        </p>
+        <p className="mt-2 text-sm leading-6 text-[var(--am-text-secondary)]">
+          {approach[primaryStyle]}
+        </p>
+      </div>
+
+      {/* Supporting preferences */}
+      <div className="mt-6 space-y-3">
+        {supportingStyle && (
+          <div className="flex items-center justify-between gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] px-4 py-3">
+            <span className="flex items-center gap-2 text-sm font-medium text-[var(--am-text-primary)]">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: dnaVisuals[supportingStyle].color }}
+              />
+              {learningDimensionLabels[supportingStyle]}
+            </span>
+            <span
+              className="text-sm font-semibold tabular-nums"
+              style={{ color: dnaVisuals[supportingStyle].color }}
+            >
+              {scores[supportingStyle]}%
+            </span>
+          </div>
+        )}
+        {secondaryStyle && (
+          <div className="flex items-center justify-between gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] px-4 py-3">
+            <span className="flex items-center gap-2 text-sm font-medium text-[var(--am-text-primary)]">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: dnaVisuals[secondaryStyle].color }}
+              />
+              {learningDimensionLabels[secondaryStyle]}
+            </span>
+            <span
+              className="text-sm font-semibold tabular-nums"
+              style={{ color: dnaVisuals[secondaryStyle].color }}
+            >
+              {scores[secondaryStyle]}%
+            </span>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

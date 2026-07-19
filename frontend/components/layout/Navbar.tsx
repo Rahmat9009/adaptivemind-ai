@@ -1,41 +1,67 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { Logo } from "@/components/am/Logo";
+
 const navItems = [
-  { label: "Features", href: "#features" },
-  { label: "How it Works", href: "#how-it-works" },
-  { label: "About", href: "#about" },
+  { label: "How it works", href: "#how-it-works" },
 ];
 
 export function Navbar() {
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <header className="sticky top-0 z-50 border-b border-white/50 bg-white/70 backdrop-blur-xl">
+    <header
+      className={`sticky top-0 z-[var(--am-z-nav)] transition-all duration-[var(--am-duration-standard)] ${
+        scrolled
+          ? "border-b border-[var(--am-border-light)] bg-[var(--am-bg-surface)]/80 backdrop-blur-xl"
+          : "bg-transparent"
+      }`}
+    >
       <nav
-        aria-label="Primary navigation"
-        className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-6 lg:px-8"
+        aria-label="Primary"
+        className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10"
       >
-        <a
-          href="#top"
-          className="text-lg font-semibold tracking-tight text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4"
+        <Link
+          href="/"
+          className="text-[var(--am-text-primary)] transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--am-primary)]"
         >
-          AdaptiveMind AI
-        </a>
+          <Logo size={28} colored />
+        </Link>
 
         <div className="hidden items-center gap-8 md:flex">
           {navItems.map((item) => (
             <a
               key={item.href}
               href={item.href}
-              className="text-sm font-medium text-slate-600 transition hover:text-slate-950 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4"
+              className="text-sm font-medium text-[var(--am-text-secondary)] transition-colors hover:text-[var(--am-text-primary)]"
             >
               {item.label}
             </a>
           ))}
         </div>
 
-        <a
-          href="/assessment"
-          className="rounded-full bg-slate-950 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4"
-        >
-          Get Started
-        </a>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/tutor"
+            className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--am-text-secondary)] transition-colors hover:text-[var(--am-text-primary)]"
+          >
+            Tutor
+          </Link>
+          <Link
+            href="/assessment"
+            className="am-btn am-btn-primary text-sm"
+          >
+            Get started
+          </Link>
+        </div>
       </nav>
     </header>
   );

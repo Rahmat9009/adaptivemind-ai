@@ -1,5 +1,59 @@
-interface DashboardHeaderProps { streak: number; lessonsCompleted: number; primaryLabel: string; }
+interface DashboardHeaderProps {
+  streak: number;
+  lessonsCompleted: number;
+  primaryLabel: string;
+}
 
-export function DashboardHeader({ streak, lessonsCompleted, primaryLabel }: DashboardHeaderProps) {
-  return <header className="rounded-3xl border border-indigo-100 bg-[linear-gradient(125deg,rgba(238,242,255,0.96),rgba(255,255,255,0.92),rgba(236,253,245,0.86))] p-6 shadow-xl shadow-indigo-950/5 sm:p-8"><p className="text-sm font-semibold uppercase tracking-wider text-indigo-700">Your learning space</p><div className="mt-3 flex flex-col justify-between gap-6 sm:flex-row sm:items-end"><div><h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Welcome back.</h1><p className="mt-2 text-lg text-slate-600">Ready for today&apos;s lesson?</p></div><dl className="grid grid-cols-3 gap-3 text-center"><div className="rounded-2xl border border-white/80 bg-white/80 px-3 py-3"><dt className="text-xs font-medium text-slate-500">Streak</dt><dd className="mt-1 text-lg font-semibold text-slate-950">{streak} day{streak === 1 ? "" : "s"}</dd></div><div className="rounded-2xl border border-white/80 bg-white/80 px-3 py-3"><dt className="text-xs font-medium text-slate-500">Lessons</dt><dd className="mt-1 text-lg font-semibold text-slate-950">{lessonsCompleted}</dd></div><div className="rounded-2xl border border-white/80 bg-white/80 px-3 py-3"><dt className="text-xs font-medium text-slate-500">Learning DNA</dt><dd className="mt-1 text-sm font-semibold text-slate-950">{primaryLabel}</dd></div></dl></div></header>;
+export function DashboardHeader({
+  streak,
+  lessonsCompleted,
+  primaryLabel,
+}: DashboardHeaderProps) {
+  return (
+    <header className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-8">
+      <div className="flex flex-col justify-between gap-6 sm:flex-row sm:items-end">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
+            Your learning space
+          </p>
+          <h1 className="mt-2 text-[clamp(1.5rem,3vw,2.25rem)] font-semibold tracking-tight leading-[1.12]">
+            Welcome back.
+          </h1>
+          <p className="mt-1 text-base text-[var(--am-text-secondary)]">
+            Ready for today&apos;s lesson?
+          </p>
+        </div>
+
+        <div className="flex gap-3">
+          <div className="rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-4 py-3 text-center">
+            <p className="text-xs font-medium text-[var(--am-text-muted)]">
+              Streak
+            </p>
+            <p className="mt-0.5 text-xl font-semibold tabular-nums text-[var(--am-text-primary)]">
+              {streak}
+              <span className="text-sm font-normal text-[var(--am-text-muted)]">
+                d
+              </span>
+            </p>
+          </div>
+          <div className="rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-4 py-3 text-center">
+            <p className="text-xs font-medium text-[var(--am-text-muted)]">
+              Lessons
+            </p>
+            <p className="mt-0.5 text-xl font-semibold tabular-nums text-[var(--am-text-primary)]">
+              {lessonsCompleted}
+            </p>
+          </div>
+          <div className="rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-4 py-3 text-center">
+            <p className="text-xs font-medium text-[var(--am-text-muted)]">
+              Style
+            </p>
+            <p className="mt-0.5 text-sm font-semibold text-[var(--am-primary)]">
+              {primaryLabel}
+            </p>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
 }

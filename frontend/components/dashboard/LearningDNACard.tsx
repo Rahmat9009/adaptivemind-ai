@@ -1,8 +1,84 @@
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
-import { learningDimensionLabels, learningDimensions, type LearningScores } from "@/lib/learning-dna";
+import {
+  learningDimensionLabels,
+  learningDimensions,
+  type LearningDimension,
+  type LearningScores,
+} from "@/lib/learning-dna";
 import { LearningDNAConstellation } from "@/components/three/LearningDNAConstellation";
+
+const dnaColors: Record<LearningDimension, string> = {
+  visual: "#22d3ee",
+  examples: "#f59e0b",
+  analogies: "#8b5cf6",
+  stories: "#fb7185",
+  challenges: "#fb6a4a",
+};
 
 export function LearningDNACard({ scores }: { scores: LearningScores }) {
   const profile = buildTeachingProfile(scores);
-  return <section aria-labelledby="learning-dna-card-title" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7"><p className="text-sm font-semibold uppercase tracking-wider text-indigo-700">Current Learning DNA profile</p><h2 id="learning-dna-card-title" className="mt-2 text-2xl font-semibold text-slate-950">{learningDimensionLabels[profile.primaryDimension]}</h2><p className="mt-1 text-sm text-slate-600">Supporting preference: {learningDimensionLabels[profile.secondaryDimension]}</p><div className="mt-5"><LearningDNAConstellation scores={scores} activeDimension={profile.primaryDimension} /></div><div className="mt-6 space-y-4">{learningDimensions.map((dimension) => <div key={dimension}><div className="flex justify-between gap-4 text-sm"><span className="font-medium text-slate-700">{learningDimensionLabels[dimension]}</span><span className="font-semibold tabular-nums text-slate-950">{scores[dimension]}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[linear-gradient(90deg,#4f46e5,#38bdf8)]" style={{ width: `${scores[dimension]}%` }} /></div></div>)}</div><p className="mt-6 text-sm leading-6 text-slate-600">You currently understand new ideas best through {learningDimensionLabels[profile.primaryDimension].toLowerCase()}-led explanations, with support from {learningDimensionLabels[profile.secondaryDimension].toLowerCase()}.</p><div className="mt-5 rounded-2xl bg-indigo-50 px-4 py-4 text-sm leading-6 text-indigo-950"><p className="font-semibold">Ada currently prioritizes:</p><p className="mt-1">✓ {learningDimensionLabels[profile.primaryDimension]}<br />✓ {learningDimensionLabels[profile.secondaryDimension]}</p></div></section>;
+
+  return (
+    <section
+      aria-labelledby="learning-dna-card-title"
+      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-7"
+    >
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+        Current Learning DNA
+      </p>
+      <h2
+        id="learning-dna-card-title"
+        className="mt-2 text-2xl font-semibold tracking-tight"
+        style={{ color: dnaColors[profile.primaryDimension] }}
+      >
+        {learningDimensionLabels[profile.primaryDimension]}
+      </h2>
+      <p className="mt-1 text-sm text-[var(--am-text-secondary)]">
+        strongest preference &middot; supporting:{" "}
+        {learningDimensionLabels[profile.secondaryDimension].toLowerCase()}
+      </p>
+
+      <div className="mt-5">
+        <LearningDNAConstellation
+          scores={scores}
+          activeDimension={profile.primaryDimension}
+        />
+      </div>
+
+      {/* Dimension bars */}
+      <div className="mt-6 space-y-3">
+        {learningDimensions.map((dimension) => (
+          <div key={dimension}>
+            <div className="flex justify-between gap-4 text-sm">
+              <span className="font-medium text-[var(--am-text-secondary)]">
+                {learningDimensionLabels[dimension]}
+              </span>
+              <span
+                className="font-semibold tabular-nums"
+                style={{ color: dnaColors[dimension] }}
+              >
+                {scores[dimension]}%
+              </span>
+            </div>
+            <div className="am-progress-track mt-1.5">
+              <div
+                className="h-full rounded-full transition-all duration-[var(--am-duration-reveal)]"
+                style={{
+                  width: `${scores[dimension]}%`,
+                  backgroundColor: dnaColors[dimension],
+                }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-6 text-sm leading-6 text-[var(--am-text-secondary)] border-t border-[var(--am-border-light)] pt-5">
+        You understand new ideas best through{" "}
+        {learningDimensionLabels[profile.primaryDimension].toLowerCase()}-led
+        explanations, with support from{" "}
+        {learningDimensionLabels[profile.secondaryDimension].toLowerCase()}.
+      </p>
+    </section>
+  );
 }

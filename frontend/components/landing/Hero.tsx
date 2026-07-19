@@ -1,90 +1,149 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { LearningDNAConstellation } from "@/components/three/LearningDNAConstellation";
 
-const previewScores = { visual: 62, examples: 74, analogies: 92, stories: 58, challenges: 48 };
+const previewScores = {
+  visual: 62,
+  examples: 74,
+  analogies: 92,
+  stories: 58,
+  challenges: 48,
+};
 
 export function Hero() {
+  const [hasResult] = useState(() => {
+    try {
+      const stored = JSON.parse(
+        localStorage.getItem("adaptivemind-learning-dna") ?? "null",
+      );
+      return !!(stored && stored.scores);
+    } catch {
+      return false;
+    }
+  });
+  const [hasScrolled, setHasScrolled] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      if (window.scrollY > 80) setHasScrolled(true);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   return (
-    <section
-      id="top"
-      className="relative isolate px-5 pt-20 pb-24 sm:px-6 sm:pt-28 lg:px-8"
-    >
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_20%,rgba(45,212,191,0.24),transparent_28%),radial-gradient(circle_at_80%_0%,rgba(99,102,241,0.18),transparent_30%),linear-gradient(135deg,#f7f9fc_0%,#ffffff_48%,#eef8f6_100%)]" />
-      <div className="mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[1.02fr_0.98fr]">
-        <div className="max-w-3xl text-center lg:text-left">
-          <p className="mb-5 inline-flex rounded-full border border-teal-200 bg-white/70 px-4 py-2 text-sm font-medium text-teal-800 shadow-sm backdrop-blur">
-            Personalized AI tutoring for every learner
-          </p>
-          <h1 className="text-5xl font-semibold tracking-tight text-slate-950 sm:text-6xl lg:text-7xl">
-            The AI tutor that learns how you learn.
-          </h1>
-          <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-600 lg:mx-0">
-            AdaptiveMind AI personalizes explanations, quizzes, and study plans
-            based on every student&apos;s unique learning style.
-          </p>
-          <div className="mt-10 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
-            <a
-              href="/assessment"
-              className="rounded-full bg-slate-950 px-7 py-3.5 text-center text-base font-semibold text-white shadow-xl shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4"
-            >
-              Start Learning
-            </a>
-            <a
-              href="#how-it-works"
-              className="rounded-full border border-slate-200 bg-white/75 px-7 py-3.5 text-center text-base font-semibold text-slate-800 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:border-slate-300 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4"
-            >
-              Watch Demo
-            </a>
+    <section className="relative isolate overflow-hidden">
+      {/* Deep space background */}
+      <div className="am-deep-space absolute inset-0 -z-10" />
+      <div
+        className="absolute inset-0 -z-10 opacity-30"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(80,70,229,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(80,70,229,0.04) 1px, transparent 1px)",
+          backgroundSize: "64px 64px",
+        }}
+      />
+
+      {/* Subtle ambient glow */}
+      <div
+        className="pointer-events-none absolute left-1/3 top-0 -z-10 h-[60vh] w-[50vw] opacity-20"
+        style={{
+          background:
+            "radial-gradient(ellipse at center, rgba(80,70,229,0.3) 0%, transparent 70%)",
+        }}
+      />
+
+      <div className="mx-auto max-w-7xl px-5 pt-24 pb-20 sm:px-8 lg:px-10 lg:pt-32 lg:pb-28">
+        <div className="grid items-center gap-14 lg:grid-cols-[1.1fr_0.9fr]">
+          {/* Left: Copy */}
+          <div className="max-w-2xl">
+            <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--am-primary)]/20 bg-[var(--am-primary)]/8 px-4 py-2 text-sm font-medium text-[var(--am-primary)]">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: "#22d3ee" }}
+              />
+              Adaptive AI tutoring, reimagined
+            </p>
+
+            <h1 className="text-[clamp(2.5rem,5.5vw,4.5rem)] font-semibold tracking-tight text-white leading-[1.08]">
+              <span className="block">Changes how it teaches</span>
+              <span className="mt-2 block bg-gradient-to-r from-[var(--am-dna-visual)] via-[var(--am-primary)] to-[var(--am-dna-analogies)] bg-clip-text text-transparent">
+                based on how you understand.
+              </span>
+            </h1>
+
+            <p className="mt-6 max-w-xl text-lg leading-8 text-white/65">
+              AdaptiveMind builds a unique Learning DNA profile from your
+              preferences — then shapes every explanation, example, and
+              challenge around the way you learn best.
+            </p>
+
+            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/assessment"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--am-primary)] px-7 py-3.5 text-base font-semibold text-white shadow-xl shadow-[var(--am-primary)]/25 transition-all duration-[var(--am-duration-quick)] hover:-translate-y-0.5 hover:bg-[var(--am-primary-hover)] hover:shadow-2xl hover:shadow-[var(--am-primary)]/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                {hasResult ? "Update my Learning DNA" : "Discover your Learning DNA"}
+                <span aria-hidden="true" className="text-sm opacity-60">
+                  →
+                </span>
+              </Link>
+
+              <Link
+                href="/tutor"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/8 px-7 py-3.5 text-base font-semibold text-white backdrop-blur-sm transition-all duration-[var(--am-duration-quick)] hover:bg-white/15 hover:border-white/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              >
+                Try the adaptive tutor
+              </Link>
+            </div>
+
+            {/* Continue learning — shown only for returning users */}
+            {hasResult && (
+              <Link
+                href="/dashboard"
+                className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-white/50 transition-colors hover:text-white/80"
+              >
+                <span
+                  className="h-1.5 w-1.5 rounded-full bg-[var(--am-success)]"
+                  aria-hidden="true"
+                />
+                Continue where you left off →
+              </Link>
+            )}
           </div>
-        </div>
 
-        <div className="relative mx-auto w-full max-w-xl">
-          <div className="relative min-h-[28rem]">
-            <LearningDNAConstellation scores={previewScores} activeDimension="analogies" />
-            <div className="absolute inset-x-4 bottom-4 overflow-hidden rounded-2xl border border-white/15 bg-slate-950/85 shadow-2xl backdrop-blur-xl">
-              <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-                <div>
-                  <p className="text-sm font-medium text-white">
-                    AI Learning Preview
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    Learning style: analogies
-                  </p>
+          {/* Right: Interactive constellation + preview card */}
+          <div className="relative">
+            <div className="relative">
+              <LearningDNAConstellation
+                scores={previewScores}
+                activeDimension="analogies"
+              />
+
+              {/* Floating teaching mode card */}
+              <div
+                className={`absolute -bottom-3 -right-3 left-4 overflow-hidden rounded-[var(--am-radius-xl)] border border-white/10 bg-[#0a0f20]/90 p-4 backdrop-blur-xl transition-all duration-[var(--am-duration-slow)] sm:left-auto sm:w-72 ${
+                  hasScrolled
+                    ? "translate-y-2 opacity-60"
+                    : "translate-y-0 opacity-100"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--am-dna-analogies)]">
+                    <span className="h-2 w-2 rounded-full bg-[var(--am-dna-analogies)]" />
+                    Teaching mode: analogy
+                  </span>
+                  <span className="rounded bg-white/8 px-2 py-0.5 text-[10px] font-medium text-white/50">
+                    LIVE
+                  </span>
                 </div>
-                <div className="flex gap-1.5" aria-hidden="true">
-                  <span className="h-2.5 w-2.5 rounded-full bg-rose-400" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
-                  <span className="h-2.5 w-2.5 rounded-full bg-teal-300" />
-                </div>
-              </div>
-
-              <div className="space-y-4 bg-[linear-gradient(145deg,#101827,#16213a)] p-5 sm:p-6">
-                <article className="ml-auto max-w-[86%] rounded-2xl rounded-tr-sm bg-white px-4 py-3 text-slate-900 shadow-lg">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
-                    Student
-                  </p>
-                  <p className="mt-1 text-base">Explain photosynthesis.</p>
-                </article>
-
-                <article className="max-w-[92%] rounded-2xl rounded-tl-sm border border-white/10 bg-white/10 px-4 py-4 text-white shadow-lg backdrop-blur">
-                  <p className="text-xs font-semibold uppercase tracking-wider text-teal-200">
-                    AdaptiveMind AI
-                  </p>
-                  <p className="mt-2 text-base leading-7 text-slate-100">
-                    Since you learn best through analogies, imagine a plant as a
-                    tiny solar-powered kitchen making its own food.
-                  </p>
-                </article>
-
-                <div className="grid grid-cols-3 gap-3 pt-2">
-                  {["Analogy", "Quiz", "Plan"].map((item) => (
-                    <div
-                      key={item}
-                      className="rounded-2xl border border-white/10 bg-white/8 px-3 py-3 text-center text-xs font-medium text-slate-200"
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
+                <p className="mt-2 text-sm leading-6 text-white/80">
+                  &ldquo;Think of a leaf as a small solar-powered kitchen:
+                  sunlight is the power, water and CO₂ are the ingredients, and
+                  glucose is the meal it prepares.&rdquo;
+                </p>
               </div>
             </div>
           </div>

@@ -1,47 +1,93 @@
+"use client";
+
+import Link from "next/link";
+
 const steps = [
-  "Take a quick learning assessment.",
-  "AdaptiveMind builds your learning profile.",
-  "Learn with personalized AI lessons.",
-  "Improve continuously as the AI adapts.",
+  {
+    number: 1,
+    title: "Discover your profile",
+    description:
+      "A short, thoughtful assessment maps your initial Learning DNA — the combination of teaching approaches that feel most natural to you.",
+    accent: "#5046e5",
+  },
+  {
+    number: 2,
+    title: "Ada teaches your way",
+    description:
+      "Choose any topic. Ada shapes the explanation around your Learning DNA — visual breakdowns, analogies, stories, examples, or challenges — not a generic lecture.",
+    accent: "#22d3ee",
+  },
+  {
+    number: 3,
+    title: "Verify and deepen",
+    description:
+      "Understanding checks, follow-up conversations, and mastery tracking make sure each concept is solid before moving forward.",
+    accent: "#8b5cf6",
+  },
+  {
+    number: 4,
+    title: "Evolve together",
+    description:
+      "Every lesson, check, and challenge refines what Ada knows about how you learn. Your Learning DNA grows with you — it is never a one-time label.",
+    accent: "#fb7185",
+  },
 ];
 
 export function HowItWorks() {
   return (
     <section
       id="how-it-works"
-      className="bg-[#f7f9fc] px-5 py-24 sm:px-6 lg:px-8"
+      className="relative isolate overflow-hidden bg-[var(--am-bg-reading)] px-5 py-24 sm:px-8 lg:px-10"
     >
-      <div className="mx-auto max-w-7xl">
+      {/* Subtle separator */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--am-primary)]/10 to-transparent" />
+
+      <div className="mx-auto max-w-6xl">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-wider text-teal-700">
-            How it Works
+          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
+            Your learning journey
           </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            A smarter path from assessment to mastery.
+          <h2 className="mt-4 text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-tight leading-[1.12]">
+            From first assessment to lasting mastery.
           </h2>
         </div>
 
-        <div className="mt-14 grid gap-4 lg:grid-cols-[1fr_auto_1fr_auto_1fr_auto_1fr] lg:items-stretch">
-          {steps.map((step, index) => (
-            <div key={step} className="contents">
-              <article className="rounded-3xl border border-white/70 bg-white/65 p-6 text-center shadow-lg shadow-slate-900/6 backdrop-blur">
-                <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-lg font-semibold text-white">
-                  {index + 1}
-                </div>
-                <p className="mt-5 text-base font-medium leading-7 text-slate-700">
-                  {step}
-                </p>
-              </article>
-              {index < steps.length - 1 ? (
-                <div
-                  className="flex items-center justify-center text-2xl font-semibold text-teal-600 lg:rotate-[-90deg]"
-                  aria-hidden="true"
+        <div className="mt-16 grid gap-6 md:grid-cols-2">
+          {steps.map((step) => (
+            <article
+              key={step.number}
+              className="group relative overflow-hidden rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-7 transition-all duration-[var(--am-duration-standard)] hover:shadow-[var(--am-shadow-md)] hover:-translate-y-0.5"
+            >
+              <div className="flex items-start gap-5">
+                <span
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--am-radius-lg)] text-lg font-semibold text-white"
+                  style={{ backgroundColor: step.accent }}
                 >
-                  ↓
+                  {step.number}
+                </span>
+                <div>
+                  <h3 className="text-lg font-semibold text-[var(--am-text-primary)]">
+                    {step.title}
+                  </h3>
+                  <p className="mt-2 leading-7 text-[var(--am-text-secondary)]">
+                    {step.description}
+                  </p>
                 </div>
-              ) : null}
-            </div>
+              </div>
+            </article>
           ))}
+        </div>
+
+        <div className="mt-12 text-center">
+          <Link
+            href="/assessment"
+            className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--am-primary)] px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-[var(--am-primary)]/20 transition-all duration-[var(--am-duration-quick)] hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[var(--am-primary)]/25"
+          >
+            Start your learning journey
+            <span aria-hidden="true" className="text-sm opacity-60">
+              →
+            </span>
+          </Link>
         </div>
       </div>
     </section>

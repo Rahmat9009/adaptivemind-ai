@@ -1,12 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { TeachingMode, TutorAction, TutorApiResponse, TutorConversationMessage, TutorConversationTurn, TutorFollowUpApiResponse, TutorFollowUpResponse, TutorLesson, UnderstandingEvaluation, UnderstandingEvaluationApiResponse } from "@/lib/ai/types";
-import { learningDimensions, type LearningDimension, type LearningScores } from "@/lib/learning-dna";
+import type {
+  TeachingMode,
+  TutorAction,
+  TutorApiResponse,
+  TutorConversationMessage,
+  TutorConversationTurn,
+  TutorFollowUpApiResponse,
+  TutorFollowUpResponse,
+  TutorLesson,
+  UnderstandingEvaluation,
+  UnderstandingEvaluationApiResponse,
+} from "@/lib/ai/types";
+import {
+  learningDimensions,
+  type LearningDimension,
+  type LearningScores,
+} from "@/lib/learning-dna";
 import { isTutorHandoff, tutorHandoffStorageKey } from "@/lib/tutor-handoff";
-import { addLessonToHistory, historyRestoreStorageKey, readLearningHistory, saveHistoryConversation, saveHistoryEvaluation, startNewTopicStorageKey } from "@/lib/dashboard-storage";
+import {
+  addLessonToHistory,
+  historyRestoreStorageKey,
+  readLearningHistory,
+  saveHistoryConversation,
+  saveHistoryEvaluation,
+  startNewTopicStorageKey,
+} from "@/lib/dashboard-storage";
 import { updateTopicMastery } from "@/lib/mastery";
-import { AppNavigation } from "@/components/layout/AppNavigation";
+import { PageShell } from "@/components/am/PageShell";
 import { LearningDNACompact } from "./LearningDNACompact";
 import { LessonActions } from "./LessonActions";
 import { LessonCard } from "./LessonCard";
@@ -21,73 +43,195 @@ import { UnderstandingFeedback } from "./UnderstandingFeedback";
 const profileStorageKey = "adaptivemind-learning-dna";
 const lessonStorageKey = "adaptivemind-current-lesson";
 const conversationStorageKey = "adaptivemind-lesson-conversation";
-const balancedScores: LearningScores = { visual: 50, examples: 50, analogies: 50, stories: 50, challenges: 50 };
+const balancedScores: LearningScores = {
+  visual: 50,
+  examples: 50,
+  analogies: 50,
+  stories: 50,
+  challenges: 50,
+};
 
-interface TutorProfile { scores: LearningScores; isBalanced: boolean; }
-interface StoredLessonSession { response: TutorApiResponse; topic: string; subject: string; level: string; teachingMode: TeachingMode; }
-interface StoredConversation { lessonTitle: string; turns: TutorConversationTurn[]; }
+interface TutorProfile {
+  scores: LearningScores;
+  isBalanced: boolean;
+}
+interface StoredLessonSession {
+  response: TutorApiResponse;
+  topic: string;
+  subject: string;
+  level: string;
+  teachingMode: TeachingMode;
+}
+interface StoredConversation {
+  lessonTitle: string;
+  turns: TutorConversationTurn[];
+}
 
 function isLearningScores(value: unknown): value is LearningScores {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return learningDimensions.every((dimension) => typeof record[dimension] === "number" && record[dimension] >= 0 && record[dimension] <= 100);
+  return learningDimensions.every(
+    (dimension) =>
+      typeof record[dimension] === "number" &&
+      record[dimension] >= 0 &&
+      record[dimension] <= 100,
+  );
 }
 
 function isStyles(value: unknown): value is LearningDimension[] {
-  return Array.isArray(value) && value.every((style) => typeof style === "string" && learningDimensions.includes(style as LearningDimension));
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (style) =>
+        typeof style === "string" &&
+        learningDimensions.includes(style as LearningDimension),
+    )
+  );
 }
 
 function isTutorLesson(value: unknown): value is TutorLesson {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return typeof record.title === "string" && typeof record.coreIdea === "string" && typeof record.explanation === "string" && Array.isArray(record.keyPoints) && record.keyPoints.every((point) => typeof point === "string") && typeof record.checkQuestion === "string" && isStyles(record.stylesUsed);
+  return (
+    typeof record.title === "string" &&
+    typeof record.coreIdea === "string" &&
+    typeof record.explanation === "string" &&
+    Array.isArray(record.keyPoints) &&
+    record.keyPoints.every((point: unknown) => typeof point === "string") &&
+    typeof record.checkQuestion === "string" &&
+    isStyles(record.stylesUsed)
+  );
 }
 
 function isTeachingMode(value: unknown): value is TeachingMode {
-  return value === "adaptive" || value === "visual" || value === "example" || value === "analogy" || value === "story" || value === "challenge";
+  return (
+    value === "adaptive" ||
+    value === "visual" ||
+    value === "example" ||
+    value === "analogy" ||
+    value === "story" ||
+    value === "challenge"
+  );
 }
 
-function isLessonAction(value: unknown): value is Exclude<TutorAction, "followup" | "evaluate"> {
-  return value === "initial" || value === "simpler" || value === "different" || value === "example" || value === "challenge";
+function isLessonAction(
+  value: unknown,
+): value is Exclude<TutorAction, "followup" | "evaluate"> {
+  return (
+    value === "initial" ||
+    value === "simpler" ||
+    value === "different" ||
+    value === "example" ||
+    value === "challenge"
+  );
 }
 
 function isTutorResponse(value: unknown): value is TutorApiResponse {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return isTutorLesson(record.lesson) && (record.source === "provider" || record.source === "demo") && isTeachingMode(record.teachingMode) && isLessonAction(record.action);
+  return (
+    isTutorLesson(record.lesson) &&
+    (record.source === "provider" || record.source === "demo") &&
+    isTeachingMode(record.teachingMode) &&
+    isLessonAction(record.action)
+  );
 }
 
-function isFollowUpResponse(value: unknown): value is TutorFollowUpResponse {
+function isFollowUpResponse(
+  value: unknown,
+): value is TutorFollowUpResponse {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return typeof record.answer === "string" && record.answer.length > 0 && isStyles(record.stylesUsed);
+  return (
+    typeof record.answer === "string" &&
+    record.answer.length > 0 &&
+    isStyles(record.stylesUsed)
+  );
 }
 
-function isFollowUpApiResponse(value: unknown): value is TutorFollowUpApiResponse {
+function isFollowUpApiResponse(
+  value: unknown,
+): value is TutorFollowUpApiResponse {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return isFollowUpResponse(record.followUp) && (record.source === "provider" || record.source === "demo") && isTeachingMode(record.teachingMode) && record.action === "followup";
+  return (
+    isFollowUpResponse(record.followUp) &&
+    (record.source === "provider" || record.source === "demo") &&
+    isTeachingMode(record.teachingMode) &&
+    record.action === "followup"
+  );
 }
-function isEvaluationApiResponse(value: unknown): value is UnderstandingEvaluationApiResponse { if (typeof value !== "object" || value === null) return false; const record = value as Record<string, unknown>; const evaluation = record.evaluation as Record<string, unknown> | undefined; return record.action === "evaluate" && (record.source === "provider" || record.source === "demo") && typeof evaluation === "object" && evaluation !== null && (evaluation.status === "correct" || evaluation.status === "partial" || evaluation.status === "misconception" || evaluation.status === "uncertain") && typeof evaluation.score === "number" && typeof evaluation.feedback === "string" && Array.isArray(evaluation.stylesUsed); }
+
+function isEvaluationApiResponse(
+  value: unknown,
+): value is UnderstandingEvaluationApiResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  const evaluation = record.evaluation as Record<string, unknown> | undefined;
+  return (
+    record.action === "evaluate" &&
+    (record.source === "provider" || record.source === "demo") &&
+    typeof evaluation === "object" &&
+    evaluation !== null &&
+    (evaluation.status === "correct" ||
+      evaluation.status === "partial" ||
+      evaluation.status === "misconception" ||
+      evaluation.status === "uncertain") &&
+    typeof evaluation.score === "number" &&
+    typeof evaluation.feedback === "string" &&
+    Array.isArray(evaluation.stylesUsed)
+  );
+}
 
 function isMessage(value: unknown): value is TutorConversationMessage {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return typeof record.id === "string" && (record.role === "student" || record.role === "tutor") && typeof record.content === "string" && typeof record.createdAt === "string";
+  return (
+    typeof record.id === "string" &&
+    (record.role === "student" || record.role === "tutor") &&
+    typeof record.content === "string" &&
+    typeof record.createdAt === "string"
+  );
 }
 
 function isTurn(value: unknown): value is TutorConversationTurn {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return isMessage(record.student) && isMessage(record.tutor) && isFollowUpResponse(record.response);
+  return (
+    isMessage(record.student) &&
+    isMessage(record.tutor) &&
+    isFollowUpResponse(record.response)
+  );
 }
 
-function normalizeStoredLesson(value: unknown): StoredLessonSession | null {
-  if (isTutorResponse(value)) return { response: value, topic: "", subject: "Science", level: "High school", teachingMode: value.teachingMode };
+function normalizeStoredLesson(
+  value: unknown,
+): StoredLessonSession | null {
+  if (isTutorResponse(value))
+    return {
+      response: value,
+      topic: "",
+      subject: "Science",
+      level: "High school",
+      teachingMode: value.teachingMode,
+    };
   if (typeof value !== "object" || value === null) return null;
   const record = value as Record<string, unknown>;
-  if (!isTutorResponse(record.response) || typeof record.topic !== "string" || typeof record.subject !== "string" || typeof record.level !== "string" || !isTeachingMode(record.teachingMode)) return null;
-  return { response: record.response, topic: record.topic, subject: record.subject, level: record.level, teachingMode: record.teachingMode };
+  if (
+    !isTutorResponse(record.response) ||
+    typeof record.topic !== "string" ||
+    typeof record.subject !== "string" ||
+    typeof record.level !== "string" ||
+    !isTeachingMode(record.teachingMode)
+  )
+    return null;
+  return {
+    response: record.response,
+    topic: record.topic,
+    subject: record.subject,
+    level: record.level,
+    teachingMode: record.teachingMode,
+  };
 }
 
 function getErrorMessage(value: unknown): string {
@@ -98,15 +242,29 @@ function getErrorMessage(value: unknown): string {
 
 function getSavedProfile(): TutorProfile | null {
   try {
-    const value: unknown = JSON.parse(localStorage.getItem(profileStorageKey) ?? "null");
+    const value: unknown = JSON.parse(
+      localStorage.getItem(profileStorageKey) ?? "null",
+    );
     if (typeof value !== "object" || value === null) return null;
     const record = value as Record<string, unknown>;
-    return isLearningScores(record.scores) ? { scores: record.scores, isBalanced: false } : null;
-  } catch { return null; }
+    return isLearningScores(record.scores)
+      ? { scores: record.scores, isBalanced: false }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
-function createMessage(role: TutorConversationMessage["role"], content: string): TutorConversationMessage {
-  return { id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, role, content, createdAt: new Date().toISOString() };
+function createMessage(
+  role: TutorConversationMessage["role"],
+  content: string,
+): TutorConversationMessage {
+  return {
+    id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    role,
+    content,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 export function TutorShell() {
@@ -117,15 +275,21 @@ export function TutorShell() {
   const [level, setLevel] = useState("High school");
   const [teachingMode, setTeachingMode] = useState<TeachingMode>("adaptive");
   const [response, setResponse] = useState<TutorApiResponse | null>(null);
-  const [conversation, setConversation] = useState<TutorConversationTurn[]>([]);
+  const [conversation, setConversation] = useState<TutorConversationTurn[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isFollowUpLoading, setIsFollowUpLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [handoffMessage, setHandoffMessage] = useState<string | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
-  const [evaluation, setEvaluation] = useState<UnderstandingEvaluation | null>(null);
-  const [evaluationSource, setEvaluationSource] = useState<"provider" | "demo">("provider");
+  const [evaluation, setEvaluation] = useState<UnderstandingEvaluation | null>(
+    null,
+  );
+  const [evaluationSource, setEvaluationSource] = useState<
+    "provider" | "demo"
+  >("provider");
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
   const latestTurnRef = useRef<HTMLDivElement>(null);
@@ -140,12 +304,31 @@ export function TutorShell() {
     const timer = window.setTimeout(() => {
       setProfile(getSavedProfile());
       try {
-        const startNewTopic = sessionStorage.getItem(startNewTopicStorageKey) === "true";
+        const startNewTopic =
+          sessionStorage.getItem(startNewTopicStorageKey) === "true";
         sessionStorage.removeItem(startNewTopicStorageKey);
-        const restoreId = startNewTopic ? null : sessionStorage.getItem(historyRestoreStorageKey);
-        const restoredLesson = restoreId ? readLearningHistory().find((entry) => entry.id === restoreId) : null;
+        const restoreId = startNewTopic
+          ? null
+          : sessionStorage.getItem(historyRestoreStorageKey);
+        const restoredLesson = restoreId
+          ? readLearningHistory().find((entry) => entry.id === restoreId)
+          : null;
         sessionStorage.removeItem(historyRestoreStorageKey);
-        const session = restoredLesson ? { response: restoredLesson.response, topic: restoredLesson.topic, subject: restoredLesson.subject, level: restoredLesson.level, teachingMode: restoredLesson.teachingMode } : startNewTopic ? null : normalizeStoredLesson(JSON.parse(localStorage.getItem(lessonStorageKey) ?? "null"));
+        const session = restoredLesson
+          ? {
+              response: restoredLesson.response,
+              topic: restoredLesson.topic,
+              subject: restoredLesson.subject,
+              level: restoredLesson.level,
+              teachingMode: restoredLesson.teachingMode,
+            }
+          : startNewTopic
+            ? null
+            : normalizeStoredLesson(
+                JSON.parse(
+                  localStorage.getItem(lessonStorageKey) ?? "null",
+                ),
+              );
         if (session) {
           setResponse(session.response);
           setTopic(session.topic);
@@ -154,12 +337,26 @@ export function TutorShell() {
           setTeachingMode(session.teachingMode);
           if (restoredLesson) {
             setHistoryId(restoredLesson.id);
-            if (restoredLesson.conversation) setConversation(restoredLesson.conversation.slice(-4));
+            if (restoredLesson.conversation)
+              setConversation(restoredLesson.conversation.slice(-4));
           }
-          const storedConversation: unknown = restoredLesson ? null : JSON.parse(localStorage.getItem(conversationStorageKey) ?? "null");
-          if (typeof storedConversation === "object" && storedConversation !== null) {
+          const storedConversation: unknown = restoredLesson
+            ? null
+            : JSON.parse(
+                localStorage.getItem(conversationStorageKey) ?? "null",
+              );
+          if (
+            typeof storedConversation === "object" &&
+            storedConversation !== null
+          ) {
             const record = storedConversation as Record<string, unknown>;
-            if (record.lessonTitle === session.response.lesson.title && Array.isArray(record.turns) && record.turns.length <= 4 && record.turns.every(isTurn)) setConversation(record.turns);
+            if (
+              record.lessonTitle === session.response.lesson.title &&
+              Array.isArray(record.turns) &&
+              record.turns.length <= 4 &&
+              record.turns.every(isTurn)
+            )
+              setConversation(record.turns);
           }
         } else {
           const params = new URLSearchParams(window.location.search);
@@ -170,36 +367,98 @@ export function TutorShell() {
           if (suggestedSubject) setSubject(suggestedSubject.slice(0, 50));
           if (suggestedLevel) setLevel(suggestedLevel.slice(0, 50));
         }
-      } catch { localStorage.removeItem(lessonStorageKey); localStorage.removeItem(conversationStorageKey); }
+      } catch {
+        localStorage.removeItem(lessonStorageKey);
+        localStorage.removeItem(conversationStorageKey);
+      }
       try {
-        const handoff: unknown = JSON.parse(sessionStorage.getItem(tutorHandoffStorageKey) ?? "null");
+        const handoff: unknown = JSON.parse(
+          sessionStorage.getItem(tutorHandoffStorageKey) ?? "null",
+        );
         if (isTutorHandoff(handoff)) setHandoffMessage(handoff.message);
         sessionStorage.removeItem(tutorHandoffStorageKey);
-      } catch { sessionStorage.removeItem(tutorHandoffStorageKey); }
+      } catch {
+        sessionStorage.removeItem(tutorHandoffStorageKey);
+      }
       setIsReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
 
-  useEffect(() => { if (conversation.length) latestTurnRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [conversation.length]);
+  useEffect(() => {
+    if (conversation.length)
+      latestTurnRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+  }, [conversation.length]);
 
-  async function requestLesson(action: Exclude<TutorAction, "followup" | "evaluate">) {
+  async function requestLesson(
+    action: Exclude<TutorAction, "followup" | "evaluate">,
+  ) {
     if (!profile || !topic.trim()) return;
     setIsLoading(true);
     setError(null);
     try {
       const previousLesson = response?.lesson;
-      const evaluationContext = evaluation ? ` Latest understanding check: ${evaluation.status}; focus: ${evaluation.needsReview.join(", ")}.` : "";
-      const apiResponse = await fetch("/api/tutor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: topic.trim(), subject, level, scores: profile.scores, action, teachingMode, previousStyles: previousLesson?.stylesUsed, previousTeachingMode: response?.teachingMode, previousTitle: previousLesson?.title, previousExplanation: `${previousLesson?.explanation.slice(0, 250) ?? ""}${evaluationContext}`.slice(0, 360) }) });
+      const evaluationContext = evaluation
+        ? ` Latest understanding check: ${evaluation.status}; focus: ${evaluation.needsReview.join(", ")}.`
+        : "";
+      const apiResponse = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: topic.trim(),
+          subject,
+          level,
+          scores: profile.scores,
+          action,
+          teachingMode,
+          previousStyles: previousLesson?.stylesUsed,
+          previousTeachingMode: response?.teachingMode,
+          previousTitle: previousLesson?.title,
+          previousExplanation: `${previousLesson?.explanation?.slice(0, 250) ?? ""}${evaluationContext}`.slice(
+            0,
+            360,
+          ),
+        }),
+      });
       const payload: unknown = await apiResponse.json();
       if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
-      if (!isTutorResponse(payload)) throw new Error("The tutor returned an incomplete lesson. Please try again.");
+      if (!isTutorResponse(payload))
+        throw new Error(
+          "The tutor returned an incomplete lesson. Please try again.",
+        );
       setResponse(payload);
       clearConversation();
-      const historyEntry = addLessonToHistory({ topic: topic.trim(), subject, level, teachingMode, stylesUsed: payload.lesson.stylesUsed, response: payload });
+      const historyEntry = addLessonToHistory({
+        topic: topic.trim(),
+        subject,
+        level,
+        teachingMode,
+        stylesUsed: payload.lesson.stylesUsed,
+        response: payload,
+      });
       setHistoryId(historyEntry.id);
-      localStorage.setItem(lessonStorageKey, JSON.stringify({ response: payload, topic: topic.trim(), subject, level, teachingMode } satisfies StoredLessonSession));
-    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "Please check your connection and try again."); } finally { setIsLoading(false); }
+      localStorage.setItem(
+        lessonStorageKey,
+        JSON.stringify({
+          response: payload,
+          topic: topic.trim(),
+          subject,
+          level,
+          teachingMode,
+        } satisfies StoredLessonSession),
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Please check your connection and try again.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function requestFollowUp(question: string): Promise<boolean> {
@@ -207,25 +466,113 @@ export function TutorShell() {
     setIsFollowUpLoading(true);
     setFollowUpError(null);
     const student = createMessage("student", question);
-    const recentConversation = conversation.slice(-3).flatMap((turn) => [turn.student, turn.tutor]);
+    const recentConversation = conversation
+      .slice(-3)
+      .flatMap((turn) => [turn.student, turn.tutor]);
     try {
-      const apiResponse = await fetch("/api/tutor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: topic.trim(), subject, level, scores: profile.scores, action: "followup", teachingMode, question, currentLesson: { title: response.lesson.title, coreIdea: response.lesson.coreIdea, explanation: response.lesson.explanation.slice(0, 360), stylesUsed: response.lesson.stylesUsed }, conversation: recentConversation }) });
+      const apiResponse = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: topic.trim(),
+          subject,
+          level,
+          scores: profile.scores,
+          action: "followup",
+          teachingMode,
+          question,
+          currentLesson: {
+            title: response.lesson.title,
+            coreIdea: response.lesson.coreIdea,
+            explanation: response.lesson.explanation.slice(0, 360),
+            stylesUsed: response.lesson.stylesUsed,
+          },
+          conversation: recentConversation,
+        }),
+      });
       const payload: unknown = await apiResponse.json();
       if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
-      if (!isFollowUpApiResponse(payload)) throw new Error("Ada returned an incomplete follow-up. Please try again.");
+      if (!isFollowUpApiResponse(payload))
+        throw new Error(
+          "Ada returned an incomplete follow-up. Please try again.",
+        );
       const tutor = createMessage("tutor", payload.followUp.answer);
-      const nextConversation = [...conversation, { student, tutor, response: payload.followUp }].slice(-4);
+      const nextConversation = [
+        ...conversation,
+        { student, tutor, response: payload.followUp },
+      ].slice(-4);
       setConversation(nextConversation);
-      localStorage.setItem(conversationStorageKey, JSON.stringify({ lessonTitle: response.lesson.title, turns: nextConversation } satisfies StoredConversation));
+      localStorage.setItem(
+        conversationStorageKey,
+        JSON.stringify({
+          lessonTitle: response.lesson.title,
+          turns: nextConversation,
+        } satisfies StoredConversation),
+      );
       if (historyId) saveHistoryConversation(historyId, nextConversation);
       return true;
     } catch (requestError) {
-      setFollowUpError(requestError instanceof Error ? requestError.message : "Please check your connection and try again.");
+      setFollowUpError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Please check your connection and try again.",
+      );
       return false;
-    } finally { setIsFollowUpLoading(false); }
+    } finally {
+      setIsFollowUpLoading(false);
+    }
   }
 
-  async function evaluateUnderstanding(answer: string) { if (!profile || !response || !topic.trim()) return; setIsEvaluating(true); setEvaluationError(null); try { const apiResponse = await fetch("/api/tutor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: topic.trim(), subject, level, scores: profile.scores, action: "evaluate", teachingMode, learnerAnswer: answer, checkQuestion: response.lesson.checkQuestion, lessonCoreIdea: response.lesson.coreIdea, lessonContext: response.lesson.explanation.slice(0, 500) }) }); const payload: unknown = await apiResponse.json(); if (!apiResponse.ok) throw new Error(getErrorMessage(payload)); if (!isEvaluationApiResponse(payload)) throw new Error("Ada returned an incomplete understanding check."); setEvaluation(payload.evaluation); setEvaluationSource(payload.source); const mastery = updateTopicMastery(topic.trim(), subject, payload.evaluation.score, payload.evaluation.status); if (historyId) saveHistoryEvaluation(historyId, { score: payload.evaluation.score, status: payload.evaluation.status, masteryLevel: mastery.masteryLevel, evaluatedAt: new Date().toISOString() }); } catch (requestError) { setEvaluationError(requestError instanceof Error ? requestError.message : "Please try again."); } finally { setIsEvaluating(false); } }
+  async function evaluateUnderstanding(answer: string) {
+    if (!profile || !response || !topic.trim()) return;
+    setIsEvaluating(true);
+    setEvaluationError(null);
+    try {
+      const apiResponse = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: topic.trim(),
+          subject,
+          level,
+          scores: profile.scores,
+          action: "evaluate",
+          teachingMode,
+          learnerAnswer: answer,
+          checkQuestion: response.lesson.checkQuestion,
+          lessonCoreIdea: response.lesson.coreIdea,
+          lessonContext: response.lesson.explanation.slice(0, 500),
+        }),
+      });
+      const payload: unknown = await apiResponse.json();
+      if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
+      if (!isEvaluationApiResponse(payload))
+        throw new Error("Ada returned an incomplete understanding check.");
+      setEvaluation(payload.evaluation);
+      setEvaluationSource(payload.source);
+      const mastery = updateTopicMastery(
+        topic.trim(),
+        subject,
+        payload.evaluation.score,
+        payload.evaluation.status,
+      );
+      if (historyId)
+        saveHistoryEvaluation(historyId, {
+          score: payload.evaluation.score,
+          status: payload.evaluation.status,
+          masteryLevel: mastery.masteryLevel,
+          evaluatedAt: new Date().toISOString(),
+        });
+    } catch (requestError) {
+      setEvaluationError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Please try again.",
+      );
+    } finally {
+      setIsEvaluating(false);
+    }
+  }
 
   function startNewLesson() {
     setResponse(null);
@@ -237,14 +584,130 @@ export function TutorShell() {
     localStorage.removeItem(lessonStorageKey);
   }
 
-  if (!isReady) return <main className="min-h-screen bg-[#f7f9fc]" aria-busy="true" />;
-  if (!profile) return <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[#f7f9fc] px-5 py-10"><div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_15%,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_85%_85%,rgba(99,102,241,0.14),transparent_32%)]" /><TutorEmptyState onUseBalancedProfile={() => setProfile({ scores: balancedScores, isBalanced: true })} /></main>;
+  if (!isReady)
+    return (
+      <div
+        className="min-h-screen bg-[var(--am-bg-reading)]"
+        aria-busy="true"
+      />
+    );
 
-  return <><AppNavigation /><main className="relative min-h-[calc(100vh-65px)] overflow-hidden bg-[#f7f9fc] px-5 py-8 sm:px-6 sm:py-12 lg:px-8">
-    <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_15%,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_85%_85%,rgba(99,102,241,0.14),transparent_32%)]" />
-    <div className="mx-auto max-w-6xl">
-      <header className="max-w-3xl"><p className="text-sm font-semibold uppercase tracking-wider text-teal-700">Adaptive AI tutor</p><h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">A lesson shaped around your current preferences.</h1><p className="mt-4 text-lg leading-8 text-slate-600">Ask Ada about a topic, then choose how you would like to be taught.</p>{handoffMessage ? <p className="mt-5 rounded-2xl border border-teal-100 bg-teal-50/80 px-4 py-3 text-sm font-medium leading-6 text-teal-900" role="status">{handoffMessage}</p> : null}</header>
-      <div className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)] lg:items-start"><div className="space-y-5"><LearningDNACompact scores={profile.scores} isBalanced={profile.isBalanced} /><TopicForm topic={topic} subject={subject} level={level} scores={profile.scores} teachingMode={teachingMode} isLoading={isLoading} onTopicChange={setTopic} onSubjectChange={setSubject} onLevelChange={setLevel} onTeachingModeChange={setTeachingMode} onSubmit={() => requestLesson("initial")} /></div><div>{error ? <TutorErrorState message={error} /> : null}{isLoading ? <TutorLoadingState /> : null}{!isLoading && response ? <><LessonCard response={response} /><LessonActions isLoading={isLoading} onAction={requestLesson} onNewLesson={startNewLesson} /><UnderstandingCheck question={response.lesson.checkQuestion} isLoading={isEvaluating} error={evaluationError} onSubmit={evaluateUnderstanding} />{evaluation ? <UnderstandingFeedback evaluation={evaluation} source={evaluationSource} onAction={(nextStep) => { if (nextStep === "simplify") void requestLesson("simpler"); else if (nextStep === "example") void requestLesson("example"); else if (nextStep === "clarify") void requestLesson("different"); }} /> : null}{topic.trim() ? <LessonFollowUp lesson={response.lesson} conversation={conversation} isLoading={isFollowUpLoading} error={followUpError} onAsk={requestFollowUp} latestTurnRef={latestTurnRef} /> : null}</> : null}{!isLoading && !response && !error ? <section className="rounded-3xl border border-dashed border-slate-300 bg-white/50 p-10 text-center text-slate-500"><p className="font-medium text-slate-700">Ada will build your focused lesson here.</p><p className="mt-2 text-sm leading-6">Choose a suggested topic or enter one of your own to begin.</p></section> : null}</div></div>
-    </div>
-  </main></>;
+  if (!profile)
+    return (
+      <PageShell>
+        <div className="py-12">
+          <TutorEmptyState
+            onUseBalancedProfile={() =>
+              setProfile({ scores: balancedScores, isBalanced: true })
+            }
+          />
+        </div>
+      </PageShell>
+    );
+
+  return (
+    <PageShell heading="Adaptive AI Tutor" subheading="A lesson shaped around your current preferences.">
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start">
+        {/* Left: Profile + form */}
+        <div className="space-y-6">
+          <LearningDNACompact
+            scores={profile.scores}
+            isBalanced={profile.isBalanced}
+          />
+          <TopicForm
+            topic={topic}
+            subject={subject}
+            level={level}
+            scores={profile.scores}
+            teachingMode={teachingMode}
+            isLoading={isLoading}
+            onTopicChange={setTopic}
+            onSubjectChange={setSubject}
+            onLevelChange={setLevel}
+            onTeachingModeChange={setTeachingMode}
+            onSubmit={() => requestLesson("initial")}
+          />
+        </div>
+
+        {/* Right: Lesson content */}
+        <div>
+          {/* Handoff message */}
+          {handoffMessage && (
+            <p
+              className="mb-6 rounded-[var(--am-radius-lg)] border border-[var(--am-primary)]/20 bg-[var(--am-primary-light)] px-4 py-3 text-sm font-medium text-[var(--am-primary)]"
+              role="status"
+            >
+              {handoffMessage}
+            </p>
+          )}
+
+          {/* Error */}
+          {error && <TutorErrorState message={error} />}
+
+          {/* Loading */}
+          {isLoading && <TutorLoadingState />}
+
+          {/* Lesson */}
+          {!isLoading && response && (
+            <>
+              <LessonCard response={response} />
+              <LessonActions
+                isLoading={isLoading}
+                onAction={requestLesson}
+                onNewLesson={startNewLesson}
+              />
+
+              {/* Understanding check */}
+              <UnderstandingCheck
+                question={response.lesson.checkQuestion}
+                isLoading={isEvaluating}
+                error={evaluationError}
+                onSubmit={evaluateUnderstanding}
+              />
+
+              {/* Evaluation feedback */}
+              {evaluation && (
+                <UnderstandingFeedback
+                  evaluation={evaluation}
+                  source={evaluationSource}
+                  onAction={(nextStep) => {
+                    if (nextStep === "simplify")
+                      void requestLesson("simpler");
+                    else if (nextStep === "example")
+                      void requestLesson("example");
+                    else if (nextStep === "clarify")
+                      void requestLesson("different");
+                  }}
+                />
+              )}
+
+              {/* Follow-up */}
+              {topic.trim() && (
+                <LessonFollowUp
+                  lesson={response.lesson}
+                  conversation={conversation}
+                  isLoading={isFollowUpLoading}
+                  error={followUpError}
+                  onAsk={requestFollowUp}
+                  latestTurnRef={latestTurnRef}
+                />
+              )}
+            </>
+          )}
+
+          {/* Empty state (no lesson yet) */}
+          {!isLoading && !response && !error && (
+            <section className="rounded-[var(--am-radius-2xl)] border border-dashed border-[var(--am-border)] bg-[var(--am-bg-elevated)]/60 p-10 text-center text-[var(--am-text-muted)]">
+              <p className="font-medium text-[var(--am-text-secondary)]">
+                Ada will build your focused lesson here.
+              </p>
+              <p className="mt-2 text-sm leading-6">
+                Choose a suggested topic or enter one of your own to begin.
+              </p>
+            </section>
+          )}
+        </div>
+      </div>
+    </PageShell>
+  );
 }

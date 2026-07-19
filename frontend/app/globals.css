@@ -1,28 +1,375 @@
 @import "tailwindcss";
 
+/* ========================================
+   AdaptiveMind AI — Design System
+   A living learning universe
+   ======================================== */
+
 :root {
-  --background: #f7f9fc;
-  --foreground: #0f172a;
+  /* --- Spatial Backgrounds --- */
+  --am-bg-deep: #080c1b;
+  --am-bg-mid: #0e1428;
+  --am-bg-surface: #f7f5f0;
+  --am-bg-reading: #faf8f5;
+  --am-bg-elevated: #ffffff;
+
+  /* --- Text --- */
+  --am-text-primary: #1a1d2e;
+  --am-text-secondary: #5c5f73;
+  --am-text-muted: #9195a8;
+  --am-text-inverse: #f0f0f2;
+
+  /* --- Learning DNA Colors --- */
+  --am-dna-visual: #22d3ee;
+  --am-dna-examples: #f59e0b;
+  --am-dna-analogies: #8b5cf6;
+  --am-dna-stories: #fb7185;
+  --am-dna-challenges: #fb6a4a;
+
+  /* --- Primary Product Accent --- */
+  --am-primary: #5046e5;
+  --am-primary-hover: #4338ca;
+  --am-primary-light: #ede9fe;
+
+  /* --- Semantic --- */
+  --am-success: #10b981;
+  --am-success-light: #ecfdf5;
+  --am-warning: #f59e0b;
+  --am-warning-light: #fffbeb;
+  --am-error: #ef4444;
+  --am-error-light: #fef2f2;
+
+  /* --- Borders --- */
+  --am-border: #e5e3de;
+  --am-border-light: #eeecea;
+  --am-border-focus: #5046e5;
+
+  /* --- Elevation --- */
+  --am-shadow-sm: 0 1px 3px rgba(8, 12, 27, 0.06);
+  --am-shadow-md: 0 4px 16px rgba(8, 12, 27, 0.08);
+  --am-shadow-lg: 0 8px 32px rgba(8, 12, 27, 0.10);
+  --am-shadow-xl: 0 16px 48px rgba(8, 12, 27, 0.14);
+
+  /* --- Spacing Scale --- */
+  --am-space-xs: 0.25rem;
+  --am-space-sm: 0.5rem;
+  --am-space-md: 1rem;
+  --am-space-lg: 1.5rem;
+  --am-space-xl: 2rem;
+  --am-space-2xl: 3rem;
+  --am-space-3xl: 4rem;
+
+  /* --- Border Radius --- */
+  --am-radius-sm: 0.5rem;
+  --am-radius-md: 0.75rem;
+  --am-radius-lg: 1rem;
+  --am-radius-xl: 1.25rem;
+  --am-radius-2xl: 1.5rem;
+  --am-radius-full: 9999px;
+
+  /* --- Motion --- */
+  --am-duration-fast: 120ms;
+  --am-duration-quick: 180ms;
+  --am-duration-standard: 280ms;
+  --am-duration-reveal: 450ms;
+  --am-duration-slow: 650ms;
+  --am-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --am-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --am-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* --- Z-Index Layers --- */
+  --am-z-base: 0;
+  --am-z-above: 10;
+  --am-z-nav: 100;
+  --am-z-overlay: 200;
+  --am-z-modal: 300;
+  --am-z-toast: 400;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --color-am-deep: var(--am-bg-deep);
+  --color-am-mid: var(--am-bg-mid);
+  --color-am-surface: var(--am-bg-surface);
+  --color-am-reading: var(--am-bg-reading);
+  --color-am-elevated: var(--am-bg-elevated);
+  --color-am-primary: var(--am-primary);
+  --color-am-primary-hover: var(--am-primary-hover);
+  --color-am-primary-light: var(--am-primary-light);
+  --color-am-text: var(--am-text-primary);
+  --color-am-text-secondary: var(--am-text-secondary);
+  --color-am-text-muted: var(--am-text-muted);
+  --color-am-text-inverse: var(--am-text-inverse);
+  --color-am-border: var(--am-border);
+  --color-am-border-light: var(--am-border-light);
+  --color-am-dna-visual: var(--am-dna-visual);
+  --color-am-dna-examples: var(--am-dna-examples);
+  --color-am-dna-analogies: var(--am-dna-analogies);
+  --color-am-dna-stories: var(--am-dna-stories);
+  --color-am-dna-challenges: var(--am-dna-challenges);
+  --color-am-success: var(--am-success);
+  --color-am-success-light: var(--am-success-light);
+  --color-am-warning: var(--am-warning);
+  --color-am-warning-light: var(--am-warning-light);
+  --color-am-error: var(--am-error);
+  --color-am-error-light: var(--am-error-light);
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", "SF Mono", Menlo, Consolas, monospace;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-}
+/* ========================================
+   Global Base Styles
+   ======================================== */
 
 html {
   scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background: var(--am-bg-reading);
+  color: var(--am-text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 ::selection {
-  background: #b8f1e4;
-  color: #0f172a;
+  background: #c4b5fd;
+  color: #1a1d2e;
+}
+
+/* ========================================
+   Focus States (WCAG 2.2 AA)
+   ======================================== */
+
+:focus-visible {
+  outline: 2px solid var(--am-primary);
+  outline-offset: 2px;
+  border-radius: var(--am-radius-sm);
+}
+
+/* ========================================
+   Spatial Background Pattern
+   ======================================== */
+
+.am-spatial-bg {
+  background:
+    radial-gradient(ellipse at 15% 8%, rgba(80, 70, 229, 0.08) 0%, transparent 45%),
+    radial-gradient(ellipse at 85% 15%, rgba(34, 211, 238, 0.06) 0%, transparent 40%),
+    radial-gradient(ellipse at 50% 90%, rgba(139, 92, 246, 0.05) 0%, transparent 40%),
+    var(--am-bg-reading);
+}
+
+/* ========================================
+   Deep Spatial Background (for dark sections)
+   ======================================== */
+
+.am-deep-space {
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(80, 70, 229, 0.12) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(139, 92, 246, 0.06) 0%, transparent 50%),
+    var(--am-bg-deep);
+}
+
+/* ========================================
+   Grid Line Overlay (subtle)
+   ======================================== */
+
+.am-grid-lines {
+  background-image:
+    linear-gradient(rgba(80, 70, 229, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(80, 70, 229, 0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ========================================
+   Connection Lines Pattern
+   ======================================== */
+
+.am-connections::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(80, 70, 229, 0.04) 1px, transparent 1px),
+    radial-gradient(circle at 60% 20%, rgba(34, 211, 238, 0.04) 1px, transparent 1px),
+    radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.04) 1px, transparent 1px);
+  background-size: 120px 120px, 100px 100px, 140px 140px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ========================================
+   Reading Surface Card
+   ======================================== */
+
+.am-card {
+  background: var(--am-bg-elevated);
+  border: 1px solid var(--am-border-light);
+  border-radius: var(--am-radius-xl);
+  box-shadow: var(--am-shadow-sm);
+  transition: box-shadow var(--am-duration-standard) var(--am-ease-out),
+              transform var(--am-duration-standard) var(--am-ease-out);
+}
+
+.am-card:hover {
+  box-shadow: var(--am-shadow-md);
+}
+
+.am-card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--am-shadow-lg);
+}
+
+/* ========================================
+   Button System
+   ======================================== */
+
+.am-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--am-radius-full);
+  transition: all var(--am-duration-quick) var(--am-ease-out);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.am-btn-primary {
+  background: var(--am-primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(80, 70, 229, 0.25);
+}
+
+.am-btn-primary:hover {
+  background: var(--am-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(80, 70, 229, 0.3);
+}
+
+.am-btn-primary:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 4px rgba(80, 70, 229, 0.2);
+}
+
+.am-btn-secondary {
+  background: var(--am-bg-elevated);
+  color: var(--am-text-primary);
+  border: 1px solid var(--am-border);
+}
+
+.am-btn-secondary:hover {
+  background: #f3f2ee;
+  border-color: var(--am-text-muted);
+}
+
+.am-btn-ghost {
+  background: transparent;
+  color: var(--am-text-secondary);
+}
+
+.am-btn-ghost:hover {
+  background: rgba(80, 70, 229, 0.06);
+  color: var(--am-text-primary);
+}
+
+/* ========================================
+   Learning DNA Dimension Colors
+   ======================================== */
+
+.am-dna-visual { color: var(--am-dna-visual); }
+.am-dna-examples { color: var(--am-dna-examples); }
+.am-dna-analogies { color: var(--am-dna-analogies); }
+.am-dna-stories { color: var(--am-dna-stories); }
+.am-dna-challenges { color: var(--am-dna-challenges); }
+
+.am-dna-visual-bg { background-color: rgba(34, 211, 238, 0.1); border-color: rgba(34, 211, 238, 0.3); }
+.am-dna-examples-bg { background-color: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3); }
+.am-dna-analogies-bg { background-color: rgba(139, 92, 246, 0.1); border-color: rgba(139, 92, 246, 0.3); }
+.am-dna-stories-bg { background-color: rgba(251, 113, 133, 0.1); border-color: rgba(251, 113, 133, 0.3); }
+.am-dna-challenges-bg { background-color: rgba(251, 106, 74, 0.1); border-color: rgba(251, 106, 74, 0.3); }
+
+/* ========================================
+   Progress Bars
+   ======================================== */
+
+.am-progress-track {
+  height: 6px;
+  border-radius: var(--am-radius-full);
+  background: rgba(80, 70, 229, 0.08);
+  overflow: hidden;
+}
+
+.am-progress-fill {
+  height: 100%;
+  border-radius: var(--am-radius-full);
+  background: linear-gradient(90deg, var(--am-primary), var(--am-dna-visual));
+  transition: width var(--am-duration-reveal) var(--am-ease-out);
+}
+
+/* ========================================
+   Reduced Motion
+   ======================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html { scroll-behavior: auto; }
+}
+
+/* ========================================
+   Noise Texture Overlay (subtle grain)
+   ======================================== */
+
+.am-noise::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 9999;
+}
+
+/* ========================================
+   Scrollbar Styling
+   ======================================== */
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(80, 70, 229, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(80, 70, 229, 0.35);
+}
+
+/* ========================================
+   Print Styles
+   ======================================== */
+
+@media print {
+  .am-noise::after,
+  nav, footer { display: none !important; }
+  body { background: white; }
 }

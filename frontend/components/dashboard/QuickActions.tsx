@@ -3,8 +3,73 @@
 import Link from "next/link";
 import { startNewTopicStorageKey } from "@/lib/dashboard-storage";
 
-interface QuickActionsProps { hasHistory: boolean; }
+interface QuickActionsProps {
+  hasHistory: boolean;
+}
 
 export function QuickActions({ hasHistory }: QuickActionsProps) {
-  return <section aria-labelledby="quick-actions-title"><h2 id="quick-actions-title" className="text-xl font-semibold text-slate-950">Choose your next step</h2><div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4"><Link href="/tutor" className="rounded-2xl border border-indigo-200 bg-indigo-600 p-5 text-white shadow-lg shadow-indigo-900/15 transition hover:-translate-y-0.5 hover:bg-indigo-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-3"><p className="font-semibold">{hasHistory ? "Continue learning" : "Start learning"}</p><p className="mt-2 text-sm leading-6 text-indigo-100">{hasHistory ? "Pick up with Ada and your current lesson." : "Begin your first personalized lesson with Ada."}</p></Link><Link href="/planner" className="rounded-2xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-3"><p className="font-semibold text-indigo-950">Build my study plan</p><p className="mt-2 text-sm leading-6 text-indigo-800">Turn your recent learning into a realistic next step.</p></Link><Link href="/tutor" onClick={() => sessionStorage.setItem(startNewTopicStorageKey, "true")} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-3"><p className="font-semibold text-slate-950">Start a new topic</p><p className="mt-2 text-sm leading-6 text-slate-600">Explore a subject or question that is on your mind.</p></Link><Link href="/assessment" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-3"><p className="font-semibold text-slate-950">Retake Learning DNA</p><p className="mt-2 text-sm leading-6 text-slate-600">Refresh your current learning preferences.</p></Link></div></section>;
+  return (
+    <section aria-labelledby="quick-actions-title">
+      <h2
+        id="quick-actions-title"
+        className="sr-only"
+      >
+        Quick actions
+      </h2>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Link
+          href="/tutor"
+          className="group rounded-[var(--am-radius-xl)] border border-[var(--am-primary)]/20 bg-[var(--am-primary)] p-5 text-white shadow-sm transition-all duration-[var(--am-duration-quick)] hover:-translate-y-0.5 hover:shadow-[var(--am-shadow-md)]"
+        >
+          <p className="font-semibold">
+            {hasHistory ? "Continue learning" : "Start learning"}
+          </p>
+          <p className="mt-1.5 text-sm leading-6 text-white/70">
+            {hasHistory
+              ? "Pick up with Ada and your current lesson."
+              : "Begin your first personalized lesson with Ada."}
+          </p>
+        </Link>
+
+        <Link
+          href="/planner"
+          className="group rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-5 shadow-sm transition-all duration-[var(--am-duration-quick)] hover:-translate-y-0.5 hover:shadow-[var(--am-shadow-md)]"
+        >
+          <p className="font-semibold text-[var(--am-text-primary)]">
+            Build my study plan
+          </p>
+          <p className="mt-1.5 text-sm leading-6 text-[var(--am-text-secondary)]">
+            Turn your recent learning into a realistic next step.
+          </p>
+        </Link>
+
+        <Link
+          href="/tutor"
+          onClick={() =>
+            sessionStorage.setItem(startNewTopicStorageKey, "true")
+          }
+          className="group rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-5 shadow-sm transition-all duration-[var(--am-duration-quick)] hover:-translate-y-0.5 hover:shadow-[var(--am-shadow-md)]"
+        >
+          <p className="font-semibold text-[var(--am-text-primary)]">
+            Start a new topic
+          </p>
+          <p className="mt-1.5 text-sm leading-6 text-[var(--am-text-secondary)]">
+            Explore a subject or question that is on your mind.
+          </p>
+        </Link>
+
+        <Link
+          href="/assessment"
+          className="group rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-5 shadow-sm transition-all duration-[var(--am-duration-quick)] hover:-translate-y-0.5 hover:shadow-[var(--am-shadow-md)]"
+        >
+          <p className="font-semibold text-[var(--am-text-primary)]">
+            Retake Learning DNA
+          </p>
+          <p className="mt-1.5 text-sm leading-6 text-[var(--am-text-secondary)]">
+            Refresh your current learning preferences.
+          </p>
+        </Link>
+      </div>
+    </section>
+  );
 }

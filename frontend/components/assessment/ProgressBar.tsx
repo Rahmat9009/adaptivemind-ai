@@ -8,12 +8,16 @@ export function ProgressBar({ current, total }: ProgressBarProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between text-sm font-medium text-slate-600">
-        <span>Question {current} of {total}</span>
-        <span>{progress}% complete</span>
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-medium text-[var(--am-text-secondary)]">
+          Question {current} of {total}
+        </span>
+        <span className="tabular-nums text-[var(--am-text-muted)]">
+          {progress}%
+        </span>
       </div>
       <div
-        className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200"
+        className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--am-border)]"
         role="progressbar"
         aria-label="Assessment progress"
         aria-valuemin={0}
@@ -21,7 +25,7 @@ export function ProgressBar({ current, total }: ProgressBarProps) {
         aria-valuenow={current}
       >
         <div
-          className="h-full rounded-full bg-[linear-gradient(90deg,#0f766e,#38bdf8,#6366f1)] transition-all duration-500"
+          className="am-progress-fill"
           style={{ width: `${progress}%` }}
         />
       </div>

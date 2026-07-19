@@ -7,7 +7,7 @@ import { Navbar } from "@/components/layout/Navbar";
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f7f9fc] text-slate-950">
+    <main className="min-h-screen bg-[var(--am-bg-reading)] text-[var(--am-text-primary)]">
       <Navbar />
       <Hero />
       <Features />

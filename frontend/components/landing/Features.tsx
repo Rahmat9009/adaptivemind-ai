@@ -1,43 +1,68 @@
 const features = [
   {
-    title: "Adaptive Learning",
-    description: "The AI continuously learns how you learn best.",
-  },
-  {
-    title: "Personalized Lessons",
+    title: "Learning DNA",
     description:
-      "Every explanation is tailored to your preferred learning style.",
+      "A dynamic profile built from your preferences across five dimensions — Visual, Examples, Analogies, Stories, and Challenges. Not a fixed label, but an evolving map of how ideas click for you.",
+    accent: "#8b5cf6",
   },
   {
-    title: "Smart Progress",
-    description: "Track strengths, weaknesses, and mastery over time.",
+    title: "Adaptive explanations",
+    description:
+      "Every lesson is shaped by your Learning DNA. The same concept can be taught visually, through analogies, as a story, with worked examples, or as a reasoning challenge — Ada chooses what fits.",
+    accent: "#22d3ee",
+  },
+  {
+    title: "Living progress",
+    description:
+      "Mastery tracking, understanding checks, and a study planner that adapts to your pace. Not a static report card — a continuous, responsive picture of your growing knowledge.",
+    accent: "#5046e5",
   },
 ];
 
 export function Features() {
   return (
-    <section id="features" className="bg-white px-5 py-24 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        <div className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-teal-700">
-            Features
+    <section className="relative isolate overflow-hidden bg-[var(--am-bg-reading)] px-5 py-24 sm:px-8 lg:px-10">
+      {/* Subtle top boundary */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--am-primary)]/15 to-transparent" />
+
+      <div className="mx-auto max-w-6xl">
+        <div className="max-w-xl">
+          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
+            How it works
           </p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            Tutoring that adjusts with every lesson.
+          <h2 className="mt-4 text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-tight text-[var(--am-text-primary)] leading-[1.12]">
+            One concept, explained in the way that makes sense to you.
           </h2>
         </div>
 
-        <div className="mt-12 grid gap-5 md:grid-cols-3">
-          {features.map((feature) => (
+        <div className="mt-16 grid gap-8 md:grid-cols-3">
+          {features.map((feature, index) => (
             <article
               key={feature.title}
-              className="group rounded-3xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-7 shadow-sm transition hover:-translate-y-1 hover:shadow-xl hover:shadow-slate-900/8"
+              className="group relative"
             >
-              <div className="mb-8 h-12 w-12 rounded-2xl bg-gradient-to-br from-teal-300 to-sky-400 shadow-lg shadow-teal-500/20" />
-              <h3 className="text-xl font-semibold text-slate-950">
+              {/* Accent line */}
+              <div
+                className="mb-6 h-1 w-12 rounded-full transition-all duration-[var(--am-duration-standard)] group-hover:w-16"
+                style={{ backgroundColor: feature.accent }}
+              />
+
+              <div className="flex items-center gap-3">
+                <span
+                  className="flex h-8 w-8 items-center justify-center rounded-[var(--am-radius-md)] text-sm font-semibold"
+                  style={{
+                    backgroundColor: `${feature.accent}15`,
+                    color: feature.accent,
+                  }}
+                >
+                  0{index + 1}
+                </span>
+              </div>
+
+              <h3 className="mt-4 text-xl font-semibold tracking-tight text-[var(--am-text-primary)]">
                 {feature.title}
               </h3>
-              <p className="mt-4 leading-7 text-slate-600">
+              <p className="mt-3 leading-7 text-[var(--am-text-secondary)]">
                 {feature.description}
               </p>
             </article>

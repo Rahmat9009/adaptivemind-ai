@@ -1,37 +1,186 @@
-import { learningDimensionLabels } from "@/lib/learning-dna";
+import { learningDimensionLabels, type LearningDimension } from "@/lib/learning-dna";
 import type { TutorApiResponse } from "@/lib/ai/types";
 
 interface LessonCardProps {
   response: TutorApiResponse;
 }
 
+const dnaColors: Record<LearningDimension, string> = {
+  visual: "#22d3ee",
+  examples: "#f59e0b",
+  analogies: "#8b5cf6",
+  stories: "#fb7185",
+  challenges: "#fb6a4a",
+};
+
 export function LessonCard({ response }: LessonCardProps) {
   const { lesson, source, action } = response;
+
   const actionLabel = {
     initial: "Personalized lesson",
     simpler: "Simplified explanation",
-    different: "A different explanation",
+    different: "A different lens",
     example: "Worked example",
     challenge: "Reasoning challenge",
   }[action];
 
   return (
-    <article className="rounded-3xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/6 sm:p-8" aria-labelledby="lesson-title">
+    <article
+      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-8"
+      aria-labelledby="lesson-title"
+    >
+      {/* Header row */}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-semibold uppercase tracking-wider text-teal-700">{actionLabel}</p>
-        {source === "demo" ? <span className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-800">Demo response</span> : null}
+        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
+          {actionLabel}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {lesson.stylesUsed.map((style) => (
+            <span
+              key={style}
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold"
+              style={{
+                backgroundColor: `${dnaColors[style]}15`,
+                color: dnaColors[style],
+              }}
+            >
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ backgroundColor: dnaColors[style] }}
+              />
+              {learningDimensionLabels[style]}
+            </span>
+          ))}
+          {source === "demo" && (
+            <span className="rounded-full border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-2.5 py-1 text-[10px] font-semibold text-[var(--am-text-muted)]">
+              Demo
+            </span>
+          )}
+        </div>
       </div>
-      <h2 id="lesson-title" className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">{lesson.title}</h2>
-      <p className="mt-3 text-sm font-medium text-slate-500">{action === "different" ? `Reframed using ${lesson.stylesUsed.map((style) => learningDimensionLabels[style]).join(" + ")}.` : `Ada personalized this lesson using ${lesson.stylesUsed.map((style) => learningDimensionLabels[style]).join(" + ")}.`}</p>
 
-      <section className="mt-8"><h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Core idea</h3><p className="mt-2 text-lg font-medium leading-8 text-slate-900">{lesson.coreIdea}</p></section>
-      <section className="mt-7"><h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">{action === "simpler" ? "Simplified explanation" : action === "challenge" ? "Reasoning setup" : action === "different" ? "A different lens" : "How it works"}</h3><p className="mt-2 leading-7 text-slate-700">{lesson.explanation}</p></section>
-      {lesson.example ? <section className="mt-7 rounded-2xl border border-sky-100 bg-sky-50/70 p-5"><h3 className="font-semibold text-slate-900">{action === "example" ? "Worked example" : "Example"}</h3><p className="mt-2 leading-7 text-slate-700">{lesson.example}</p></section> : null}
-      {lesson.analogy ? <section className="mt-4 rounded-2xl border border-teal-100 bg-teal-50/70 p-5"><h3 className="font-semibold text-slate-900">Useful analogy</h3><p className="mt-2 leading-7 text-slate-700">{lesson.analogy}</p></section> : null}
-      <section className="mt-7"><h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">Key points</h3><ul className="mt-3 space-y-2 text-slate-700">{lesson.keyPoints.map((point) => <li key={point} className="flex gap-3"><span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-teal-500" aria-hidden="true" />{point}</li>)}</ul></section>
-      {lesson.practicePrompt ? <section className="mt-7 rounded-2xl border border-indigo-100 bg-indigo-50/70 p-5"><h3 className="font-semibold text-slate-900">Try a similar one</h3><p className="mt-2 leading-7 text-slate-700">{lesson.practicePrompt}</p></section> : null}
-      {lesson.challenge ? <section className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-5"><h3 className="font-semibold text-slate-900">Your challenge</h3><p className="mt-2 leading-7 text-slate-700">{lesson.challenge}</p>{lesson.hint ? <details className="mt-4 rounded-xl bg-white/80 px-4 py-3 text-sm text-slate-700"><summary className="cursor-pointer font-semibold text-slate-900">Optional hint</summary><p className="mt-2 leading-6">{lesson.hint}</p></details> : null}</section> : null}
-      <section className="mt-7 rounded-2xl bg-slate-950 p-5 text-white"><h3 className="text-sm font-semibold uppercase tracking-wider text-teal-200">Quick understanding check</h3><p className="mt-2 leading-7 text-slate-100">{lesson.checkQuestion}</p></section>
+      {/* Title */}
+      <h2
+        id="lesson-title"
+        className="mt-4 text-2xl font-semibold tracking-tight text-[var(--am-text-primary)] sm:text-3xl"
+      >
+        {lesson.title}
+      </h2>
+
+      {/* Core Idea */}
+      <section className="mt-7">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+          Core idea
+        </h3>
+        <p className="mt-2 text-lg font-medium leading-8 text-[var(--am-text-primary)]">
+          {lesson.coreIdea}
+        </p>
+      </section>
+
+      {/* Explanation */}
+      <section className="mt-6">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+          {action === "simpler"
+            ? "Simplified explanation"
+            : action === "challenge"
+              ? "Reasoning setup"
+              : action === "different"
+                ? "A different lens"
+                : "Explanation"}
+        </h3>
+        <p className="mt-2 leading-7 text-[var(--am-text-secondary)]">
+          {lesson.explanation}
+        </p>
+      </section>
+
+      {/* Example */}
+      {lesson.example && (
+        <section className="mt-6 rounded-[var(--am-radius-xl)] border border-[var(--am-dna-examples)]/20 bg-[var(--am-dna-examples)]/8 p-5">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--am-text-primary)]">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: dnaColors.examples }}
+            />
+            {action === "example" ? "Worked example" : "Example"}
+          </h3>
+          <p className="mt-2 leading-7 text-[var(--am-text-secondary)]">
+            {lesson.example}
+          </p>
+        </section>
+      )}
+
+      {/* Analogy */}
+      {lesson.analogy && (
+        <section className="mt-4 rounded-[var(--am-radius-xl)] border border-[var(--am-dna-analogies)]/20 bg-[var(--am-dna-analogies)]/8 p-5">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--am-text-primary)]">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: dnaColors.analogies }}
+            />
+            Analogy
+          </h3>
+          <p className="mt-2 leading-7 text-[var(--am-text-secondary)]">
+            {lesson.analogy}
+          </p>
+        </section>
+      )}
+
+      {/* Key Points */}
+      <section className="mt-6">
+        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+          Key points
+        </h3>
+        <ul className="mt-3 space-y-2">
+          {lesson.keyPoints.map((point) => (
+            <li
+              key={point}
+              className="flex gap-3 text-sm leading-6 text-[var(--am-text-secondary)]"
+            >
+              <span
+                className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{ backgroundColor: dnaColors[lesson.stylesUsed[0] ?? "visual"] }}
+              />
+              {point}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* Practice prompt */}
+      {lesson.practicePrompt && (
+        <section className="mt-6 rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] p-5">
+          <h3 className="text-sm font-semibold text-[var(--am-text-primary)]">
+            Try a similar one
+          </h3>
+          <p className="mt-2 leading-7 text-[var(--am-text-secondary)]">
+            {lesson.practicePrompt}
+          </p>
+        </section>
+      )}
+
+      {/* Challenge */}
+      {lesson.challenge && (
+        <section className="mt-6 rounded-[var(--am-radius-xl)] border border-[var(--am-dna-challenges)]/20 bg-[var(--am-dna-challenges)]/8 p-5">
+          <h3 className="flex items-center gap-2 text-sm font-semibold text-[var(--am-text-primary)]">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{ backgroundColor: dnaColors.challenges }}
+            />
+            Your challenge
+          </h3>
+          <p className="mt-2 leading-7 text-[var(--am-text-secondary)]">
+            {lesson.challenge}
+          </p>
+          {lesson.hint && (
+            <details className="mt-4 rounded-[var(--am-radius-md)] bg-[var(--am-bg-elevated)]/80 px-4 py-3 text-sm text-[var(--am-text-secondary)]">
+              <summary className="cursor-pointer font-semibold text-[var(--am-text-primary)]">
+                Optional hint
+              </summary>
+              <p className="mt-2 leading-6">{lesson.hint}</p>
+            </details>
+          )}
+        </section>
+      )}
     </article>
   );
 }
