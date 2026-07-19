@@ -4,14 +4,15 @@ import {
   type LearningDimension,
   type LearningScores,
 } from "@/lib/learning-dna";
+import { dnaHex } from "@/lib/learning-dna-visuals";
 
 interface LearningDNAChartProps {
   scores: LearningScores;
   isVisible: boolean;
 }
 
-function DimensionIcon({ dimension }: { dimension: LearningDimension }) {
-  const shared = { className: "h-5 w-5", fill: "none", stroke: "currentColor", strokeWidth: 1.8, viewBox: "0 0 24 24", "aria-hidden": true };
+function DimensionMark({ dimension }: { dimension: LearningDimension }) {
+  const shared = { className: "h-5 w-5", fill: "none", stroke: "currentColor", strokeWidth: 1.6, viewBox: "0 0 24 24", "aria-hidden": true };
   if (dimension === "visual") return <svg {...shared}><path d="M3 12s3.2-5 9-5 9 5 9 5-3.2 5-9 5-9-5-9-5Z" /><circle cx="12" cy="12" r="2.5" /></svg>;
   if (dimension === "examples") return <svg {...shared}><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M8 9h8M8 13h5M8 17h3" /></svg>;
   if (dimension === "analogies") return <svg {...shared}><path d="M7 12h10M7 8h4M13 16h4" /><circle cx="5" cy="8" r="2" /><circle cx="19" cy="16" r="2" /></svg>;
@@ -20,21 +21,35 @@ function DimensionIcon({ dimension }: { dimension: LearningDimension }) {
 }
 
 export function LearningDNAChart({ scores, isVisible }: LearningDNAChartProps) {
+  const ranked = [...learningDimensions].sort((a, b) => scores[b] - scores[a]);
   return (
-    <section aria-labelledby="dna-chart-title" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-      <div className="flex items-center justify-between gap-4">
-        <h2 id="dna-chart-title" className="text-xl font-semibold text-slate-950">Your learning preferences</h2>
-        <span className="text-sm text-slate-500">Initial profile</span>
+    <section aria-labelledby="dna-chart-title" className="surface-paper rounded-[2rem] p-6 sm:p-8">
+      <div className="flex items-baseline justify-between gap-4">
+        <h2 id="dna-chart-title" className="font-display text-2xl text-ink-950">All five dimensions</h2>
+        <span className="font-mono text-xs uppercase tracking-wider text-ink-500">Initial profile</span>
       </div>
-      <div className="mt-7 space-y-6">
-        {learningDimensions.map((dimension) => (
-          <div key={dimension}>
+      <div className="mt-8 space-y-7">
+        {ranked.map((dimension, i) => (
+          <div key={dimension} className="dna-visual" style={{ ["--dna" as string]: dnaHex[dimension] }}>
             <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 text-slate-700"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-700"><DimensionIcon dimension={dimension} /></span><span className="font-medium">{learningDimensionLabels[dimension]}</span></div>
-              <span className="text-sm font-semibold tabular-nums text-slate-950">{scores[dimension]}%</span>
+              <div className="flex items-center gap-3 text-ink-700">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl dna-text" style={{ background: `${dnaHex[dimension]}1a` }}>
+                  <DimensionMark dimension={dimension} />
+                </span>
+                <span className="font-medium text-ink-900">{learningDimensionLabels[dimension]}</span>
+                <span className="font-mono text-[0.7rem] text-ink-500">0{i + 1}</span>
+              </div>
+              <span className="font-mono text-sm font-semibold tabular-nums text-ink-950">{scores[dimension]}%</span>
             </div>
-            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-100">
-              <div className="h-full rounded-full bg-[linear-gradient(90deg,#0f766e,#38bdf8,#6366f1)] transition-all duration-700 ease-out" style={{ width: isVisible ? `${scores[dimension]}%` : "0%" }} />
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-900/8">
+              <div
+                className="h-full rounded-full transition-all duration-1000 ease-out"
+                style={{
+                  width: isVisible ? `${scores[dimension]}%` : "0%",
+                  background: `linear-gradient(90deg, ${dnaHex[dimension]}, ${dnaHex[dimension]}cc)`,
+                  boxShadow: `0 0 12px -2px ${dnaHex[dimension]}`,
+                }}
+              />
             </div>
           </div>
         ))}

@@ -2,17 +2,148 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
 import { learningDimensionLabels, learningDimensions, type LearningDimension, type LearningScores } from "@/lib/learning-dna";
-import { learningDNAVisuals } from "@/lib/learning-dna-visuals";
+import { dnaHex, dnaProjection2D } from "@/lib/learning-dna-visuals";
 import { SceneFallback } from "./SceneFallback";
 
-const AdaptiveScene = dynamic(() => import("./AdaptiveScene"), { ssr: false, loading: () => null });
+const AdaptiveScene = dynamic(() => import("./AdaptiveScene"), {
+  ssr: false,
+  loading: () => null,
+});
 
-interface LearningDNAConstellationProps { scores: LearningScores; activeDimension?: LearningDimension; compact?: boolean; onDimensionSelect?: (dimension: LearningDimension) => void; }
+type Variant = "signature" | "compact" | "minimal";
 
-export function LearningDNAConstellation({ scores, activeDimension, compact = false, onDimensionSelect }: LearningDNAConstellationProps) {
+interface LearningDNAConstellationProps {
+  scores: LearningScores;
+  activeDimension?: LearningDimension;
+  variant?: Variant;
+  onDimensionSelect?: (dimension: LearningDimension) => void;
+  caption?: string;
+  interactive?: boolean;
+}
+
+const variantSizes: Record<Variant, string> = {
+  signature: "min-h-[460px] sm:min-h-[520px]",
+  compact: "min-h-[240px]",
+  minimal: "min-h-[180px]",
+};
+
+/**
+ * The signature Learning DNA visualization — a connected-node constellation
+ * rendered in 3D (with an accessible SVG fallback). Five nodes, one per
+ * learning dimension, colored with the stable DNA palette. The active
+ * dimension breathes and brightens. Selecting a node is optional.
+ */
+export function LearningDNAConstellation({
+  scores,
+  activeDimension,
+  variant = "signature",
+  onDimensionSelect,
+  caption,
+  interactive = true,
+}: LearningDNAConstellationProps) {
   const [reducedMotion, setReducedMotion] = useState(true);
-  useEffect(() => { const media = window.matchMedia("(prefers-reduced-motion: reduce)"); const update = () => setReducedMotion(media.matches); update(); media.addEventListener("change", update); return () => media.removeEventListener("change", update); }, []);
-  const dimensions = compact ? learningDimensions.slice(0, 3) : learningDimensions;
-  return <section className={`relative isolate overflow-hidden rounded-3xl border border-indigo-100 bg-[#0b1020] ${compact ? "min-h-52" : "min-h-96"}`} aria-label="Interactive Learning DNA constellation"><div className="absolute inset-0" aria-hidden="true">{reducedMotion ? <SceneFallback scores={scores} compact={compact} /> : <AdaptiveScene scores={scores} activeDimension={activeDimension} />}</div><div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_25%,rgba(8,12,27,0.45)_100%)]" />{dimensions.map((dimension, index) => <button key={dimension} type="button" onClick={() => onDimensionSelect?.(dimension)} className={`absolute z-10 rounded-lg border px-2.5 py-1.5 text-left text-xs font-semibold text-white backdrop-blur transition focus:outline-none focus-visible:ring-2 focus-visible:ring-white ${activeDimension === dimension ? "border-white bg-white/20" : "border-white/20 bg-slate-950/45 hover:border-white/60"}`} style={{ left: `${[8, 67, 65, 39, 8][index]}%`, top: `${[12, 17, 70, 80, 61][index]}%` }}><span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: learningDNAVisuals[dimension].color }} />{learningDimensionLabels[dimension]} {scores[dimension]}%</button>)}<p className="sr-only">Learning DNA scores: {learningDimensions.map((dimension) => `${learningDimensionLabels[dimension]} ${scores[dimension]} percent`).join(", ")}.</p></section>;
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+
+  return (
+    <figure
+      className={`surface-midnight bg-grain relative isolate overflow-hidden rounded-[2rem] ${variantSizes[variant]}`}
+      aria-label="Learning DNA constellation"
+    >
+      {/* Ambient backdrop tint from the active dimension */}
+      <div
+        className="pointer-events-none absolute inset-0 opacity-50 transition-opacity duration-700"
+        style={{
+          background: activeDimension
+            ? `radial-gradient(circle at 50% 45%, ${dnaHex[activeDimension]}22, transparent 55%)`
+            : "radial-gradient(circle at 50% 45%, rgba(196,202,237,0.08), transparent 55%)",
+        }}
+      />
+
+      {/* The 3D scene or its fallback */}
+      <div className="absolute inset-0" aria-hidden={reducedMotion ? undefined : true}>
+        {reducedMotion ? (
+          <SceneFallback scores={scores} activeDimension={activeDimension} compact={variant !== "signature"} />
+        ) : (
+          <AdaptiveScene scores={scores} activeDimension={activeDimension} />
+        )}
+      </div>
+
+      {/* Vignette so labels read clearly */}
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(circle at center, transparent 30%, rgba(7,11,24,0.55) 100%)",
+        }}
+      />
+
+      {/* Dimension labels — positioned around the constellation using the 2D projection */}
+      <div className="pointer-events-none absolute inset-0">
+        {learningDimensions.map((dimension) => {
+          const p = dnaProjection2D[dimension];
+          const isActive = activeDimension === dimension;
+          return (
+            <button
+              key={dimension}
+              type="button"
+              disabled={!interactive}
+              onClick={() => onDimensionSelect?.(dimension)}
+              aria-pressed={isActive}
+              className={`group pointer-events-auto absolute flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium backdrop-blur-md transition-all duration-300 ${
+                isActive
+                  ? "border-white/30 bg-white/12 text-white"
+                  : "border-white/10 bg-midnight-950/40 text-midnight-200 hover:border-white/30"
+              } ${interactive ? "cursor-pointer" : "cursor-default"}`}
+              style={{
+                left: `${p.x}%`,
+                top: `${p.y}%`,
+                transform: "translate(-50%, -50%)",
+              }}
+            >
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{
+                  backgroundColor: dnaHex[dimension],
+                  boxShadow: `0 0 10px ${dnaHex[dimension]}`,
+                }}
+              />
+              <span>{learningDimensionLabels[dimension]}</span>
+              <motion.span
+                className="font-mono text-[0.7rem] tabular-nums"
+                style={{ color: dnaHex[dimension] }}
+                key={scores[dimension]}
+                initial={{ opacity: 0, y: -3 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
+              >
+                {scores[dimension]}
+              </motion.span>
+            </button>
+          );
+        })}
+      </div>
+
+      {caption ? (
+        <figcaption className="absolute inset-x-0 bottom-0 px-6 pb-5 text-center">
+          <p className="mx-auto max-w-md text-xs leading-5 text-midnight-200/80">
+            {caption}
+          </p>
+        </figcaption>
+      ) : null}
+
+      <p className="sr-only">
+        Learning DNA scores: {learningDimensions
+          .map((d) => `${learningDimensionLabels[d]} ${scores[d]} percent`)
+          .join(", ")}.
+      </p>
+    </figure>
+  );
 }

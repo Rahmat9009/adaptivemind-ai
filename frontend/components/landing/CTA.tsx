@@ -1,20 +1,36 @@
+"use client";
+
+import { motion } from "motion/react";
+import { easeOutExpo } from "@/lib/motion";
+
 export function CTA() {
   return (
-    <section id="about" className="bg-white px-5 py-8 sm:px-6 lg:px-8">
-      <div
-        id="cta"
-        className="mx-auto max-w-7xl rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,#0f172a_0%,#174153_50%,#0f766e_100%)] px-6 py-16 text-center shadow-2xl shadow-slate-900/15 sm:px-12 sm:py-20"
+    <section id="about" className="bg-paper-50 px-5 py-24 sm:px-8 lg:px-12">
+      <motion.div
+        initial={{ opacity: 0, y: 24 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-80px" }}
+        transition={{ duration: 0.7, ease: easeOutExpo }}
+        className="surface-midnight relative mx-auto max-w-5xl overflow-hidden rounded-[2.5rem] px-6 py-20 text-center sm:px-12"
       >
-        <h2 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-          Ready to learn smarter?
+        <div className="pointer-events-none absolute inset-0 bg-grain opacity-50" />
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_0%,rgba(45,212,191,0.14),transparent_50%)]" />
+
+        <p className="eyebrow-num text-midnight-300">Begin</p>
+        <h2 className="font-display mx-auto mt-6 max-w-2xl text-4xl leading-[1.05] text-paper-50 sm:text-5xl">
+          Two minutes from now,<br />your tutor will know you better.
         </h2>
+        <p className="mx-auto mt-6 max-w-md text-base leading-7 text-midnight-200">
+          A short assessment. A living profile. Lessons that finally feel like
+          they were written for the way you think.
+        </p>
         <a
           href="/assessment"
-          className="mt-8 inline-flex rounded-full bg-white px-7 py-3.5 text-base font-semibold text-slate-950 shadow-xl shadow-black/15 transition hover:-translate-y-0.5 hover:bg-teal-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-4 focus-visible:ring-offset-teal-900"
+          className="mt-10 inline-flex rounded-full bg-paper-50 px-8 py-4 text-base font-semibold text-midnight-950 shadow-xl shadow-black/30 transition hover:-translate-y-0.5 hover:bg-paper-100"
         >
-          Start Free
+          Map my Learning DNA
         </a>
-      </div>
+      </motion.div>
     </section>
   );
 }

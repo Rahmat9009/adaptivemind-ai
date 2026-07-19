@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { AppNavigation } from "@/components/layout/AppNavigation";
+import { LearningDNAConstellation } from "@/components/three/LearningDNAConstellation";
 import {
   assessmentQuestions,
   calculateLearningDNA,
@@ -11,6 +12,7 @@ import {
   type LearningDimension,
   type LearningScores,
 } from "@/lib/learning-dna";
+import { easeOutExpo } from "@/lib/motion";
 import { ProgressBar } from "./ProgressBar";
 import { QuestionCard } from "./QuestionCard";
 
@@ -23,15 +25,14 @@ interface StoredLearningDNA {
   completedAt: string | null;
 }
 
+const emptyScores: LearningScores = { visual: 0, examples: 0, analogies: 0, stories: 0, challenges: 0 };
+
 function createEmptyAnswers(): Array<number | null> {
   return Array.from({ length: assessmentQuestions.length }, () => null);
 }
 
 function isStoredLearningDNA(value: unknown): value is StoredLearningDNA {
-  if (typeof value !== "object" || value === null) {
-    return false;
-  }
-
+  if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
   return Array.isArray(record.selectedAnswers);
 }
@@ -63,9 +64,25 @@ export function AssessmentShell() {
         setIsReady(true);
       }
     }, 0);
-
     return () => window.clearTimeout(timer);
   }, []);
+
+  /**
+   * Partial Learning DNA — calculated from the questions answered so far.
+   * This is what makes the constellation "evolve" as the user answers.
+   */
+  const partialScores: LearningScores = useMemo(() => {
+    const partial = answers.map((a, i) => (i <= questionIndex ? a : null));
+    return calculateLearningDNA(partial);
+  }, [answers, questionIndex]);
+
+  const answeredCount = answers.filter((a) => a !== null).length;
+  const activeDimension = useMemo<LearningDimension | undefined>(() => {
+    const sorted = (Object.keys(partialScores) as LearningDimension[]).sort(
+      (a, b) => partialScores[b] - partialScores[a],
+    );
+    return answeredCount > 0 ? sorted[0] : undefined;
+  }, [partialScores, answeredCount]);
 
   function saveProgress(nextAnswers: Array<number | null>) {
     const savedProfile: StoredLearningDNA = {
@@ -91,12 +108,10 @@ export function AssessmentShell() {
       setShowRequiredMessage(true);
       return;
     }
-
     if (questionIndex < assessmentQuestions.length - 1) {
       setQuestionIndex((current) => current + 1);
       return;
     }
-
     const scores = calculateLearningDNA(answers);
     const profile: StoredLearningDNA = {
       selectedAnswers: answers,
@@ -108,36 +123,100 @@ export function AssessmentShell() {
     router.push("/assessment/results");
   }
 
-  if (!isReady) {
-    return <div className="min-h-screen bg-[#f7f9fc]" aria-busy="true" />;
-  }
+  if (!isReady) return <div className="min-h-screen bg-paper-50" aria-busy="true" />;
 
   const isLastQuestion = questionIndex === assessmentQuestions.length - 1;
 
   return (
-    <><AppNavigation /><main className="relative min-h-[calc(100vh-65px)] overflow-hidden bg-[#f7f9fc] px-5 py-8 sm:px-6 sm:py-12 lg:px-8">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_10%_10%,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_90%_90%,rgba(99,102,241,0.14),transparent_32%)]" />
-      <div className="mx-auto max-w-3xl">
-        <section className="rounded-[2rem] border border-white/80 bg-white/75 p-6 shadow-2xl shadow-slate-900/8 backdrop-blur-xl sm:p-10">
-          <p className="text-sm font-semibold uppercase tracking-wider text-teal-700">Learning DNA assessment</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Find the approaches that help ideas click.</h1>
-          <p className="mt-3 max-w-2xl leading-7 text-slate-600">Choose what feels most natural. Your first profile takes about two minutes and will evolve as you learn.</p>
+    <>
+      <AppNavigation />
+      <main className="relative min-h-[calc(100vh-65px)] overflow-hidden bg-paper-50 px-5 py-10 sm:px-8 sm:py-14 lg:px-12">
+        <div className="mx-auto max-w-7xl">
+          <header className="max-w-3xl">
+            <p className="eyebrow-num text-ink-500">Learning DNA assessment</p>
+            <h1 className="font-display mt-4 text-4xl leading-tight tracking-tight text-ink-950 sm:text-5xl">
+              Watch your learning profile form, one answer at a time.
+            </h1>
+            <p className="mt-4 max-w-2xl text-base leading-7 text-ink-700">
+              There are no right answers. Choose what feels most natural. With each
+              choice, the constellation beside you gains detail.
+            </p>
+          </header>
 
-          <div className="mt-8"><ProgressBar current={questionIndex + 1} total={assessmentQuestions.length} /></div>
+          <div className="mt-10 grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12">
+            {/* Left — question */}
+            <section className="surface-paper rounded-[2rem] p-6 sm:p-10">
+              <ProgressBar current={questionIndex + 1} total={assessmentQuestions.length} />
 
-          <form className="mt-10" onSubmit={(event) => { event.preventDefault(); handleContinue(); }}>
-            <motion.div key={questionIndex} initial={reducedMotion ? false : { opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={reducedMotion ? undefined : { opacity: 0, x: -18 }} transition={{ duration: reducedMotion ? 0.12 : 0.24 }}>
-              <QuestionCard questionIndex={questionIndex} selectedAnswer={answers[questionIndex]} onSelect={handleSelect} />
-            </motion.div>
-            <p className="mt-4 min-h-6 text-sm font-medium text-rose-600" role="alert">{showRequiredMessage ? "Choose an answer before continuing." : ""}</p>
+              <div className="mt-10">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={questionIndex}
+                    initial={reducedMotion ? false : { opacity: 0, x: 24 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={reducedMotion ? undefined : { opacity: 0, x: -24 }}
+                    transition={{ duration: reducedMotion ? 0.12 : 0.4, ease: easeOutExpo }}
+                  >
+                    <QuestionCard questionIndex={questionIndex} selectedAnswer={answers[questionIndex]} onSelect={handleSelect} />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
 
-            <div className="mt-7 flex items-center justify-between gap-4 border-t border-slate-200 pt-6">
-              <button type="button" onClick={() => setQuestionIndex((current) => Math.max(0, current - 1))} disabled={questionIndex === 0} className="rounded-full px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2">Back</button>
-              <button type="submit" className="rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4">{isLastQuestion ? "See my Learning DNA" : "Continue"}</button>
-            </div>
-          </form>
-        </section>
-      </div>
-    </main></>
+              <p className="mt-5 min-h-6 text-sm font-medium text-rose-700" role="alert">
+                {showRequiredMessage ? "Choose an answer before continuing." : ""}
+              </p>
+
+              <div className="mt-6 flex items-center justify-between gap-4 border-t border-ink-900/8 pt-6">
+                <button
+                  type="button"
+                  onClick={() => setQuestionIndex((current) => Math.max(0, current - 1))}
+                  disabled={questionIndex === 0}
+                  className="rounded-full px-5 py-3 text-sm font-semibold text-ink-700 transition hover:bg-ink-900/5 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  ← Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleContinue}
+                  className="rounded-full bg-ink-950 px-6 py-3 text-sm font-semibold text-paper-50 shadow-lg transition hover:-translate-y-0.5 hover:bg-ink-800"
+                >
+                  {isLastQuestion ? "Reveal my Learning DNA →" : "Continue →"}
+                </button>
+              </div>
+            </section>
+
+            {/* Right — evolving constellation (sticky on desktop) */}
+            <aside className="lg:sticky lg:top-24 lg:self-start">
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, ease: easeOutExpo }}
+              >
+                <LearningDNAConstellation
+                  scores={answeredCount > 0 ? partialScores : { ...emptyScores, visual: 30, examples: 30, analogies: 30, stories: 30, challenges: 30 }}
+                  activeDimension={activeDimension}
+                  interactive={false}
+                  variant="signature"
+                  caption={
+                    answeredCount === 0
+                      ? "Answer your first question to begin tracing your profile."
+                      : `${answeredCount} of ${assessmentQuestions.length} answers · your strongest dimension so far is highlighted.`
+                  }
+                />
+              </motion.div>
+
+              <div className="mt-4 grid grid-cols-5 gap-2 text-center">
+                {(Object.keys(partialScores) as LearningDimension[]).map((d) => (
+                  <div key={d} className="rounded-xl border border-ink-900/8 bg-paper-50 px-1 py-2">
+                    <p className="font-mono text-sm font-semibold tabular-nums text-ink-950">{partialScores[d]}</p>
+                    <p className="mt-0.5 text-[0.65rem] uppercase tracking-wider text-ink-500">{d.slice(0, 3)}</p>
+                  </div>
+                ))}
+              </div>
+            </aside>
+          </div>
+        </div>
+      </main>
+    </>
   );
 }

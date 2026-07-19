@@ -8,12 +8,12 @@ export function ProgressBar({ current, total }: ProgressBarProps) {
 
   return (
     <div>
-      <div className="flex items-center justify-between text-sm font-medium text-slate-600">
-        <span>Question {current} of {total}</span>
-        <span>{progress}% complete</span>
+      <div className="flex items-center justify-between font-mono text-xs uppercase tracking-wider text-ink-500">
+        <span>Question {String(current).padStart(2, "0")} / {String(total).padStart(2, "0")}</span>
+        <span>{progress}% traced</span>
       </div>
       <div
-        className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200"
+        className="mt-3 h-px w-full bg-ink-900/12"
         role="progressbar"
         aria-label="Assessment progress"
         aria-valuemin={0}
@@ -21,8 +21,8 @@ export function ProgressBar({ current, total }: ProgressBarProps) {
         aria-valuenow={current}
       >
         <div
-          className="h-full rounded-full bg-[linear-gradient(90deg,#0f766e,#38bdf8,#6366f1)] transition-all duration-500"
-          style={{ width: `${progress}%` }}
+          className="h-px bg-gradient-to-r from-dna-visual via-dna-analogies to-dna-stories transition-all duration-700"
+          style={{ width: `${progress}%`, boxShadow: "0 0 8px -1px var(--color-dna-visual)" }}
         />
       </div>
     </div>

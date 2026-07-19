@@ -237,14 +237,55 @@ export function TutorShell() {
     localStorage.removeItem(lessonStorageKey);
   }
 
-  if (!isReady) return <main className="min-h-screen bg-[#f7f9fc]" aria-busy="true" />;
-  if (!profile) return <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[#f7f9fc] px-5 py-10"><div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_15%,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_85%_85%,rgba(99,102,241,0.14),transparent_32%)]" /><TutorEmptyState onUseBalancedProfile={() => setProfile({ scores: balancedScores, isBalanced: true })} /></main>;
+  if (!isReady) return <main className="min-h-screen bg-paper-50" aria-busy="true" />;
+  if (!profile) return (
+    <main className="relative grid min-h-screen place-items-center overflow-hidden bg-paper-50 px-5 py-10">
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_15%,rgba(45,212,191,0.12),transparent_30%),radial-gradient(circle_at_85%_85%,rgba(167,139,250,0.10),transparent_32%)]" />
+      <TutorEmptyState onUseBalancedProfile={() => setProfile({ scores: balancedScores, isBalanced: true })} />
+    </main>
+  );
 
-  return <><AppNavigation /><main className="relative min-h-[calc(100vh-65px)] overflow-hidden bg-[#f7f9fc] px-5 py-8 sm:px-6 sm:py-12 lg:px-8">
-    <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_15%,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_85%_85%,rgba(99,102,241,0.14),transparent_32%)]" />
-    <div className="mx-auto max-w-6xl">
-      <header className="max-w-3xl"><p className="text-sm font-semibold uppercase tracking-wider text-teal-700">Adaptive AI tutor</p><h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">A lesson shaped around your current preferences.</h1><p className="mt-4 text-lg leading-8 text-slate-600">Ask Ada about a topic, then choose how you would like to be taught.</p>{handoffMessage ? <p className="mt-5 rounded-2xl border border-teal-100 bg-teal-50/80 px-4 py-3 text-sm font-medium leading-6 text-teal-900" role="status">{handoffMessage}</p> : null}</header>
-      <div className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)] lg:items-start"><div className="space-y-5"><LearningDNACompact scores={profile.scores} isBalanced={profile.isBalanced} /><TopicForm topic={topic} subject={subject} level={level} scores={profile.scores} teachingMode={teachingMode} isLoading={isLoading} onTopicChange={setTopic} onSubjectChange={setSubject} onLevelChange={setLevel} onTeachingModeChange={setTeachingMode} onSubmit={() => requestLesson("initial")} /></div><div>{error ? <TutorErrorState message={error} /> : null}{isLoading ? <TutorLoadingState /> : null}{!isLoading && response ? <><LessonCard response={response} /><LessonActions isLoading={isLoading} onAction={requestLesson} onNewLesson={startNewLesson} /><UnderstandingCheck question={response.lesson.checkQuestion} isLoading={isEvaluating} error={evaluationError} onSubmit={evaluateUnderstanding} />{evaluation ? <UnderstandingFeedback evaluation={evaluation} source={evaluationSource} onAction={(nextStep) => { if (nextStep === "simplify") void requestLesson("simpler"); else if (nextStep === "example") void requestLesson("example"); else if (nextStep === "clarify") void requestLesson("different"); }} /> : null}{topic.trim() ? <LessonFollowUp lesson={response.lesson} conversation={conversation} isLoading={isFollowUpLoading} error={followUpError} onAsk={requestFollowUp} latestTurnRef={latestTurnRef} /> : null}</> : null}{!isLoading && !response && !error ? <section className="rounded-3xl border border-dashed border-slate-300 bg-white/50 p-10 text-center text-slate-500"><p className="font-medium text-slate-700">Ada will build your focused lesson here.</p><p className="mt-2 text-sm leading-6">Choose a suggested topic or enter one of your own to begin.</p></section> : null}</div></div>
-    </div>
-  </main></>;
+  return (
+    <>
+      <AppNavigation />
+      <main className="relative min-h-[calc(100vh-65px)] overflow-hidden bg-paper-50 px-5 py-8 sm:px-8 sm:py-12 lg:px-12">
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_15%,rgba(45,212,191,0.08),transparent_30%),radial-gradient(circle_at_85%_85%,rgba(167,139,250,0.08),transparent_32%)]" />
+        <div className="mx-auto max-w-6xl">
+          <header className="max-w-3xl">
+            <p className="eyebrow-num text-ink-500">Adaptive AI tutor</p>
+            <h1 className="font-display mt-3 text-4xl leading-tight tracking-tight text-ink-950 sm:text-5xl">A lesson shaped around your current preferences.</h1>
+            <p className="mt-4 text-lg leading-8 text-ink-700">Ask Ada about a topic, then choose how you would like to be taught.</p>
+            {handoffMessage ? <p className="mt-5 rounded-2xl border border-dna-visual/25 bg-dna-visual/8 px-4 py-3 text-sm font-medium leading-6 text-ink-800" role="status">{handoffMessage}</p> : null}
+          </header>
+          <div className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start">
+            <div className="space-y-5 lg:sticky lg:top-24">
+              <LearningDNACompact scores={profile.scores} isBalanced={profile.isBalanced} />
+              <TopicForm topic={topic} subject={subject} level={level} scores={profile.scores} teachingMode={teachingMode} isLoading={isLoading} onTopicChange={setTopic} onSubjectChange={setSubject} onLevelChange={setLevel} onTeachingModeChange={setTeachingMode} onSubmit={() => requestLesson("initial")} />
+            </div>
+            <div className="space-y-5">
+              {error ? <TutorErrorState message={error} /> : null}
+              {isLoading ? <TutorLoadingState /> : null}
+              {!isLoading && response ? (
+                <>
+                  <LessonCard response={response} />
+                  <LessonActions isLoading={isLoading} onAction={requestLesson} onNewLesson={startNewLesson} />
+                  <UnderstandingCheck question={response.lesson.checkQuestion} isLoading={isEvaluating} error={evaluationError} onSubmit={evaluateUnderstanding} />
+                  {evaluation ? (
+                    <UnderstandingFeedback evaluation={evaluation} source={evaluationSource} onAction={(nextStep) => { if (nextStep === "simplify") void requestLesson("simpler"); else if (nextStep === "example") void requestLesson("example"); else if (nextStep === "clarify") void requestLesson("different"); }} />
+                  ) : null}
+                  {topic.trim() ? <LessonFollowUp lesson={response.lesson} conversation={conversation} isLoading={isFollowUpLoading} error={followUpError} onAsk={requestFollowUp} latestTurnRef={latestTurnRef} /> : null}
+                </>
+              ) : null}
+              {!isLoading && !response && !error ? (
+                <section className="rounded-[2rem] border border-dashed border-ink-900/15 bg-paper-100/40 p-10 text-center text-ink-500">
+                  <p className="font-display text-lg text-ink-800">Ada will build your focused lesson here.</p>
+                  <p className="mt-2 text-sm leading-6">Choose a suggested topic or enter one of your own to begin.</p>
+                </section>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      </main>
+    </>
+  );
 }

@@ -1,28 +1,213 @@
 @import "tailwindcss";
 
-:root {
-  --background: #f7f9fc;
-  --foreground: #0f172a;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
-  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  /* Midnight system — deep ink backgrounds with a warm undertone */
+  --color-midnight-950: #070b18;
+  --color-midnight-900: #0b1124;
+  --color-midnight-850: #0f1530;
+  --color-midnight-800: #141b3a;
+  --color-midnight-700: #1c2548;
+  --color-midnight-600: #28315f;
+  --color-midnight-500: #3a4576;
+  --color-midnight-400: #5a6498;
+  --color-midnight-300: #8e96bd;
+  --color-midnight-200: #c4caed;
+  --color-midnight-100: #e5e8fa;
+
+  /* Warm off-white system — cream/stone papers */
+  --color-paper-50: #fdfbf6;
+  --color-paper-100: #f9f5ec;
+  --color-paper-200: #f1ebe0;
+  --color-paper-300: #e6dec8;
+  --color-ink-950: #1a1714;
+  --color-ink-900: #2b2620;
+  --color-ink-800: #3d362d;
+  --color-ink-700: #574d40;
+  --color-ink-600: #75675600;
+  --color-ink-500: #9a8b78;
+  --color-ink-400: #c0b29c;
+  --color-ink-300: #ddceb5;
+
+  /* Learning DNA — five signature hues, stable across light/dark */
+  --color-dna-visual: #2dd4bf;
+  --color-dna-examples: #fbbf24;
+  --color-dna-analogies: #a78bfa;
+  --color-dna-stories: #fb7185;
+  --color-dna-challenges: #ff6b5b;
+
+  /* Supporting accents derived from the DNA palette */
+  --color-accent-100: #d9fbe9;
+  --color-accent-300: #5eead4;
+  --color-accent-500: #0d9488;
+  --color-accent-700: #115e59;
+
+  --font-sans: var(--font-inter), "Helvetica Neue", Arial, sans-serif;
+  --font-serif: var(--font-fraunces), "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --font-mono: var(--font-jetbrains), "SFMono-Regular", Consolas, monospace;
+
+  --radius-card: 1.5rem;
+  --radius-pill: 999px;
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quint: cubic-bezier(0.83, 0, 0.17, 1);
 }
 
+/* Local font fallback — Next font is loaded in layout; this is a defensive baseline */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  background: var(--color-paper-50);
+  color: var(--color-ink-900);
+  font-feature-settings: "ss01", "cv11", "kern";
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 ::selection {
-  background: #b8f1e4;
-  color: #0f172a;
+  background: rgba(45, 212, 191, 0.28);
+  color: inherit;
 }
+
+/* Editorial display type */
+.font-display {
+  font-family: var(--font-serif);
+  font-optical-sizing: auto;
+  font-variation-settings: "opsz" 96, "SOFT" 0;
+  letter-spacing: -0.02em;
+}
+
+.font-display-tight {
+  font-family: var(--font-serif);
+  letter-spacing: -0.03em;
+  font-variation-settings: "opsz" 144;
+}
+
+/* Numeric label / metadata font */
+.font-mono {
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum", "zero";
+}
+
+/* Subtle grain — applied only on midnight surfaces, never paper */
+.bg-grain {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+
+/* Editorial divider */
+.rule {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, currentColor 22%, transparent) 30%,
+    color-mix(in srgb, currentColor 22%, transparent) 70%,
+    transparent
+  );
+}
+
+/* DNA color utility classes (mapped to dimensions) */
+.dna-visual { --dna: var(--color-dna-visual); }
+.dna-examples { --dna: var(--color-dna-examples); }
+.dna-analogies { --dna: var(--color-dna-analogies); }
+.dna-stories { --dna: var(--color-dna-stories); }
+.dna-challenges { --dna: var(--color-dna-challenges); }
+
+.dna-text { color: var(--dna); }
+.dna-bg { background-color: var(--dna); }
+.dna-border { border-color: var(--dna); }
+.dna-ring { box-shadow: 0 0 0 1px color-mix(in srgb, var(--dna) 40%, transparent) inset, 0 0 28px -8px var(--dna); }
+.dna-glow { box-shadow: 0 0 24px -6px var(--dna); }
+
+/* Paper card — calm, warm surface */
+.surface-paper {
+  background: linear-gradient(180deg, var(--color-paper-50), var(--color-paper-100));
+  border: 1px solid color-mix(in srgb, var(--color-ink-900) 8%, transparent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset, 0 18px 40px -28px rgba(20, 27, 58, 0.28);
+}
+
+/* Midnight card */
+.surface-midnight {
+  background: linear-gradient(165deg, #0b1124 0%, #0f1530 60%, #0b1124 100%);
+  border: 1px solid rgba(196, 202, 237, 0.12);
+  box-shadow: 0 40px 90px -50px rgba(0, 0, 0, 0.8);
+}
+
+/* Quiet pill */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: var(--radius-pill);
+  padding: 0.4rem 0.85rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+/* Numbered eyebrow */
+.eyebrow-num {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+/* Focus ring tuned for both surfaces */
+:where(a, button, input, textarea, select, [role="button"]):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--color-paper-50), 0 0 0 4px var(--color-dna-visual);
+  border-radius: 4px;
+}
+.surface-midnight :where(a, button, input, textarea, select, [role="button"]):focus-visible {
+  box-shadow: 0 0 0 2px var(--color-midnight-950), 0 0 0 4px var(--color-dna-visual);
+}
+
+/* Reduce motion — respect system preference globally */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Custom scrollbar — minimal, only on overflow containers */
+.scroll-quiet {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-ink-900) 18%, transparent) transparent;
+}
+.scroll-quiet::-webkit-scrollbar { width: 6px; height: 6px; }
+.scroll-quiet::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-ink-900) 18%, transparent);
+  border-radius: 999px;
+}
+
+/* Reveal-up animation primitive — driven by AnimatePresence/motion in React */
+@keyframes drift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.animate-drift { animation: drift 6s var(--ease-in-out-quint) infinite; }
+
+@keyframes pulse-soft {
+  0%, 100% { opacity: 0.85; }
+  50% { opacity: 1; }
+}
+.animate-pulse-soft { animation: pulse-soft 2.4s ease-in-out infinite; }
+
+/* Hide scrollbar but keep scroll (used for inline carousels) */
+.scroll-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scroll-hidden::-webkit-scrollbar { display: none; }

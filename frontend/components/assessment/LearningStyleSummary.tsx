@@ -1,4 +1,5 @@
 import { learningDimensionLabels, type LearningDimension, type LearningScores } from "@/lib/learning-dna";
+import { dnaHex } from "@/lib/learning-dna-visuals";
 
 interface LearningStyleSummaryProps {
   primaryStyle: LearningDimension;
@@ -25,14 +26,41 @@ export function LearningStyleSummary({ primaryStyle, scores }: LearningStyleSumm
   const supportingStyle = (Object.keys(scores) as LearningDimension[])
     .filter((dimension) => dimension !== primaryStyle)
     .sort((first, second) => scores[second] - scores[first])[0];
+  const color = dnaHex[primaryStyle];
 
   return (
-    <section className="rounded-3xl border border-teal-100 bg-[linear-gradient(145deg,#ecfdf5,#eff6ff)] p-6 shadow-lg shadow-teal-950/5 sm:p-8">
-      <p className="text-sm font-semibold uppercase tracking-wider text-teal-700">Primary learning preference</p>
-      <div className="mt-3 flex items-end gap-3"><h2 className="text-3xl font-semibold tracking-tight text-slate-950">{learningDimensionLabels[primaryStyle]}</h2><span className="pb-1 text-lg font-semibold text-teal-800">{scores[primaryStyle]}%</span></div>
-      <p className="mt-4 leading-7 text-slate-700">Based on your current assessment preferences, you currently respond best to {guidance[primaryStyle]}.</p>
-      <div className="mt-6 border-t border-teal-200/80 pt-5"><p className="text-xs font-semibold uppercase tracking-wider text-teal-700">Recommended approach</p><p className="mt-2 text-sm leading-6 text-slate-700">{approach[primaryStyle]}</p></div>
-      {supportingStyle ? <p className="mt-5 text-sm leading-6 text-slate-600"><span className="font-semibold text-slate-800">Strongest supporting preference:</span> {learningDimensionLabels[supportingStyle]} ({scores[supportingStyle]}%).</p> : null}
+    <section
+      className="relative overflow-hidden rounded-[2rem] p-6 sm:p-8"
+      style={{
+        background: `linear-gradient(160deg, ${color}14, var(--color-paper-50) 70%)`,
+        border: `1px solid ${color}33`,
+      }}
+    >
+      <p className="eyebrow-num" style={{ color }}>Primary learning dimension</p>
+      <div className="mt-4 flex items-end gap-3">
+        <h2 className="font-display text-4xl leading-none tracking-tight text-ink-950 sm:text-5xl">
+          {learningDimensionLabels[primaryStyle]}
+        </h2>
+        <span className="pb-1 font-mono text-lg font-semibold" style={{ color }}>
+          {scores[primaryStyle]}%
+        </span>
+      </div>
+      <p className="mt-5 leading-7 text-ink-800">
+        You currently respond best to {guidance[primaryStyle]}.
+      </p>
+      <div className="mt-6 border-t pt-5" style={{ borderColor: `${color}33` }}>
+        <p className="eyebrow-num text-ink-500">How Ada will start</p>
+        <p className="mt-2 text-sm leading-6 text-ink-700">{approach[primaryStyle]}</p>
+      </div>
+      {supportingStyle ? (
+        <p className="mt-5 text-sm leading-6 text-ink-600">
+          <span className="font-semibold text-ink-800">Strongest supporting dimension: </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: dnaHex[supportingStyle] }} />
+            {learningDimensionLabels[supportingStyle]} ({scores[supportingStyle]}%)
+          </span>
+        </p>
+      ) : null}
     </section>
   );
 }

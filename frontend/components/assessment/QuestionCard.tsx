@@ -13,10 +13,10 @@ export function QuestionCard({ questionIndex, selectedAnswer, onSelect }: Questi
 
   return (
     <fieldset>
-      <legend className="max-w-2xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+      <legend className="max-w-2xl font-display text-3xl leading-tight tracking-tight text-ink-950 sm:text-4xl">
         {question.prompt}
       </legend>
-      <div className="mt-8 grid gap-3">
+      <div className="mt-9 grid gap-3">
         {question.answers.map((answer, answerIndex) => (
           <AnswerOption
             key={answer.label}

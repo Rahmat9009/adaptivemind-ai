@@ -7,8 +7,8 @@ import { Navbar } from "@/components/layout/Navbar";
 
 export default function Home() {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f7f9fc] text-slate-950">
-      <Navbar />
+    <main className="min-h-screen overflow-hidden bg-midnight-950 text-paper-50">
+      <Navbar mode="marketing" />
       <Hero />
       <Features />
       <HowItWorks />

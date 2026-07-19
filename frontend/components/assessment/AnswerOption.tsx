@@ -1,4 +1,5 @@
-import type { AssessmentAnswer } from "@/lib/learning-dna";
+import type { AssessmentAnswer, LearningDimension } from "@/lib/learning-dna";
+import { dnaHex } from "@/lib/learning-dna-visuals";
 
 interface AnswerOptionProps {
   answer: AssessmentAnswer;
@@ -6,6 +7,14 @@ interface AnswerOptionProps {
   isSelected: boolean;
   questionId: string;
   onSelect: (index: number) => void;
+}
+
+/** Returns the dimension whose contribution is highest in this answer (the "tint" for the option). */
+function primaryDimension(answer: AssessmentAnswer): LearningDimension | null {
+  const entries = Object.entries(answer.contributions) as [LearningDimension, number][];
+  if (!entries.length) return null;
+  entries.sort((a, b) => b[1] - a[1]);
+  return entries[0][1] > 0 ? entries[0][0] : null;
 }
 
 export function AnswerOption({
@@ -16,11 +25,18 @@ export function AnswerOption({
   onSelect,
 }: AnswerOptionProps) {
   const inputId = `${questionId}-answer-${index}`;
+  const tint = primaryDimension(answer);
+  const tintColor = tint ? dnaHex[tint] : "var(--color-ink-500)";
 
   return (
     <label
       htmlFor={inputId}
-      className="group relative block cursor-pointer rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-teal-500 has-[:focus-visible]:ring-offset-4"
+      className={`group relative block cursor-pointer rounded-2xl border bg-paper-50 p-5 transition-all duration-300 hover:-translate-y-0.5 ${
+        isSelected
+          ? "border-transparent shadow-[0_0_0_1.5px_var(--color-dna-visual),0_18px_40px_-28px_rgba(20,27,58,0.4)]"
+          : "border-ink-900/10 hover:border-ink-900/20"
+      }`}
+      style={isSelected && tint ? { boxShadow: `0 0 0 1.5px ${tintColor}, 0 18px 40px -28px rgba(20,27,58,0.4)` } : undefined}
     >
       <input
         id={inputId}
@@ -32,17 +48,30 @@ export function AnswerOption({
       />
       <span className="flex gap-4">
         <span
-          className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 border-slate-300 transition peer-checked:border-teal-600 peer-checked:bg-teal-600"
+          className="mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition"
+          style={{
+            borderColor: isSelected ? tintColor : "color-mix(in srgb, var(--color-ink-900) 25%, transparent)",
+            backgroundColor: isSelected ? tintColor : "transparent",
+          }}
           aria-hidden="true"
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-white opacity-0 transition peer-checked:opacity-100" />
+          <span
+            className="h-1.5 w-1.5 rounded-full bg-paper-50 transition"
+            style={{ opacity: isSelected ? 1 : 0 }}
+          />
         </span>
         <span>
-          <span className="block text-base font-semibold text-slate-900">{answer.label}</span>
-          <span className="mt-1 block text-sm leading-6 text-slate-600">{answer.description}</span>
+          <span className="block text-base font-semibold text-ink-950">{answer.label}</span>
+          <span className="mt-1 block text-sm leading-6 text-ink-600">{answer.description}</span>
         </span>
       </span>
-      {isSelected ? <span className="pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-teal-500 ring-offset-1" /> : null}
+      {tint ? (
+        <span
+          className="absolute right-5 top-5 h-1.5 w-1.5 rounded-full opacity-0 transition-opacity duration-300 group-hover:opacity-60"
+          style={{ background: tintColor }}
+          aria-hidden="true"
+        />
+      ) : null}
     </label>
   );
 }

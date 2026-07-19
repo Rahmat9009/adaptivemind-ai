@@ -3,16 +3,19 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { motion, useReducedMotion } from "motion/react";
 import {
   getPrimaryLearningStyle,
+  learningDimensionLabels,
   type LearningDimension,
   type LearningScores,
 } from "@/lib/learning-dna";
+import { dnaHex } from "@/lib/learning-dna-visuals";
+import { easeOutExpo } from "@/lib/motion";
 import { LearningDNAChart } from "./LearningDNAChart";
 import { LearningStyleSummary } from "./LearningStyleSummary";
 import { AppNavigation } from "@/components/layout/AppNavigation";
 import { LearningDNAConstellation } from "@/components/three/LearningDNAConstellation";
-import { motion, useReducedMotion } from "motion/react";
 
 const storageKey = "adaptivemind-learning-dna";
 
@@ -56,9 +59,10 @@ export function ResultsExperience() {
       }
       setResult(storedResult);
       setIsReady(true);
-      requestAnimationFrame(() => setIsVisible(true));
+      // Sequence the reveal: constellation first, then chart bars, then summary
+      const t1 = window.setTimeout(() => setIsVisible(true), 350);
+      return () => window.clearTimeout(t1);
     }, 0);
-
     return () => window.clearTimeout(timer);
   }, [router]);
 
@@ -67,27 +71,129 @@ export function ResultsExperience() {
     router.push("/assessment");
   }
 
-  if (!isReady || !result) return <main className="min-h-screen bg-[#f7f9fc]" aria-busy="true" />;
+  if (!isReady || !result) return <main className="min-h-screen bg-paper-50" aria-busy="true" />;
+
+  const { scores, primaryLearningStyle: primary } = result;
+  const color = dnaHex[primary];
 
   return (
-    <><AppNavigation /><main className="relative min-h-[calc(100vh-65px)] overflow-hidden bg-[#f7f9fc] px-5 py-8 sm:px-6 sm:py-12 lg:px-8">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_10%_10%,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_90%_90%,rgba(99,102,241,0.14),transparent_32%)]" />
-      <div className="mx-auto max-w-4xl">
-        <header className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-teal-700">Initial learning profile</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">Your AdaptiveMind Learning DNA</h1>
-          <p className="mt-5 text-lg leading-8 text-slate-600">Based on your current assessment preferences, this profile highlights the approaches that feel most useful right now. It will evolve from future learning interactions.</p>
-        </header>
-        <motion.div initial={reducedMotion ? false : { opacity: 0, y: 14, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} transition={{ duration: reducedMotion ? 0.12 : 0.5 }} className="mt-8"><LearningDNAConstellation scores={result.scores} activeDimension={result.primaryLearningStyle} /></motion.div>
-        <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-          <LearningStyleSummary primaryStyle={result.primaryLearningStyle} scores={result.scores} />
-          <LearningDNAChart scores={result.scores} isVisible={isVisible} />
+    <>
+      <AppNavigation />
+      <main className="relative min-h-[calc(100vh-65px)] overflow-hidden bg-paper-50 px-5 py-12 sm:px-8 lg:px-12 lg:py-16">
+        {/* Ambient tint from the user's primary dimension — the page adopts their color */}
+        <div
+          className="pointer-events-none absolute inset-0 -z-10 opacity-70 transition-opacity duration-1000"
+          style={{ background: `radial-gradient(circle at 50% 0%, ${color}10, transparent 50%)` }}
+        />
+
+        <div className="mx-auto max-w-5xl">
+          {/* Reveal sequence — staged */}
+          <motion.header
+            initial={reducedMotion ? false : { opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: easeOutExpo }}
+            className="max-w-3xl"
+          >
+            <p className="eyebrow-num text-ink-500">Your Learning DNA</p>
+            <h1 className="font-display mt-5 text-4xl leading-[1.02] tracking-tight text-ink-950 sm:text-5xl lg:text-6xl">
+              This is the shape of how you learn.
+            </h1>
+            <p className="mt-6 max-w-2xl text-lg leading-8 text-ink-700">
+              An initial profile, traced from eight answers. It is not a label —
+              it is a starting point that Ada will keep reshaping as you learn.
+            </p>
+          </motion.header>
+
+          {/* Signature reveal — the constellation materializes, then the primary dimension is announced */}
+          <motion.div
+            initial={reducedMotion ? false : { opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ duration: 1.1, ease: easeOutExpo, delay: 0.2 }}
+            className="mt-10"
+          >
+            <LearningDNAConstellation
+              scores={scores}
+              activeDimension={primary}
+              interactive
+              caption="Your five dimensions, connected. The brightest is where Ada begins."
+            />
+          </motion.div>
+
+          {/* Primary dimension — large editorial reveal */}
+          <motion.div
+            initial={reducedMotion ? false : { opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: easeOutExpo, delay: 0.55 }}
+            className="mt-12 flex flex-col items-center text-center"
+          >
+            <p className="eyebrow-num text-ink-500">Your primary dimension</p>
+            <motion.h2
+              initial={reducedMotion ? false : { opacity: 0, y: 30, letterSpacing: "0.04em" }}
+              animate={{ opacity: 1, y: 0, letterSpacing: "-0.03em" }}
+              transition={{ duration: 0.9, ease: easeOutExpo, delay: 0.7 }}
+              className="font-display mt-4 text-6xl leading-none tracking-tight sm:text-7xl lg:text-8xl"
+              style={{ color }}
+            >
+              {learningDimensionLabels[primary]}
+            </motion.h2>
+            <motion.p
+              initial={reducedMotion ? false : { opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.8, delay: 0.95 }}
+              className="mt-5 max-w-lg text-base leading-7 text-ink-700"
+            >
+              You think most clearly through {learningDimensionLabels[primary].toLowerCase()}.
+              Ada will lead with this and weave in your supporting dimensions when they help.
+            </motion.p>
+          </motion.div>
+
+          {/* Detail row — summary + full chart */}
+          <div className="mt-14 grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+            <motion.div
+              initial={reducedMotion ? false : { opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: easeOutExpo, delay: 1.05 }}
+            >
+              <LearningStyleSummary primaryStyle={primary} scores={scores} />
+            </motion.div>
+            <motion.div
+              initial={reducedMotion ? false : { opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, ease: easeOutExpo, delay: 1.15 }}
+            >
+              <LearningDNAChart scores={scores} isVisible={isVisible} />
+            </motion.div>
+          </div>
+
+          {/* Next steps */}
+          <motion.div
+            initial={reducedMotion ? false : { opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, ease: easeOutExpo, delay: 1.3 }}
+            className="mt-14 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <p className="font-display text-xl text-ink-950">Ready to meet Ada?</p>
+              <p className="mt-1 text-sm text-ink-600">Your first lesson will already know how you learn.</p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <button
+                type="button"
+                onClick={handleRetake}
+                className="rounded-full border border-ink-900/15 px-6 py-3.5 text-sm font-semibold text-ink-800 transition hover:bg-ink-900/5"
+              >
+                Retake assessment
+              </button>
+              <Link
+                href="/dashboard"
+                className="rounded-full bg-ink-950 px-7 py-3.5 text-center text-sm font-semibold text-paper-50 shadow-lg transition hover:-translate-y-0.5 hover:bg-ink-800"
+              >
+                Go to my dashboard →
+              </Link>
+            </div>
+          </motion.div>
         </div>
-        <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-          <Link href="/dashboard" className="rounded-full bg-slate-950 px-6 py-3.5 text-center text-sm font-semibold text-white shadow-lg shadow-slate-950/15 transition hover:-translate-y-0.5 hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4">Start your first lesson</Link>
-          <button type="button" onClick={handleRetake} className="rounded-full border border-slate-200 bg-white px-6 py-3.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-4">Retake assessment</button>
-        </div>
-      </div>
-    </main></>
+      </main>
+    </>
   );
 }
