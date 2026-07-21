@@ -136,7 +136,7 @@ export function PlannerShell() {
   if (!ready)
     return (
       <div
-        className="min-h-screen bg-[var(--am-bg-reading)]"
+        className="min-h-screen bg-[var(--am-bg)]"
         aria-busy="true"
       />
     );
@@ -146,18 +146,18 @@ export function PlannerShell() {
   return (
     <PageShell
       heading="Study Planner"
-      subheading="A practical plan for your next learning steps. Ada uses your recent progress and current preferences to keep the plan focused."
+      subheading="Your connected learning journey"
     >
       {/* Plan Setup */}
       <motion.section
         variants={fadeIn}
         initial="hidden"
         animate="visible"
-        className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)]"
+        className="am-card p-6"
       >
         <motion.h2
           variants={slideUp}
-          className="text-xl font-semibold text-[var(--am-text-primary)]"
+          className="am-heading-serif text-xl text-[var(--am-text-primary)]"
         >
           Plan setup
         </motion.h2>
@@ -331,11 +331,11 @@ export function PlannerShell() {
           {/* Summary */}
           <motion.div
             variants={staggerItem}
-            className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)]"
+            className="am-card p-6"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold text-[var(--am-text-primary)]">
+                <h2 className="am-heading-serif text-xl text-[var(--am-text-primary)]">
                   Your learning journey
                 </h2>
                 <p className="mt-1 text-sm text-[var(--am-text-secondary)]">
@@ -378,7 +378,7 @@ export function PlannerShell() {
                 <motion.article
                   key={day.dayNumber}
                   variants={staggerItem}
-                  className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)]"
+                  className="am-card p-6"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -386,13 +386,13 @@ export function PlannerShell() {
                         className={`flex h-8 w-8 items-center justify-center rounded-[var(--am-radius-full)] text-sm font-semibold ${
                           dayProgress === 100
                             ? "bg-[var(--am-success)] text-white"
-                            : "border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] text-[var(--am-text-secondary)]"
+                            : "border-2 border-[var(--am-primary)] bg-[var(--am-warm-bg)] text-[var(--am-primary)]"
                         }`}
                       >
                         {dayProgress === 100 ? "✓" : day.dayNumber}
                       </span>
                       <div>
-                        <h3 className="text-lg font-semibold text-[var(--am-text-primary)]">
+                        <h3 className="am-heading-serif text-lg text-[var(--am-text-primary)]">
                           Day {day.dayNumber}
                         </h3>
                         <p className="text-sm text-[var(--am-text-secondary)]">
@@ -424,7 +424,7 @@ export function PlannerShell() {
                     {day.tasks.map((task) => (
                       <div
                         key={task.id}
-                        className="flex items-center gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-4 py-3 transition-colors"
+                        className="flex items-center gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-warm-bg)] px-4 py-3 transition-colors"
                       >
                         <button
                           type="button"
@@ -486,9 +486,9 @@ export function PlannerShell() {
           variants={fadeIn}
           initial="hidden"
           animate="visible"
-          className="mt-8 rounded-[var(--am-radius-2xl)] border border-dashed border-[var(--am-border)] bg-[var(--am-bg-elevated)]/60 p-10 text-center"
+          className="am-card mt-8 p-10 text-center border-dashed"
         >
-          <p className="font-medium text-[var(--am-text-secondary)]">
+          <p className="am-heading-serif text-base text-[var(--am-text-secondary)]">
             Configure your plan settings and build a study plan to see your
             learning journey here.
           </p>

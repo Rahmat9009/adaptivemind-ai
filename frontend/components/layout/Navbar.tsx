@@ -21,12 +21,12 @@ export function Navbar() {
     <header
       className={`sticky top-0 z-[var(--am-z-nav)] transition-all duration-[var(--am-duration-standard)] ${
         scrolled
-          ? "border-b border-[var(--am-border-light)] bg-[var(--am-bg-surface)]/80 backdrop-blur-xl"
+          ? "border-b border-[var(--am-border-light)] bg-[var(--am-surface)]/90 backdrop-blur-xl"
           : "bg-transparent"
       }`}
     >
-      <nav aria-label="Primary" className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 sm:px-8 lg:px-10">
-        <Link href="/" className="text-[var(--am-text-primary)] transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--am-primary)]">
+      <nav aria-label="Primary" className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5 sm:px-8 lg:px-10">
+        <Link href="/" className="transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--am-primary)]">
           <Logo size={26} colored />
         </Link>
 
@@ -42,7 +42,7 @@ export function Navbar() {
           <Link href="/tutor" className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--am-text-secondary)] transition-colors hover:text-[var(--am-text-primary)]">
             Tutor
           </Link>
-          <Link href="/assessment" className="am-btn am-btn-primary text-sm">
+          <Link href="/assessment" className="am-btn am-btn-primary text-sm py-2 px-5">
             Get started
           </Link>
         </div>

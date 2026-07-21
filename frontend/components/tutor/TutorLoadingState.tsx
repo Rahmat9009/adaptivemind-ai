@@ -8,7 +8,7 @@ export function TutorLoadingState() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-8 shadow-[var(--am-shadow-sm)]"
+      className="am-card p-8"
       role="status"
     >
       <div className="flex items-center gap-3">
@@ -17,7 +17,7 @@ export function TutorLoadingState() {
           className="h-8 w-8 animate-pulse rounded-full"
           style={{
             background:
-              "conic-gradient(from 0deg, #5046e5, #22d3ee, #8b5cf6, #5046e5)",
+              "conic-gradient(from 0deg, #1751EF, #0891B2, #7C3AED, #1751EF)",
           }}
         />
         <div>

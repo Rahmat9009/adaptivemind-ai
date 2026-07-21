@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
-import { PageShell } from "@/components/am/PageShell";
 import { LearningDNAConstellation } from "@/components/three/LearningDNAConstellation";
 import {
   assessmentQuestions,
@@ -35,24 +34,19 @@ function isStoredLearningDNA(value: unknown): value is StoredLearningDNA {
   return Array.isArray(record.selectedAnswers);
 }
 
-/** Calculate live scores from current answers (ignoring unanswered) */
-function getLiveScores(
-  answers: Array<number | null>,
-): LearningScores {
+function getLiveScores(answers: Array<number | null>): LearningScores {
   const filled = answers.map((a) => a ?? 0);
   return calculateLearningDNA(filled);
 }
 
 export function AssessmentShell() {
   const router = useRouter();
-  const [answers, setAnswers] =
-    useState<Array<number | null>>(createEmptyAnswers);
+  const [answers, setAnswers] = useState<Array<number | null>>(createEmptyAnswers);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [isReady, setIsReady] = useState(false);
   const [showRequiredMessage, setShowRequiredMessage] = useState(false);
   const reducedMotion = useReducedMotion();
 
-  // Restore saved progress
   useEffect(() => {
     const timer = window.setTimeout(() => {
       try {
@@ -62,18 +56,14 @@ export function AssessmentShell() {
         if (isStoredLearningDNA(storedValue)) {
           const restoredAnswers = createEmptyAnswers().map((_, index) => {
             const answer = storedValue.selectedAnswers[index];
-            return typeof answer === "number" && answer >= 0 && answer < 4
-              ? answer
-              : null;
+            return typeof answer === "number" && answer >= 0 && answer < 4 ? answer : null;
           });
           setAnswers(restoredAnswers);
           const firstIncomplete = restoredAnswers.findIndex(
             (answer) => answer === null,
           );
           setQuestionIndex(
-            firstIncomplete === -1
-              ? assessmentQuestions.length - 1
-              : firstIncomplete,
+            firstIncomplete === -1 ? assessmentQuestions.length - 1 : firstIncomplete,
           );
         }
       } catch {
@@ -127,12 +117,7 @@ export function AssessmentShell() {
   }
 
   if (!isReady) {
-    return (
-      <div
-        className="min-h-screen bg-[var(--am-bg-reading)]"
-        aria-busy="true"
-      />
-    );
+    return <div className="min-h-screen bg-[var(--am-bg)]" aria-busy="true" />;
   }
 
   const isLastQuestion = questionIndex === assessmentQuestions.length - 1;
@@ -140,106 +125,95 @@ export function AssessmentShell() {
   const hasAnyAnswer = answers.some((a) => a !== null);
 
   return (
-    <PageShell>
-      <div className="flex flex-col gap-8 lg:flex-row">
-        {/* Left: Question */}
-        <div className="flex-1">
-          <section className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
-              Learning DNA assessment
-            </p>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--am-text-primary)] sm:text-3xl">
-              How do you learn best?
-            </h1>
-            <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--am-text-secondary)]">
-              Choose what feels most natural. Your first profile takes about two
-              minutes and will evolve as you learn.
-            </p>
+    <div id="main-content" className="min-h-screen bg-[var(--am-bg)]">
+      {/* Assessment header */}
+      <header className="mx-auto max-w-6xl px-5 pt-11 pb-4 sm:px-8 lg:px-10">
+        <p className="am-label text-[var(--am-primary)]/70">
+          Learning DNA assessment
+        </p>
+        <h1 className="am-heading-serif mt-2 text-3xl text-[var(--am-text-primary)] sm:text-4xl">
+          How do you learn best?
+        </h1>
+        <p className="mt-2 max-w-xl text-base leading-7 text-[var(--am-text-secondary)]">
+          Choose what feels most natural. Your first profile takes about two minutes and will evolve as you learn.
+        </p>
+      </header>
 
-            <div className="mt-6">
-              <ProgressBar
-                current={questionIndex + 1}
-                total={assessmentQuestions.length}
-              />
-            </div>
-
-            <form
-              className="mt-8"
-              onSubmit={(event) => {
-                event.preventDefault();
-                handleContinue();
-              }}
-            >
-              <QuestionCard
-                questionIndex={questionIndex}
-                selectedAnswer={answers[questionIndex]}
-                onSelect={handleSelect}
-              />
-
-              <p
-                className="mt-4 min-h-5 text-sm font-medium text-[var(--am-error)]"
-                role="alert"
-              >
-                {showRequiredMessage
-                  ? "Choose an answer before continuing."
-                  : ""}
-              </p>
-
-              <div className="mt-8 flex items-center justify-between gap-4 border-t border-[var(--am-border-light)] pt-6">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setQuestionIndex((current) => Math.max(0, current - 1))
-                  }
-                  disabled={questionIndex === 0}
-                  className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold text-[var(--am-text-secondary)] transition-colors hover:bg-[var(--am-border-light)] disabled:cursor-not-allowed disabled:opacity-30"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M19 12H5M12 19l-7-7 7-7" />
-                  </svg>
-                  Back
-                </button>
-
-                <button
-                  type="submit"
-                  className="am-btn am-btn-primary"
-                >
-                  {isLastQuestion ? "See my Learning DNA" : "Continue"}
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="opacity-60">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </button>
+      <div className="mx-auto max-w-6xl px-5 pb-20 sm:px-8 lg:px-10">
+        <div className="flex flex-col gap-8 lg:flex-row">
+          {/* Left: Question */}
+          <div className="flex-1">
+            <div className="am-card p-6 sm:p-8">
+              <div className="mb-6">
+                <ProgressBar current={questionIndex + 1} total={assessmentQuestions.length} />
               </div>
-            </form>
-          </section>
-        </div>
 
-        {/* Right: Evolving constellation */}
-        {hasAnyAnswer && (
-          <motion.aside
-            initial={reducedMotion ? false : { opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="lg:w-80 xl:w-96"
-          >
-            <div className="sticky top-24">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
-                Your evolving profile
-              </p>
-              <LearningDNAConstellation
-                scores={liveScores}
-                activeDimension={
-                  buildTeachingProfile(liveScores).primaryDimension
-                }
-              />
-              <p className="mt-3 text-xs leading-5 text-[var(--am-text-muted)]">
-                Your answers are building your Learning DNA. Each choice
-                strengthens a preference.
-              </p>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  handleContinue();
+                }}
+              >
+                <QuestionCard
+                  questionIndex={questionIndex}
+                  selectedAnswer={answers[questionIndex]}
+                  onSelect={handleSelect}
+                />
+
+                <p className="mt-4 min-h-5 text-sm font-medium text-[var(--am-error)]" role="alert">
+                  {showRequiredMessage ? "Choose an answer before continuing." : ""}
+                </p>
+
+                <div className="mt-8 flex items-center justify-between gap-4 border-t border-[var(--am-border-light)] pt-6">
+                  <button
+                    type="button"
+                    onClick={() => setQuestionIndex((current) => Math.max(0, current - 1))}
+                    disabled={questionIndex === 0}
+                    className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold text-[var(--am-text-secondary)] transition-colors hover:bg-[var(--am-border-light)] disabled:cursor-not-allowed disabled:opacity-30"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M19 12H5M12 19l-7-7 7-7" />
+                    </svg>
+                    Back
+                  </button>
+
+                  <button type="submit" className="am-btn am-btn-primary">
+                    {isLastQuestion ? "See my Learning DNA" : "Continue"}
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="opacity-60">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  </button>
+                </div>
+              </form>
             </div>
-          </motion.aside>
-        )}
+          </div>
+
+          {/* Right: Evolving constellation */}
+          {hasAnyAnswer && (
+            <motion.aside
+              initial={reducedMotion ? false : { opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="lg:w-80 xl:w-96"
+            >
+              <div className="sticky top-24">
+                <p className="am-label text-[var(--am-text-muted)] mb-3">
+                  Your evolving profile
+                </p>
+                <div className="am-card p-4">
+                  <LearningDNAConstellation
+                    scores={liveScores}
+                    activeDimension={buildTeachingProfile(liveScores).primaryDimension}
+                  />
+                </div>
+                <p className="mt-3 text-xs leading-5 text-[var(--am-text-muted)]">
+                  Your answers are building your Learning DNA. Each choice adds context for Ada.
+                </p>
+              </div>
+            </motion.aside>
+          )}
+        </div>
       </div>
-    </PageShell>
+    </div>
   );
 }

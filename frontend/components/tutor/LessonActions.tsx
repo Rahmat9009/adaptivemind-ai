@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
+import { Button } from "@/components/base/buttons/button";
 import { staggerContainer, staggerItem } from "@/lib/motion";
 import type { TutorAction } from "@/lib/ai/types";
 
@@ -37,24 +38,26 @@ export function LessonActions({
     >
       {actions.map(({ action, label }) => (
         <motion.div key={action} variants={staggerItem}>
-          <button
+          <Button
             type="button"
+            color="tertiary"
+            size="sm"
+            isDisabled={isLoading}
             onClick={() => onAction(action)}
-            disabled={isLoading}
-            className="rounded-full border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] px-4 py-2 text-sm font-semibold text-[var(--am-text-secondary)] shadow-sm transition-all duration-[var(--am-duration-quick)] hover:border-[var(--am-primary)]/30 hover:text-[var(--am-primary)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {label}
-          </button>
+          </Button>
         </motion.div>
       ))}
       <motion.div variants={staggerItem}>
-        <button
+        <Button
           type="button"
+          color="link-gray"
+          size="sm"
           onClick={onNewLesson}
-          className="rounded-full px-4 py-2 text-sm font-semibold text-[var(--am-text-muted)] transition-colors hover:text-[var(--am-text-primary)]"
         >
           New topic
-        </button>
+        </Button>
       </motion.div>
     </motion.div>
   );

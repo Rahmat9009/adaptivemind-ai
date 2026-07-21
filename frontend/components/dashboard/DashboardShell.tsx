@@ -14,6 +14,8 @@ import {
 import { type LearningScores } from "@/lib/learning-dna";
 import { getLessonRecommendation } from "@/lib/recommendations";
 import { getMasterySummary } from "@/lib/mastery";
+import { loadLearningDNA2, type LearningDNA2 } from "@/lib/learning-dna-v2";
+import { getDueReviews, getUpcomingReviews } from "@/lib/spaced-review";
 import { DashboardHeader } from "./DashboardHeader";
 import { EmptyDashboard } from "./EmptyDashboard";
 import { LearningDNACard } from "./LearningDNACard";
@@ -25,6 +27,9 @@ import { RecommendationCard } from "./RecommendationCard";
 import { MasteryOverview } from "./MasteryOverview";
 import { StudyPlanCard } from "./StudyPlanCard";
 import { readStudyPlan, type StudyPlan } from "@/lib/study-planner";
+import { LearningDNAEvidence } from "./LearningDNAEvidence";
+import { SpacedReviewCard } from "./SpacedReviewCard";
+import { PrivacySummary } from "./PrivacySummary";
 
 const profileStorageKey = "adaptivemind-learning-dna";
 
@@ -62,6 +67,10 @@ export function DashboardShell() {
     averageRecentScore: null,
   });
   const [studyPlan, setStudyPlan] = useState<StudyPlan | null>(null);
+  const [dna2, setDna2] = useState<LearningDNA2 | null>(null);
+  const [dueReviews, setDueReviews] = useState<ReturnType<typeof getDueReviews>>([]);
+  const [upcomingReviews, setUpcomingReviews] = useState<ReturnType<typeof getUpcomingReviews>>([]);
+  const [resetConfirm, setResetConfirm] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -79,6 +88,9 @@ export function DashboardShell() {
         setHistory(readLearningHistory());
         setMastery(getMasterySummary());
         setStudyPlan(readStudyPlan());
+        setDna2(loadLearningDNA2());
+        setDueReviews(getDueReviews());
+        setUpcomingReviews(getUpcomingReviews());
         markDashboardVisited();
       } finally {
         setIsReady(true);
@@ -88,11 +100,8 @@ export function DashboardShell() {
   }, []);
 
   if (!isReady)
-    return (
-      <div className="min-h-screen bg-[var(--am-bg-reading)]" aria-busy="true" />
-    );
+    return <div className="min-h-screen bg-[var(--am-bg)]" aria-busy="true" />;
 
-  // No scores yet — empty state
   if (!scores)
     return (
       <PageShell>
@@ -100,23 +109,48 @@ export function DashboardShell() {
           variants={fadeIn}
           initial="hidden"
           animate="visible"
-          className="mx-auto max-w-xl rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-8 text-center shadow-[var(--am-shadow-sm)]"
+          className="mx-auto max-w-xl am-card p-8 text-center"
         >
-          <h1 className="text-2xl font-semibold text-[var(--am-text-primary)]">
+          <h1 className="am-heading-serif text-2xl text-[var(--am-text-primary)]">
             Start with your Learning DNA
           </h1>
           <p className="mt-3 leading-7 text-[var(--am-text-secondary)]">
             Your dashboard becomes personal after the short assessment.
           </p>
-          <Link
-            href="/assessment"
-            className="am-btn am-btn-primary mt-6 inline-flex"
-          >
+          <Link href="/assessment" className="am-btn am-btn-primary mt-6 inline-flex">
             Take the assessment
           </Link>
         </motion.section>
       </PageShell>
     );
+
+  function handleExportProfile() {
+    const data = {
+      scores,
+      history: history.slice(0, 20),
+      mastery: mastery.entries.slice(0, 20),
+      dna2,
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `adaptivemind-profile-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleResetData() {
+    localStorage.removeItem(profileStorageKey);
+    localStorage.removeItem("adaptivemind-learning-dna-v2");
+    localStorage.removeItem("adaptivemind-mastery");
+    localStorage.removeItem("adaptivemind-review-cards");
+    localStorage.removeItem("adaptivemind-confidence-records");
+    localStorage.removeItem("adaptivemind-current-lesson");
+    localStorage.removeItem("adaptivemind-lesson-conversation");
+    window.location.reload();
+  }
 
   const profile = buildTeachingProfile(scores);
   const streak = getStreak(history);
@@ -145,15 +179,14 @@ export function DashboardShell() {
           />
         </motion.div>
 
-        {/* Quick actions — two-column layout */}
+        {/* Quick actions */}
         <motion.div variants={staggerItem}>
           <QuickActions hasHistory={history.length > 0} />
         </motion.div>
 
-        {/* Learning DNA + side column */}
+        {/* Learning DNA + personalization side column */}
         <motion.div variants={staggerItem} className="grid gap-8 lg:grid-cols-[1.2fr_1fr]">
           <LearningDNACard scores={scores} />
-
           <div className="space-y-6">
             <PersonalizationCard scores={scores} />
             <ProgressCard
@@ -178,6 +211,18 @@ export function DashboardShell() {
           <StudyPlanCard plan={studyPlan} />
         </motion.div>
 
+        {/* Learning DNA Evidence */}
+        {dna2 && (
+          <motion.div variants={staggerItem}>
+            <LearningDNAEvidence dna={dna2} />
+          </motion.div>
+        )}
+
+        {/* Spaced Review */}
+        <motion.div variants={staggerItem}>
+          <SpacedReviewCard dueReviews={dueReviews} upcomingReviews={upcomingReviews} />
+        </motion.div>
+
         {/* Mastery */}
         <motion.div variants={staggerItem}>
           <MasteryOverview
@@ -189,7 +234,7 @@ export function DashboardShell() {
           />
         </motion.div>
 
-        {/* Recommendations + History or Empty */}
+        {/* Recommendations + History */}
         {history.length > 0 ? (
           <motion.div variants={staggerItem} className="grid gap-8 lg:grid-cols-[1fr_1fr]">
             <RecommendationCard
@@ -202,6 +247,17 @@ export function DashboardShell() {
             <EmptyDashboard />
           </motion.div>
         )}
+
+        {/* Privacy & Data */}
+        <motion.div variants={staggerItem}>
+          <PrivacySummary
+            onExport={handleExportProfile}
+            onReset={() => setResetConfirm(true)}
+            resetConfirm={resetConfirm}
+            onConfirmReset={handleResetData}
+            onCancelReset={() => setResetConfirm(false)}
+          />
+        </motion.div>
       </motion.div>
     </PageShell>
   );

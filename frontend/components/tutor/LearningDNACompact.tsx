@@ -26,10 +26,10 @@ export function LearningDNACompact({
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-5 shadow-[var(--am-shadow-sm)]"
+      className="am-card p-5"
       aria-label="Current learning profile"
     >
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+      <p className="am-label text-[var(--am-text-muted)]">
         Learning DNA active
       </p>
       <p className="mt-1.5 text-base font-semibold text-[var(--am-text-primary)]">

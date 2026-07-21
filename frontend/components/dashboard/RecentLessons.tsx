@@ -29,12 +29,12 @@ export function RecentLessons({ history }: { history: LessonHistoryEntry[] }) {
       initial="hidden"
       animate="visible"
       aria-labelledby="recent-lessons-title"
-      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)]"
+      className="am-card p-6"
     >
       <div className="flex items-center justify-between gap-4">
         <h2
           id="recent-lessons-title"
-          className="text-xl font-semibold text-[var(--am-text-primary)]"
+          className="am-heading-serif text-xl text-[var(--am-text-primary)]"
         >
           Recent lessons
         </h2>

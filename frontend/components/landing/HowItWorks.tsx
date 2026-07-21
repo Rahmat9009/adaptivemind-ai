@@ -2,102 +2,80 @@
 
 import Link from "next/link";
 import { motion } from "motion/react";
-import { fadeIn, slideUp, staggerContainer, staggerItem } from "@/lib/motion";
+import { slideUp, staggerContainer, staggerItem } from "@/lib/motion";
 
 const steps = [
   {
     number: 1,
-    title: "Discover your profile",
-    description:
-      "A short, thoughtful assessment maps your initial Learning DNA — the combination of teaching approaches that feel most natural to you.",
-    accent: "#5046e5",
+    title: "Discover your Learning DNA",
+    description: "A short assessment captures which explanation approaches you respond to — visuals, examples, analogies, stories, or challenges. This is a starting hypothesis, not a fixed label.",
   },
   {
     number: 2,
-    title: "Ada teaches your way",
-    description:
-      "Choose any topic. Ada shapes the explanation around your Learning DNA — visual breakdowns, analogies, stories, examples, or challenges — not a generic lecture.",
-    accent: "#22d3ee",
+    title: "Learn with Ada",
+    description: "Ada shapes every explanation around what works best for you. As you complete lessons, your effective approaches become clearer.",
   },
   {
     number: 3,
-    title: "Verify and deepen",
-    description:
-      "Understanding checks, follow-up conversations, and mastery tracking make sure each concept is solid before moving forward.",
-    accent: "#8b5cf6",
+    title: "Check your understanding",
+    description: "Brief checks, follow-up conversations, and mastery tracking ensure each concept is solid before you move forward.",
   },
   {
     number: 4,
-    title: "Evolve together",
-    description:
-      "Every lesson, check, and challenge refines what Ada knows about how you learn. Your Learning DNA grows with you — it is never a one-time label.",
-    accent: "#fb7185",
+    title: "Build lasting mastery",
+    description: "Every lesson and check refines your profile. Your Learning DNA evolves with you — it is never a one-time label.",
   },
 ];
 
-function ArrowRightIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-      className="opacity-60"
-    >
-      <path d="M5 12h14M12 5l7 7-7 7" />
-    </svg>
-  );
-}
-
 export function HowItWorks() {
   return (
-    <motion.section
+    <section
       id="how-it-works"
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, amount: 0.1 }}
-      variants={fadeIn}
-      className="relative isolate overflow-hidden bg-[var(--am-bg-reading)] px-5 py-24 sm:px-8 lg:px-10"
+      className="relative isolate overflow-hidden bg-[var(--am-warm-bg)] px-5 py-20 sm:px-8 lg:px-10 lg:py-28"
     >
-      {/* Subtle separator */}
-      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--am-primary)]/10 to-transparent" />
-
       <div className="mx-auto max-w-6xl">
-        <motion.div variants={slideUp} className="mx-auto max-w-2xl text-center">
-          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
+        <motion.div
+          initial="hidden"
+          whileInView="visible"
+          viewport={{ once: true, amount: 0.2 }}
+          variants={slideUp}
+          className="max-w-2xl"
+        >
+          <p className="am-label text-[var(--am-primary)]/70">
             Your learning journey
           </p>
-          <h2 className="mt-4 text-[clamp(1.75rem,3.5vw,2.75rem)] font-semibold tracking-tight leading-[1.12]">
+          <h2 className="am-heading-serif mt-4 text-[clamp(1.75rem,3.5vw,2.75rem)] text-[var(--am-text-primary)]">
             From first assessment to lasting mastery.
           </h2>
         </motion.div>
 
-        <motion.div
-          variants={staggerContainer}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, amount: 0.05 }}
-          className="mt-16 grid gap-6 md:grid-cols-2"
-        >
-          {steps.map((step) => (
-            <motion.article
-              key={step.number}
-              variants={staggerItem}
-              className="group relative overflow-hidden rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-7 transition-all duration-[var(--am-duration-standard)] hover:shadow-[var(--am-shadow-md)] hover:-translate-y-0.5"
-            >
-              <div className="flex items-start gap-5">
-                <span
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--am-radius-lg)] text-lg font-semibold text-white"
-                  style={{ backgroundColor: step.accent }}
-                >
-                  {step.number}
-                </span>
-                <div>
+        {/* Connected path timeline */}
+        <div className="mt-14 relative">
+          {/* Vertical connecting line (desktop) */}
+          <div className="absolute left-8 top-0 bottom-0 w-px bg-[var(--am-border)] hidden md:block" />
+
+          <motion.div
+            variants={staggerContainer}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.1 }}
+            className="space-y-10"
+          >
+            {steps.map((step, index) => (
+              <motion.div
+                key={step.number}
+                variants={staggerItem}
+                className="relative flex flex-col gap-4 md:flex-row md:items-start"
+              >
+                {/* Step number circle */}
+                <div className="relative z-10 flex md:w-16 shrink-0 justify-center">
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--am-surface)] border-2 border-[var(--am-primary)] text-lg font-bold text-[var(--am-primary)] shadow-[var(--am-shadow-sm)]">
+                    {step.number}
+                  </span>
+                </div>
+
+                {/* Content */}
+                <div className="am-card p-6 md:p-8 flex-1 md:ml-4">
                   <h3 className="text-lg font-semibold text-[var(--am-text-primary)]">
                     {step.title}
                   </h3>
@@ -105,27 +83,39 @@ export function HowItWorks() {
                     {step.description}
                   </p>
                 </div>
-              </div>
-            </motion.article>
-          ))}
-        </motion.div>
 
-        <motion.div
-          variants={slideUp}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="mt-12 text-center"
-        >
-          <Link
-            href="/assessment"
-            className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--am-primary)] px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-[var(--am-primary)]/20 transition-all duration-[var(--am-duration-quick)] hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[var(--am-primary)]/25 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                {/* Arrow connector for non-last items */}
+                {index < steps.length - 1 && (
+                  <div className="hidden md:flex justify-center absolute -bottom-8 left-8 w-px h-8">
+                    <svg width="16" height="16" viewBox="0 0 16 16" className="text-[var(--am-border)] absolute -bottom-1 -left-[7px]">
+                      <path d="M8 12l-4-4h8l-4 4z" fill="currentColor" />
+                    </svg>
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </motion.div>
+
+          {/* CTA */}
+          <motion.div
+            variants={slideUp}
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            className="mt-12 text-center"
           >
-            Start your learning journey
-            <ArrowRightIcon />
-          </Link>
-        </motion.div>
+            <Link
+              href="/assessment"
+              className="am-btn am-btn-primary"
+            >
+              Start your learning journey
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="opacity-60">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </motion.div>
+        </div>
       </div>
-    </motion.section>
+    </section>
   );
 }

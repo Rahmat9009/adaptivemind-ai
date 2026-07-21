@@ -2,6 +2,7 @@
 
 import { motion } from "motion/react";
 import { staggerContainer, staggerItem } from "@/lib/motion";
+import { ProgressBarBase } from "@/components/base/progress-indicators/progress-indicators";
 import type { TopicMastery } from "@/lib/mastery";
 
 export function MasteryOverview({
@@ -22,12 +23,12 @@ export function MasteryOverview({
       variants={staggerContainer}
       initial="hidden"
       animate="visible"
-      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)]"
+      className="am-card p-6"
       aria-labelledby="mastery-title"
     >
       <h2
         id="mastery-title"
-        className="text-xl font-semibold text-[var(--am-text-primary)]"
+        className="am-heading-serif text-xl text-[var(--am-text-primary)]"
       >
         Mastery journey
       </h2>
@@ -38,31 +39,30 @@ export function MasteryOverview({
             variants={staggerItem}
             className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4"
           >
-            <div className="rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-4 py-3">
-              <p className="text-xs text-[var(--am-text-muted)]">Mastered</p>
-              <p className="text-2xl font-semibold text-[var(--am-success)]">
-                {mastered}
-              </p>
+            <div className="rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-white px-4 py-3 shadow-[var(--am-shadow-sm)]">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--am-text-muted)]">Mastered</p>
+              <p className="mt-1 text-2xl font-semibold text-[var(--am-success)]">{mastered}</p>
+              {entries.length > 0 && (
+                <ProgressBarBase value={mastered} max={entries.length} className="mt-2 h-1.5" progressClassName="bg-[var(--am-success)]" />
+              )}
             </div>
-            <div className="rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-4 py-3">
-              <p className="text-xs text-[var(--am-text-muted)]">Developing</p>
-              <p className="text-2xl font-semibold text-[var(--am-warning)]">
-                {developing}
-              </p>
+            <div className="rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-white px-4 py-3 shadow-[var(--am-shadow-sm)]">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--am-text-muted)]">Developing</p>
+              <p className="mt-1 text-2xl font-semibold text-[var(--am-warning)]">{developing}</p>
+              {entries.length > 0 && (
+                <ProgressBarBase value={developing} max={entries.length} className="mt-2 h-1.5" progressClassName="bg-[var(--am-warning)]" />
+              )}
             </div>
-            <div className="rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-4 py-3">
-              <p className="text-xs text-[var(--am-text-muted)]">
-                Needs review
-              </p>
-              <p className="text-2xl font-semibold text-[var(--am-error)]">
-                {needsReview}
-              </p>
+            <div className="rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-white px-4 py-3 shadow-[var(--am-shadow-sm)]">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--am-text-muted)]">Needs review</p>
+              <p className="mt-1 text-2xl font-semibold text-[var(--am-error)]">{needsReview}</p>
+              {entries.length > 0 && (
+                <ProgressBarBase value={needsReview} max={entries.length} className="mt-2 h-1.5" progressClassName="bg-[var(--am-error)]" />
+              )}
             </div>
-            <div className="rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-4 py-3">
-              <p className="text-xs text-[var(--am-text-muted)]">
-                Recent score
-              </p>
-              <p className="text-2xl font-semibold tabular-nums text-[var(--am-text-primary)]">
+            <div className="rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-white px-4 py-3 shadow-[var(--am-shadow-sm)]">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--am-text-muted)]">Recent score</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums text-[var(--am-text-primary)]">
                 {averageRecentScore ?? "—"}
                 {averageRecentScore !== null ? "%" : ""}
               </p>
@@ -70,19 +70,29 @@ export function MasteryOverview({
           </motion.div>
 
           <motion.div variants={staggerItem} className="mt-5 space-y-2">
-            {entries.slice(0, 5).map((entry) => (
-              <div
-                key={entry.topicId}
-                className="flex items-center justify-between gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] px-4 py-2.5"
-              >
-                <span className="text-sm font-medium text-[var(--am-text-primary)]">
-                  {entry.topic}
-                </span>
-                <span className="text-xs font-medium text-[var(--am-text-muted)] capitalize">
-                  {entry.masteryLevel.replace("-", " ")}
-                </span>
-              </div>
-            ))}
+            {entries.slice(0, 5).map((entry) => {
+              const masteryPct = entry.bestScore;
+              return (
+                <div
+                  key={entry.topicId}
+                  className="flex items-center justify-between gap-3 rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-white px-4 py-3"
+                >
+                  <span className="text-sm font-medium text-[var(--am-text-primary)]">
+                    {entry.topic}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="inline-flex items-center rounded-md border border-[var(--am-border-light)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--am-text-muted)]">
+                      {entry.masteryLevel.replace("-", " ")}
+                    </span>
+                    {entry.bestScore != null && (
+                      <span className="w-16">
+                        <ProgressBarBase value={masteryPct} className="h-1.5" progressClassName="bg-[var(--am-primary)]" />
+                      </span>
+                    )}
+                  </span>
+                </div>
+              );
+            })}
           </motion.div>
         </>
       ) : (

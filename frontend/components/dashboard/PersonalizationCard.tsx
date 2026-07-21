@@ -17,15 +17,15 @@ export function PersonalizationCard({ scores }: { scores: LearningScores }) {
       initial="hidden"
       animate="visible"
       aria-labelledby="personalization-title"
-      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-7"
+      className="am-card p-6 sm:p-7"
     >
       <motion.div variants={slideUp}>
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+        <p className="am-label text-[var(--am-text-muted)]">
           How Ada adapts
         </p>
         <h2
           id="personalization-title"
-          className="mt-2 text-xl font-semibold text-[var(--am-text-primary)]"
+          className="am-heading-serif mt-2 text-xl text-[var(--am-text-primary)]"
         >
           Your adaptive approach
         </h2>
@@ -47,9 +47,9 @@ export function PersonalizationCard({ scores }: { scores: LearningScores }) {
 
       <motion.div
         variants={slideUp}
-        className="mt-5 rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] p-4"
+        className="mt-5 rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-warm-bg)] p-4"
       >
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
+        <p className="am-label text-[var(--am-primary)]/70">
           Why this matters
         </p>
         <p className="mt-2 text-sm leading-6 text-[var(--am-text-secondary)]">
@@ -57,8 +57,8 @@ export function PersonalizationCard({ scores }: { scores: LearningScores }) {
           {learningDimensionLabels[profile.primaryDimension].toLowerCase()} and
           uses{" "}
           {learningDimensionLabels[profile.secondaryDimension].toLowerCase()}{" "}
-          when it helps make the idea clearer. These are current preferences,
-          not fixed labels.
+          when it helps make the idea clearer. As you complete lessons, Ada
+          learns which approaches actually work best for you.
         </p>
       </motion.div>
     </motion.section>

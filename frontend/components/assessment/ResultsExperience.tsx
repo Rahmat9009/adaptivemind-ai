@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
 import {
   getPrimaryLearningStyle,
   type LearningDimension,
@@ -13,8 +12,6 @@ import { createTutorHandoff } from "@/lib/tutor-handoff";
 import { tutorHandoffStorageKey } from "@/lib/tutor-handoff";
 import { LearningDNAChart } from "./LearningDNAChart";
 import { LearningStyleSummary } from "./LearningStyleSummary";
-import { PageShell } from "@/components/am/PageShell";
-import { LearningDNAConstellation } from "@/components/three/LearningDNAConstellation";
 
 const storageKey = "adaptivemind-learning-dna";
 
@@ -54,7 +51,6 @@ export function ResultsExperience() {
   const [result, setResult] = useState<StoredResult | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
-  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -67,7 +63,6 @@ export function ResultsExperience() {
       setIsReady(true);
       requestAnimationFrame(() => setIsVisible(true));
     }, 0);
-
     return () => window.clearTimeout(timer);
   }, [router]);
 
@@ -85,92 +80,68 @@ export function ResultsExperience() {
   }
 
   if (!isReady || !result) {
-    return (
-      <div
-        className="min-h-screen bg-[var(--am-bg-reading)]"
-        aria-busy="true"
-      />
-    );
+    return <div className="min-h-screen bg-[var(--am-bg)]" aria-busy="true" />;
   }
 
   return (
-    <PageShell>
-      <div className="mx-auto max-w-4xl">
-        {/* Header */}
-        <header className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
-            Your Learning DNA
+    <div id="main-content" className="min-h-screen bg-[var(--am-bg)]">
+      <div className="mx-auto max-w-6xl px-5 pt-11 pb-20 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-4xl">
+          {/* Header */}
+          <header className="max-w-2xl">
+            <p className="am-label text-[var(--am-primary)]/70">
+              Your Learning DNA
+            </p>
+            <h1 className="am-heading-serif mt-3 text-[clamp(1.75rem,4vw,2.75rem)] text-[var(--am-text-primary)] leading-[1.08]">
+              A profile shaped around how you understand.
+            </h1>
+            <p className="mt-4 text-base leading-7 text-[var(--am-text-secondary)]">
+              Based on your choices, here is how Ada will start personalizing
+              your lessons. This is a starting hypothesis — as you complete
+              lessons, Ada learns which approaches actually help you.
+            </p>
+          </header>
+
+          {/* Summary + Chart */}
+          <div className="mt-10 grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-start">
+            <LearningStyleSummary
+              primaryStyle={result.primaryLearningStyle}
+              scores={result.scores}
+            />
+            <LearningDNAChart scores={result.scores} isVisible={isVisible} />
+          </div>
+
+          {/* Action row */}
+          <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+            <Link href="/dashboard" className="am-btn am-btn-primary">
+              Go to dashboard
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="opacity-60">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </Link>
+            <button
+              type="button"
+              onClick={handleProceedToTutor}
+              className="am-btn am-btn-secondary"
+            >
+              Start your first lesson
+            </button>
+            <button
+              type="button"
+              onClick={handleRetake}
+              className="am-btn am-btn-ghost"
+            >
+              Retake assessment
+            </button>
+          </div>
+
+          <p className="mt-10 text-sm leading-6 text-[var(--am-text-muted)] border-t border-[var(--am-border-light)] pt-6">
+            Your Learning DNA starts as an initial hypothesis. As you complete
+            lessons, Ada observes which approaches actually help you understand
+            and adjusts accordingly.
           </p>
-          <h1 className="mt-3 text-[clamp(1.75rem,4vw,2.75rem)] font-semibold tracking-tight leading-[1.12]">
-            A profile shaped around how you understand.
-          </h1>
-          <p className="mt-4 text-base leading-7 text-[var(--am-text-secondary)]">
-            Based on your choices, here is how Ada will personalize your
-            lessons. Preferences evolve — this is your starting point, not a
-            permanent label.
-          </p>
-        </header>
-
-        {/* Constellation reveal */}
-        <motion.div
-          initial={
-            reducedMotion ? false : { opacity: 0, y: 14, scale: 0.98 }
-          }
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{
-            duration: reducedMotion ? 0.12 : 0.5,
-            ease: [0.16, 1, 0.3, 1],
-          }}
-          className="mt-8"
-        >
-          <LearningDNAConstellation
-            scores={result.scores}
-            activeDimension={result.primaryLearningStyle}
-          />
-        </motion.div>
-
-        {/* Summary + Chart */}
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_1fr] lg:items-start">
-          <LearningStyleSummary
-            primaryStyle={result.primaryLearningStyle}
-            scores={result.scores}
-          />
-          <LearningDNAChart scores={result.scores} isVisible={isVisible} />
         </div>
-
-        {/* Action row */}
-        <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-          <Link
-            href="/dashboard"
-            className="am-btn am-btn-primary"
-          >
-            Go to dashboard
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="opacity-60">
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          </Link>
-          <button
-            type="button"
-            onClick={handleProceedToTutor}
-            className="am-btn am-btn-secondary"
-          >
-            Start your first lesson
-          </button>
-          <button
-            type="button"
-            onClick={handleRetake}
-            className="am-btn am-btn-ghost"
-          >
-            Retake assessment
-          </button>
-        </div>
-
-        <p className="mt-8 text-sm leading-6 text-[var(--am-text-muted)] border-t border-[var(--am-border-light)] pt-6">
-          Your Learning DNA is an adaptive preference profile, not a diagnostic
-          label. It responds to how you learn — as you engage with new topics
-          and modes, the profile refines itself.
-        </p>
       </div>
-    </PageShell>
+    </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import { type RefObject, useState } from "react";
 import { motion } from "motion/react";
+import { Button } from "@/components/base/buttons/button";
 import { fadeIn, slideUp, staggerContainer, staggerItem } from "@/lib/motion";
 import type {
   TutorConversationTurn,
@@ -55,12 +56,12 @@ export function LessonFollowUp({
     >
       <motion.div variants={slideUp} className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
+          <p className="am-label text-[var(--am-primary)]/70">
             Follow-up
           </p>
           <h2
             id="ada-follow-up-heading"
-            className="mt-1 text-xl font-semibold text-[var(--am-text-primary)]"
+            className="am-heading-serif mt-1 text-xl text-[var(--am-text-primary)]"
           >
             Ask Ada about this lesson
           </h2>
@@ -130,15 +131,16 @@ export function LessonFollowUp({
         aria-label="Suggested questions"
       >
         {suggestions.map((suggestion) => (
-          <button
+          <Button
             key={suggestion}
             type="button"
+            color="tertiary"
+            size="xs"
+            isDisabled={isLoading}
             onClick={() => void submitQuestion(suggestion)}
-            disabled={isLoading}
-            className="rounded-full border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] px-3 py-2 text-left text-sm font-medium text-[var(--am-text-secondary)] transition-colors hover:border-[var(--am-primary)]/30 hover:text-[var(--am-primary)] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {suggestion}
-          </button>
+          </Button>
         ))}
       </motion.div>
 
@@ -174,13 +176,15 @@ export function LessonFollowUp({
           <p className="text-xs text-[var(--am-text-muted)]">
             Press Enter to ask. Use Shift+Enter for a new line.
           </p>
-          <button
+          <Button
             type="submit"
-            disabled={isLoading || !question.trim()}
-            className="am-btn am-btn-primary py-2.5 px-5 text-sm"
+            color="primary"
+            size="sm"
+            isDisabled={isLoading || !question.trim()}
+            isLoading={isLoading}
           >
-            {isLoading ? "Ada is thinking..." : "Ask"}
-          </button>
+            Ask
+          </Button>
         </div>
         {error && (
           <p className="mt-3 text-sm font-medium text-[var(--am-error)]" role="alert">

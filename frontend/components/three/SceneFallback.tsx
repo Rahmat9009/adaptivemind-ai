@@ -25,11 +25,11 @@ const connectionPairs = [
 ];
 
 const dnaColors: Record<string, string> = {
-  visual: "#22d3ee",
-  examples: "#f59e0b",
-  analogies: "#8b5cf6",
-  stories: "#fb7185",
-  challenges: "#fb6a4a",
+  visual: "#0891B2",
+  examples: "#B45309",
+  analogies: "#7C3AED",
+  stories: "#BE185D",
+  challenges: "#DC2626",
 };
 
 function getRadius(score: number) {
@@ -41,16 +41,17 @@ export function SceneFallback({ scores, compact = false, activeDimension }: Scen
     <div
       className="relative min-h-80 overflow-hidden rounded-[var(--am-radius-2xl)]"
       style={{
-        background: "radial-gradient(ellipse at 30% 20%, rgba(80,70,229,0.12) 0%, transparent 55%), radial-gradient(ellipse at 70% 80%, rgba(139,92,246,0.08) 0%, transparent 50%), linear-gradient(145deg, #080c1b 0%, #0e1428 50%, #0a0f20 100%)",
+        background: "radial-gradient(ellipse at 30% 20%, rgba(23,81,239,0.06) 0%, transparent 55%), radial-gradient(ellipse at 70% 80%, rgba(124,58,237,0.05) 0%, transparent 50%), linear-gradient(145deg, #F8F7F5 0%, #F3F1EE 50%, #EDEBE8 100%)",
       }}
       role="figure"
       aria-label={`Learning DNA constellation — ${learningDimensions.map(d => `${learningDimensionLabels[d]}: ${scores[d]}%`).join(", ")}`}
     >
       {/* Subtle grid pattern */}
       <div
-        className="absolute inset-0 opacity-20"
+        className="absolute inset-0 opacity-15"
+        aria-hidden="true"
         style={{
-          backgroundImage: "linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)",
+          backgroundImage: "linear-gradient(rgba(0,0,0,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,0.03) 1px, transparent 1px)",
           backgroundSize: "48px 48px",
         }}
       />
@@ -105,12 +106,12 @@ export function SceneFallback({ scores, compact = false, activeDimension }: Scen
             {/* Active ring */}
             {isActive && (
               <div
-                className="absolute rounded-full animate-pulse"
+                className="absolute rounded-full opacity-40"
                 style={{
                   width: radius + 10,
                   height: radius + 10,
                   border: `2px solid ${color}`,
-                  opacity: 0.4,
+                  opacity: 0.3,
                 }}
               />
             )}
@@ -121,12 +122,12 @@ export function SceneFallback({ scores, compact = false, activeDimension }: Scen
                 width: radius,
                 height: radius,
                 backgroundColor: color,
-                borderColor: isActive ? color : "rgba(255,255,255,0.2)",
+                borderColor: isActive ? color : "rgba(0,0,0,0.08)",
                 boxShadow: `0 0 ${isActive ? 20 : 12}px ${color}44, 0 0 ${isActive ? 60 : 30}px ${color}22`,
               }}
             />
             {!compact && (
-              <span className="whitespace-nowrap rounded-md bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white/90 backdrop-blur-sm">
+              <span className="whitespace-nowrap rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-surface)] px-2 py-0.5 text-[11px] font-semibold text-[var(--am-text-primary)] shadow-sm backdrop-blur-sm">
                 {learningDimensionLabels[dimension]} {score}%
               </span>
             )}
@@ -136,7 +137,7 @@ export function SceneFallback({ scores, compact = false, activeDimension }: Scen
 
       {/* Center ambient glow */}
       <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none" aria-hidden="true">
-        <div className="h-1 w-1 rounded-full opacity-30" style={{ backgroundColor: "#5046e5", boxShadow: "0 0 20px #5046e5, 0 0 60px #5046e544" }} />
+        <div className="h-1 w-1 rounded-full opacity-30" style={{ backgroundColor: "var(--am-primary)", boxShadow: "0 0 20px var(--am-primary), 0 0 60px rgba(23,81,239,0.3)" }} />
       </div>
 
       {/* Screen-reader accessible data */}

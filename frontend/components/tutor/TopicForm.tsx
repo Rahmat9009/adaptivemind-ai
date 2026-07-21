@@ -1,6 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
+import { Button } from "@/components/base/buttons/button";
+import { InputBase } from "@/components/base/input/input";
 import { fadeIn, slideUp, staggerContainer, staggerItem } from "@/lib/motion";
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
 import type { TeachingMode } from "@/lib/ai/types";
@@ -37,7 +39,7 @@ const teachingModes: Array<{
   {
     value: "adaptive",
     label: "Use my Learning DNA",
-    description: "Ada blends your strongest preferences.",
+    description: "Ada starts with your Learning DNA.",
   },
   {
     value: "visual",
@@ -90,28 +92,28 @@ export function TopicForm({
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-5 shadow-[var(--am-shadow-sm)] sm:p-7"
+      className="am-card p-5 sm:p-7"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
       }}
     >
       <motion.div variants={slideUp}>
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+        <p className="am-label text-[var(--am-text-muted)]">
           What to learn
         </p>
 
         <label htmlFor="topic" className="sr-only">
           Ask Ada what you want to learn
         </label>
-        <input
+        <InputBase
           id="topic"
           value={topic}
           onChange={(event) => onTopicChange(event.target.value)}
           maxLength={160}
           placeholder="For example, explain Newton's First Law"
-          className="mt-3 w-full rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-4 py-3.5 text-base text-[var(--am-text-primary)] outline-none transition placeholder:text-[var(--am-text-muted)] focus:border-[var(--am-primary)] focus:bg-[var(--am-bg-elevated)] focus:ring-2 focus:ring-[var(--am-primary)]/15"
-          autoComplete="off"
+          size="lg"
+          className="mt-3"
         />
       </motion.div>
 
@@ -150,7 +152,7 @@ export function TopicForm({
         variants={slideUp}
         className="mt-6 border-t border-[var(--am-border-light)] pt-6"
       >
-        <legend className="text-sm font-semibold text-[var(--am-text-primary)]">
+        <legend className="am-heading-serif text-sm text-[var(--am-text-primary)]">
           Teaching mode
         </legend>
         <motion.div
@@ -210,24 +212,27 @@ export function TopicForm({
       >
         <div className="flex flex-wrap gap-2" aria-label="Example topics">
           {suggestions.map((suggestion) => (
-            <button
+            <Button
               key={suggestion}
               type="button"
+              color="tertiary"
+              size="xs"
               onClick={() => onTopicChange(suggestion)}
-              className="rounded-full border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-3 py-1.5 text-xs font-medium text-[var(--am-text-secondary)] transition-colors hover:border-[var(--am-primary)]/40 hover:text-[var(--am-primary)]"
             >
               {suggestion}
-            </button>
+            </Button>
           ))}
         </div>
 
-        <button
+        <Button
           type="submit"
-          disabled={isLoading || !topic.trim()}
-          className="am-btn am-btn-primary"
+          color="primary"
+          size="md"
+          isDisabled={isLoading || !topic.trim()}
+          isLoading={isLoading}
         >
-          {isLoading ? "Preparing lesson..." : "Teach me"}
-        </button>
+          Teach me
+        </Button>
       </motion.div>
     </motion.form>
   );

@@ -19,11 +19,11 @@ export function ProgressCard({
   return (
     <section
       aria-labelledby="progress-title"
-      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)]"
+      className="am-card p-6"
     >
       <h2
         id="progress-title"
-        className="text-xl font-semibold text-[var(--am-text-primary)]"
+        className="am-heading-serif text-xl text-[var(--am-text-primary)]"
       >
         Your progress
       </h2>

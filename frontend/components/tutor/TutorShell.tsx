@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Button } from "@/components/base/buttons/button";
 import type {
   TeachingMode,
   TutorAction,
@@ -12,6 +13,7 @@ import type {
   TutorLesson,
   UnderstandingEvaluation,
   UnderstandingEvaluationApiResponse,
+  ExplainBackApiResponse,
 } from "@/lib/ai/types";
 import {
   learningDimensions,
@@ -28,6 +30,20 @@ import {
   startNewTopicStorageKey,
 } from "@/lib/dashboard-storage";
 import { updateTopicMastery } from "@/lib/mastery";
+import {
+  loadLearningDNA2,
+  saveLearningDNA2,
+  recordCheckOutcome,
+} from "@/lib/learning-dna-v2";
+import {
+  defaultApproachState,
+  updateApproachState,
+} from "@/lib/mode-effectiveness";
+import {
+  getReviewCard,
+  upsertReviewCard,
+  updateReviewCard,
+} from "@/lib/spaced-review";
 import { PageShell } from "@/components/am/PageShell";
 import { LearningDNACompact } from "./LearningDNACompact";
 import { LessonActions } from "./LessonActions";
@@ -39,6 +55,28 @@ import { TutorErrorState } from "./TutorErrorState";
 import { TutorLoadingState } from "./TutorLoadingState";
 import { UnderstandingCheck } from "./UnderstandingCheck";
 import { UnderstandingFeedback } from "./UnderstandingFeedback";
+import { ExplainBack, type ExplainBackFeedback, type ExplainBackState } from "./ExplainBack";
+import { HintLadder } from "./HintLadder";
+import { loadReadingSettings, type ReadingSettings } from "./ReadingPreferences";
+import { ReadingPreferencesInline } from "./ReadingPreferencesInline";
+import { ConfidenceCoaching } from "./ConfidenceCoaching";
+import { WhyThisMode } from "./WhyThisMode";
+import { QuickRecall } from "./QuickRecall";
+import {
+  scheduleQuickRecall,
+  simulateQuickRecallDue,
+  getQuickRecallStatus,
+  completeQuickRecall,
+  type QuickRecallRecord,
+} from "@/lib/quick-recall";
+import { LearnerTransparency } from "./LearnerTransparency";
+import { PreferenceOverridesUI } from "./PreferenceOverridesUI";
+import { ExplanationHistoryView } from "./ExplanationHistoryView";
+import { PeerAgent, type PeerAgentState, type PeerAgentMessage } from "./PeerAgent";
+import {
+  addExplanationRecord,
+  getExplanationHistoryForConcept,
+} from "@/lib/explanation-history";
 
 const profileStorageKey = "adaptivemind-learning-dna";
 const lessonStorageKey = "adaptivemind-current-lesson";
@@ -183,6 +221,25 @@ function isEvaluationApiResponse(
   );
 }
 
+function isExplainBackApiResponse(
+  value: unknown,
+): value is ExplainBackApiResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  const evaluation = record.evaluation as Record<string, unknown> | undefined;
+  return (
+    record.action === "explain-back" &&
+    (record.source === "provider" || record.source === "demo") &&
+    typeof evaluation === "object" &&
+    evaluation !== null &&
+    typeof evaluation.isComplete === "boolean" &&
+    typeof evaluation.score === "number" &&
+    Array.isArray(evaluation.understood) &&
+    Array.isArray(evaluation.missing) &&
+    Array.isArray(evaluation.stylesUsed)
+  );
+}
+
 function isMessage(value: unknown): value is TutorConversationMessage {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
@@ -292,6 +349,25 @@ export function TutorShell() {
   >("provider");
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
+  const [explainBackFeedback, setExplainBackFeedback] = useState<ExplainBackFeedback | null>(null);
+  const [explainBackState, setExplainBackState] = useState<ExplainBackState>("prompt");
+  const [isExplainBackLoading, setIsExplainBackLoading] = useState(false);
+  const [explainBackError, setExplainBackError] = useState<string | null>(null);
+  const [hintLevel, setHintLevel] = useState<0 | 1 | 2 | 3 | 4>(0);
+  const [hints, setHints] = useState<[string, string, string, string] | null>(null);
+  const [isHintLoading, setIsHintLoading] = useState(false);
+  const [readingSettings, setReadingSettings] = useState<ReadingSettings>(() => {
+    try { return loadReadingSettings(); } catch { return { textSize: "normal" as const, lineSpacing: "normal" as const, contentWidth: "normal" as const, reducedVisualDensity: false, highContrast: false }; }
+  });
+  const [showReadingPrefs, setShowReadingPrefs] = useState(false);
+  const [hasAttempted, setHasAttempted] = useState(false);
+  const [confidenceBefore, setConfidenceBefore] = useState<number | null>(null);
+  const [quickRecallRecord, setQuickRecallRecord] = useState<QuickRecallRecord | null>(null);
+  const [quickRecallStatus, setQuickRecallStatus] = useState<"due" | "completed" | "full-review-recommended" | "not-due">("not-due");
+  const [peerAgentState, setPeerAgentState] = useState<PeerAgentState>("prompt");
+  const [peerAgentMessages, setPeerAgentMessages] = useState<PeerAgentMessage[]>([]);
+  const [isPeerLoading, setIsPeerLoading] = useState(false);
+  const [peerError, setPeerError] = useState<string | null>(null);
   const latestTurnRef = useRef<HTMLDivElement>(null);
 
   function clearConversation() {
@@ -563,6 +639,96 @@ export function TutorShell() {
           masteryLevel: mastery.masteryLevel,
           evaluatedAt: new Date().toISOString(),
         });
+
+      // ── LD2.0 data wiring ──
+      // Record outcome in Learning DNA evidence model
+      try {
+        const dna = loadLearningDNA2();
+        const { getPrimaryLearningStyle } = await import("@/lib/learning-dna");
+        const approach: import("@/lib/learning-dna").LearningDimension =
+          teachingMode !== "adaptive"
+            ? (teachingMode as import("@/lib/learning-dna").LearningDimension)
+            : getPrimaryLearningStyle(profile.scores);
+        const updatedDna = recordCheckOutcome(dna, approach, {
+          score: payload.evaluation.score,
+          confidenceBefore: 50,
+          confidenceAfter: payload.evaluation.confidenceInsight
+            ? 75
+            : 50,
+          hintCount: 0,
+          retryCount: 0,
+          switchedAway: false,
+        });
+        saveLearningDNA2(updatedDna);
+      } catch { /* non-critical, silently skip */ }
+
+      // Update Thompson sampling state
+      try {
+        const { getPrimaryLearningStyle } = await import("@/lib/learning-dna");
+        const approach: import("@/lib/learning-dna").LearningDimension =
+          teachingMode !== "adaptive"
+            ? (teachingMode as import("@/lib/learning-dna").LearningDimension)
+            : getPrimaryLearningStyle(profile.scores);
+        const state = defaultApproachState();
+        const success = payload.evaluation.score >= 60;
+        updateApproachState(state, approach, success);
+      } catch { /* non-critical */ }
+
+      // Create or update SM-2 review card
+      try {
+        const quality = payload.evaluation.status === "correct" ? 5
+          : payload.evaluation.status === "partial" ? 3
+          : 1;
+        const existing = getReviewCard(topic.trim());
+        if (existing) {
+          upsertReviewCard(updateReviewCard(existing, quality, topic.trim(), topic.trim(), subject));
+        } else {
+          const newCard = {
+            skillId: topic.trim(),
+            topic: topic.trim(),
+            subject,
+            repetition: 0,
+            easeFactor: 2.5,
+            interval: 0,
+            qualityHistory: [] as number[],
+          };
+          upsertReviewCard(updateReviewCard(newCard, quality, topic.trim(), topic.trim(), subject));
+        }
+      } catch { /* non-critical */ }
+
+      // ── Explanation history ──
+      try {
+        const approach: import("@/lib/explanation-history").ExplanationRecord["approach"] =
+          teachingMode !== "adaptive"
+            ? (teachingMode as import("@/lib/learning-dna").LearningDimension)
+            : "adaptive";
+        addExplanationRecord({
+          conceptId: topic.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          conceptLabel: topic.trim(),
+          timestamp: new Date().toISOString(),
+          approach,
+          lessonId: historyId ?? "unknown",
+          reasonSelected: teachingMode === "adaptive" ? "Thompson sampling" : "Learner choice",
+          learnerConfidence: confidenceBefore ?? 50,
+          checkType: "understanding",
+          evaluationStatus: payload.evaluation.status,
+          evaluationScore: payload.evaluation.score,
+          hintsUsed: hintLevel,
+          retries: 0,
+          masteryBefore: 0,
+          masteryAfter: mastery.masteryLevel === "mastered" ? 100 : mastery.masteryLevel === "proficient" ? 75 : mastery.masteryLevel === "developing" ? 50 : 25,
+          switchedAway: false,
+          learnerFeedback: null,
+          recommendationOutcome: payload.evaluation.status,
+        });
+      } catch { /* non-critical */ }
+
+      // ── Schedule quick recall ──
+      try {
+        const qr = scheduleQuickRecall(topic.trim(), topic.trim(), subject);
+        setQuickRecallRecord(qr);
+        setQuickRecallStatus(getQuickRecallStatus(topic.trim()));
+      } catch { /* non-critical */ }
     } catch (requestError) {
       setEvaluationError(
         requestError instanceof Error
@@ -580,14 +746,189 @@ export function TutorShell() {
     setTopic("");
     setHistoryId(null);
     setEvaluation(null);
+    setExplainBackFeedback(null);
+    setExplainBackState("prompt");
+    setHints(null);
+    setHintLevel(0);
+    setHasAttempted(false);
+    setConfidenceBefore(null);
+    setQuickRecallRecord(null);
+    setQuickRecallStatus("not-due");
     clearConversation();
     localStorage.removeItem(lessonStorageKey);
+  }
+
+  async function requestExplainBack(learnerResponse: string) {
+    if (!profile || !response || !topic.trim()) return;
+    setIsExplainBackLoading(true);
+    setExplainBackError(null);
+    try {
+      const apiResponse = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: topic.trim(),
+          subject,
+          level,
+          scores: profile.scores,
+          action: "explain-back",
+          teachingMode,
+          learnerResponse,
+          lessonContext: response.lesson.explanation.slice(0, 500),
+        }),
+      });
+      const payload: unknown = await apiResponse.json();
+      if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
+      if (!isExplainBackApiResponse(payload))
+        throw new Error("Ada could not evaluate this explanation.");
+      const evalResult = payload.evaluation;
+      setExplainBackFeedback({
+        understood: evalResult.understood,
+        missing: evalResult.missing,
+        misconception: evalResult.misconception,
+        followUpQuestion: evalResult.followUpQuestion,
+        isComplete: evalResult.isComplete,
+      });
+      setExplainBackState("feedback");
+    } catch (requestError) {
+      setExplainBackError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Please try again.",
+      );
+    } finally {
+      setIsExplainBackLoading(false);
+    }
+  }
+
+  function handleExplainBackRetry() {
+    setExplainBackState("prompt");
+    setExplainBackFeedback(null);
+  }
+
+  function handleExplainBackNext() {
+    setExplainBackState("prompt");
+    setExplainBackFeedback(null);
+  }
+
+  async function requestHints(level?: number) {
+    if (!profile || !response || !topic.trim()) return;
+    setIsHintLoading(true);
+    try {
+      const apiResponse = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: topic.trim(),
+          subject,
+          level,
+          scores: profile.scores,
+          action: "hint",
+          teachingMode,
+          currentHintLevel: level ?? hintLevel,
+          lessonContext: response.lesson.explanation.slice(0, 500),
+          challengeContext: response.lesson.challenge,
+        }),
+      });
+      const payload: unknown = await apiResponse.json();
+      if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
+      if (payload && typeof payload === "object" && Array.isArray((payload as Record<string, unknown>).hints)) {
+        setHints((payload as { hints: [string, string, string, string] }).hints);
+        setHintLevel((prev) => Math.min(prev + 1, 3) as 0 | 1 | 2 | 3 | 4);
+      }
+    } catch {
+      // Silently fail for hints — not critical
+    } finally {
+      setIsHintLoading(false);
+    }
+  }
+
+  // ── Peer Agent handlers ──
+  function startPeerSession() {
+    setPeerAgentState("active");
+    setPeerAgentMessages([]);
+    setPeerError(null);
+    // Initial peer prompt
+    const initialPrompt = `I heard something about "${topic.trim()}" but I am not sure I understand. Can you explain the main idea to me?`;
+    setPeerAgentMessages([{ role: "peer", content: initialPrompt }]);
+  }
+
+  async function handlePeerSubmit(explanation: string) {
+    if (!response) return;
+    setIsPeerLoading(true);
+    setPeerError(null);
+    const userMsg: PeerAgentMessage = { role: "learner", content: explanation };
+    setPeerAgentMessages((prev) => [...prev, userMsg]);
+    try {
+      const apiResponse = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          topic: topic.trim(),
+          subject,
+          level,
+          scores: profile?.scores ?? balancedScores,
+          action: "followup",
+          teachingMode,
+          question: `The student just explained "${topic.trim()}" to you as a confused classmate. You are playing the role of a classmate who just heard their explanation. Respond naturally as a confused peer who is trying to understand, asking a follow-up question or expressing confusion about one specific part. Keep it brief (2-3 sentences). Do NOT break character. Do NOT reveal you are an AI.`,
+          currentLesson: {
+            title: response.lesson.title,
+            coreIdea: response.lesson.coreIdea,
+            explanation: response.lesson.explanation.slice(0, 360),
+            stylesUsed: response.lesson.stylesUsed,
+          },
+          conversation: [],
+        }),
+      });
+      const payload: unknown = await apiResponse.json();
+      const answer = payload && typeof payload === "object" && "followUp" in payload
+        ? (payload as { followUp: { answer: string } }).followUp?.answer
+        : null;
+      if (answer) {
+        setPeerAgentMessages((prev) => [
+          ...prev,
+          { role: "peer", content: answer },
+        ]);
+      }
+    } catch {
+      setPeerError("Could not get a response. Try again.");
+    } finally {
+      setIsPeerLoading(false);
+    }
+  }
+
+  function handlePeerComplete() {
+    setPeerAgentState("complete");
+    // Record explanation history
+    try {
+      addExplanationRecord({
+        conceptId: topic.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        conceptLabel: topic.trim(),
+        timestamp: new Date().toISOString(),
+        approach: teachingMode !== "adaptive"
+          ? (teachingMode as import("@/lib/learning-dna").LearningDimension)
+          : "adaptive",
+        lessonId: historyId ?? "unknown",
+        reasonSelected: "Peer agent session",
+        learnerConfidence: confidenceBefore ?? 50,
+        checkType: "peer-agent",
+        evaluationStatus: "correct",
+        evaluationScore: 0,
+        hintsUsed: 0,
+        retries: 0,
+        masteryBefore: 0,
+        masteryAfter: 0,
+        switchedAway: false,
+        learnerFeedback: null,
+        recommendationOutcome: "peer-session",
+      });
+    } catch { /* non-critical */ }
   }
 
   if (!isReady)
     return (
       <div
-        className="min-h-screen bg-[var(--am-bg-reading)]"
+        className="min-h-screen bg-[var(--am-bg)]"
         aria-busy="true"
       />
     );
@@ -606,7 +947,7 @@ export function TutorShell() {
     );
 
   return (
-    <PageShell heading="Adaptive AI Tutor" subheading="A lesson shaped around your current preferences.">
+    <PageShell heading="Ada" subheading="Your adaptive tutor">
       <div className="grid gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start">
         {/* Left: Profile + form */}
         <div className="space-y-6">
@@ -627,6 +968,51 @@ export function TutorShell() {
             onTeachingModeChange={setTeachingMode}
             onSubmit={() => requestLesson("initial")}
           />
+
+          {/* Reading Preferences toggle */}
+          <Button
+            type="button"
+            color="tertiary"
+            size="sm"
+            onClick={() => setShowReadingPrefs(!showReadingPrefs)}
+            className="w-full"
+          >
+            <span className="flex items-center justify-between w-full">
+              <span>Reading preferences</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+              </svg>
+            </span>
+          </Button>
+          {showReadingPrefs && (
+            <div className="rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-surface)] p-4">
+              <ReadingPreferencesInline
+                settings={readingSettings}
+                onChange={setReadingSettings}
+              />
+            </div>
+          )}
+
+          {/* Why this mode? */}
+          {response && (
+            <WhyThisMode
+              activeMode={teachingMode}
+              onModeChange={setTeachingMode}
+              availableModes={["adaptive", "visual", "example", "analogy", "story", "challenge"]}
+            />
+          )}
+
+          {/* Learner transparency */}
+          {topic.trim() && (
+            <LearnerTransparency topic={topic.trim()} />
+          )}
+
+          {/* Preference overrides */}
+          <PreferenceOverridesUI />
+
+          {/* Explanation history */}
+          <ExplanationHistoryView currentConcept={topic.trim()} />
         </div>
 
         {/* Right: Lesson content */}
@@ -657,6 +1043,22 @@ export function TutorShell() {
                 onNewLesson={startNewLesson}
               />
 
+              {/* Hint Ladder for challenges */}
+              {response.lesson.challenge && hints && (
+                <HintLadder
+                  hints={hints}
+                  currentLevel={hintLevel as 0 | 1 | 2 | 3 | 4}
+                  isLoading={isHintLoading}
+                  onRequestHint={requestHints}
+                  gateType="attempt"
+                  hasAttempted={hasAttempted}
+                  onAttempt={() => {
+                    setHasAttempted(true);
+                  }}
+                  isChallenge={true}
+                />
+              )}
+
               {/* Understanding check */}
               <UnderstandingCheck
                 question={response.lesson.checkQuestion}
@@ -681,6 +1083,67 @@ export function TutorShell() {
                 />
               )}
 
+              {/* Confidence coaching */}
+              {evaluation && (
+                <ConfidenceCoaching
+                  confidence={confidenceBefore}
+                  score={evaluation.score}
+                  calibrationRecords={getExplanationHistoryForConcept(topic.trim()).map(
+                    (r) => ({ selfReported: r.learnerConfidence, actualScore: r.evaluationScore }),
+                  )}
+                  status={evaluation.status}
+                />
+              )}
+
+              {/* Quick recall */}
+              {quickRecallRecord && (
+                <QuickRecall
+                  topic={quickRecallRecord.topic}
+                  recallStatus={quickRecallStatus}
+                  isSimulated={true}
+                  onSubmit={(answer) => {
+                    // Score the answer (simple heuristic for demo)
+                    const score = Math.min(100, Math.max(0, answer.length * 2));
+                    completeQuickRecall(quickRecallRecord.skillId, score);
+                    setQuickRecallStatus(getQuickRecallStatus(quickRecallRecord.skillId));
+                  }}
+                  onRetry={() => {
+                    const simulated = simulateQuickRecallDue(quickRecallRecord.skillId);
+                    setQuickRecallRecord(simulated);
+                    setQuickRecallStatus("due");
+                  }}
+                  onFullReview={() => void requestLesson("different")}
+                />
+              )}
+
+              {/* Explain Back */}
+              {response.lesson.checkQuestion && (
+                <ExplainBack
+                  topic={topic.trim()}
+                  state={explainBackState}
+                  isLoading={isExplainBackLoading}
+                  error={explainBackError}
+                  feedback={explainBackFeedback}
+                  onSubmit={requestExplainBack}
+                  onRetry={handleExplainBackRetry}
+                  onNext={handleExplainBackNext}
+                />
+              )}
+
+              {/* Peer Agent */}
+              {response.lesson.checkQuestion && (
+                <PeerAgent
+                  topic={topic.trim()}
+                  state={peerAgentState}
+                  isLoading={isPeerLoading}
+                  error={peerError}
+                  messages={peerAgentMessages}
+                  onStart={startPeerSession}
+                  onSubmit={handlePeerSubmit}
+                  onComplete={handlePeerComplete}
+                />
+              )}
+
               {/* Follow-up */}
               {topic.trim() && (
                 <LessonFollowUp
@@ -697,11 +1160,11 @@ export function TutorShell() {
 
           {/* Empty state (no lesson yet) */}
           {!isLoading && !response && !error && (
-            <section className="rounded-[var(--am-radius-2xl)] border border-dashed border-[var(--am-border)] bg-[var(--am-bg-elevated)]/60 p-10 text-center text-[var(--am-text-muted)]">
-              <p className="font-medium text-[var(--am-text-secondary)]">
+            <section className="am-card p-10 text-center border-dashed">
+              <p className="am-heading-serif text-base text-[var(--am-text-secondary)]">
                 Ada will build your focused lesson here.
               </p>
-              <p className="mt-2 text-sm leading-6">
+              <p className="mt-2 text-sm leading-6 text-[var(--am-text-muted)]">
                 Choose a suggested topic or enter one of your own to begin.
               </p>
             </section>

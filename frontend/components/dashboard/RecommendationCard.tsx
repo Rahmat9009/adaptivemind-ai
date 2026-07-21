@@ -20,15 +20,15 @@ export function RecommendationCard({
       initial="hidden"
       animate="visible"
       aria-labelledby="recommendation-title"
-      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)]"
+      className="am-card p-6"
     >
       <motion.div variants={slideUp}>
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
+        <p className="am-label text-[var(--am-primary)]/70">
           Suggested next
         </p>
         <h2
           id="recommendation-title"
-          className="mt-2 text-2xl font-semibold tracking-tight text-[var(--am-text-primary)]"
+          className="am-heading-serif mt-2 text-2xl text-[var(--am-text-primary)]"
         >
           {recommendation.topic}
         </h2>

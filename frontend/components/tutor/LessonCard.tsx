@@ -10,11 +10,11 @@ interface LessonCardProps {
 }
 
 const dnaColors: Record<LearningDimension, string> = {
-  visual: "#22d3ee",
-  examples: "#f59e0b",
-  analogies: "#8b5cf6",
-  stories: "#fb7185",
-  challenges: "#fb6a4a",
+  visual: "#0891B2",
+  examples: "#B45309",
+  analogies: "#7C3AED",
+  stories: "#BE185D",
+  challenges: "#DC2626",
 };
 
 export function LessonCard({ response }: LessonCardProps) {
@@ -33,12 +33,12 @@ export function LessonCard({ response }: LessonCardProps) {
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-8"
+      className="am-card p-6 sm:p-8"
       aria-labelledby="lesson-title"
     >
       {/* Header row */}
       <motion.div variants={slideUp} className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
+        <p className="am-label text-[var(--am-primary)]/70">
           {actionLabel}
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -70,14 +70,14 @@ export function LessonCard({ response }: LessonCardProps) {
       <motion.h2
         variants={slideUp}
         id="lesson-title"
-        className="mt-4 text-2xl font-semibold tracking-tight text-[var(--am-text-primary)] sm:text-3xl"
+        className="am-heading-serif mt-4 text-2xl text-[var(--am-text-primary)] sm:text-3xl"
       >
         {lesson.title}
       </motion.h2>
 
       {/* Core Idea */}
       <motion.section variants={slideUp} className="mt-7">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+        <h3 className="am-label text-[var(--am-text-muted)]">
           Core idea
         </h3>
         <p className="mt-2 text-lg font-medium leading-8 text-[var(--am-text-primary)]">
@@ -87,7 +87,7 @@ export function LessonCard({ response }: LessonCardProps) {
 
       {/* Explanation */}
       <motion.section variants={slideUp} className="mt-6">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+        <h3 className="am-label text-[var(--am-text-muted)]">
           {action === "simpler"
             ? "Simplified explanation"
             : action === "challenge"
@@ -141,7 +141,7 @@ export function LessonCard({ response }: LessonCardProps) {
 
       {/* Key Points */}
       <motion.section variants={slideUp} className="mt-6">
-        <h3 className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+        <h3 className="am-label text-[var(--am-text-muted)]">
           Key points
         </h3>
         <ul className="mt-3 space-y-2">

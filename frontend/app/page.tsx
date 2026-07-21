@@ -7,7 +7,7 @@ import { Navbar } from "@/components/layout/Navbar";
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[var(--am-bg-reading)] text-[var(--am-text-primary)]">
+    <main id="main-content" className="min-h-screen bg-[var(--am-bg)] text-[var(--am-text-primary)]">
       <Navbar />
       <Hero />
       <Features />

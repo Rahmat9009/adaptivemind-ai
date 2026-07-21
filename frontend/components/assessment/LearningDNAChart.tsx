@@ -14,11 +14,11 @@ interface LearningDNAChartProps {
 }
 
 const dnaColors: Record<LearningDimension, string> = {
-  visual: "#22d3ee",
-  examples: "#f59e0b",
-  analogies: "#8b5cf6",
-  stories: "#fb7185",
-  challenges: "#fb6a4a",
+  visual: "#0891B2",
+  examples: "#B45309",
+  analogies: "#7C3AED",
+  stories: "#BE185D",
+  challenges: "#DC2626",
 };
 
 function DimensionIcon({ dimension }: { dimension: LearningDimension }) {
@@ -73,18 +73,13 @@ export function LearningDNAChart({
   return (
     <section
       aria-labelledby="dna-chart-title"
-      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-8"
+      className="am-card p-6 sm:p-8"
     >
       <div className="flex items-center justify-between gap-4">
-        <h2
-          id="dna-chart-title"
-          className="text-xl font-semibold text-[var(--am-text-primary)]"
-        >
-          All preferences
+        <h2 id="dna-chart-title" className="text-xl font-semibold text-[var(--am-text-primary)]">
+          All approaches
         </h2>
-        <span className="text-sm text-[var(--am-text-muted)]">
-          Initial profile
-        </span>
+        <span className="text-sm text-[var(--am-text-muted)]">Initial profile</span>
       </div>
 
       <div className="mt-6 space-y-5">
@@ -101,21 +96,16 @@ export function LearningDNAChart({
                 >
                   <DimensionIcon dimension={dimension} />
                 </span>
-                <span className="text-sm font-medium">
-                  {learningDimensionLabels[dimension]}
-                </span>
+                <span className="text-sm font-medium">{learningDimensionLabels[dimension]}</span>
               </div>
-              <span
-                className="text-sm font-bold tabular-nums"
-                style={{ color: dnaColors[dimension] }}
-              >
+              <span className="text-sm font-bold tabular-nums" style={{ color: dnaColors[dimension] }}>
                 {scores[dimension]}%
               </span>
             </div>
 
             <div className="mt-2 am-progress-track">
               <motion.div
-                className="am-progress-fill"
+                className="h-full rounded-full"
                 initial={{ width: 0 }}
                 animate={{ width: isVisible ? `${scores[dimension]}%` : "0%" }}
                 transition={{
@@ -123,9 +113,7 @@ export function LearningDNAChart({
                   ease: [0.16, 1, 0.3, 1],
                   delay: index * 0.1,
                 }}
-                style={{
-                  background: `linear-gradient(90deg, ${dnaColors[dimension]}, ${dnaColors[dimension]}88)`,
-                }}
+                style={{ background: `linear-gradient(90deg, ${dnaColors[dimension]}, ${dnaColors[dimension]}88)` }}
               />
             </div>
           </div>

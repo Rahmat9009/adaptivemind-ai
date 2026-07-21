@@ -12,11 +12,11 @@ import {
 import { LearningDNAConstellation } from "@/components/three/LearningDNAConstellation";
 
 const dnaColors: Record<LearningDimension, string> = {
-  visual: "#22d3ee",
-  examples: "#f59e0b",
-  analogies: "#8b5cf6",
-  stories: "#fb7185",
-  challenges: "#fb6a4a",
+  visual: "#0891B2",
+  examples: "#B45309",
+  analogies: "#7C3AED",
+  stories: "#BE185D",
+  challenges: "#DC2626",
 };
 
 export function LearningDNACard({ scores }: { scores: LearningScores }) {
@@ -25,20 +25,20 @@ export function LearningDNACard({ scores }: { scores: LearningScores }) {
   return (
     <section
       aria-labelledby="learning-dna-card-title"
-      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)] sm:p-7"
+      className="am-card p-6 sm:p-7"
     >
-      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+      <p className="am-label text-[var(--am-text-muted)]">
         Current Learning DNA
       </p>
       <h2
         id="learning-dna-card-title"
-        className="mt-2 text-2xl font-semibold tracking-tight"
+        className="am-heading-serif mt-2 text-2xl"
         style={{ color: dnaColors[profile.primaryDimension] }}
       >
         {learningDimensionLabels[profile.primaryDimension]}
       </h2>
       <p className="mt-1 text-sm text-[var(--am-text-secondary)]">
-        strongest preference &middot; supporting:{" "}
+        starting approach &middot; supporting:{" "}
         {learningDimensionLabels[profile.secondaryDimension].toLowerCase()}
       </p>
 

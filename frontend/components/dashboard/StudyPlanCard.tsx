@@ -33,10 +33,10 @@ export function StudyPlanCard({ plan }: { plan: StudyPlan | null }) {
         variants={fadeIn}
         initial="hidden"
         animate="visible"
-        className="rounded-[var(--am-radius-2xl)] border border-dashed border-[var(--am-border)] bg-[var(--am-bg-elevated)]/60 p-6 shadow-sm"
+        className="am-card p-6 border-dashed"
       >
         <motion.div variants={slideUp}>
-          <h2 className="text-xl font-semibold text-[var(--am-text-primary)]">
+          <h2 className="am-heading-serif text-xl text-[var(--am-text-primary)]">
             My Study Plan
           </h2>
           <p className="mt-2 text-sm leading-6 text-[var(--am-text-secondary)]">
@@ -61,12 +61,12 @@ export function StudyPlanCard({ plan }: { plan: StudyPlan | null }) {
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)]"
+      className="am-card p-6"
     >
       <motion.div variants={slideUp}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-[var(--am-text-primary)]">
+            <h2 className="am-heading-serif text-xl text-[var(--am-text-primary)]">
               My Study Plan
             </h2>
             <p className="mt-1 text-sm text-[var(--am-text-secondary)]">

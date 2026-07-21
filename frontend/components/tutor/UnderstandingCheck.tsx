@@ -30,16 +30,16 @@ export function UnderstandingCheck({
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="mt-8 rounded-[var(--am-radius-2xl)] border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] p-6 shadow-[var(--am-shadow-sm)]"
+      className="mt-8 am-card p-6"
       aria-labelledby="understanding-title"
     >
       <motion.div variants={slideUp}>
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
+        <p className="am-label text-[var(--am-primary)]/70">
           Check your understanding
         </p>
         <h2
           id="understanding-title"
-          className="mt-2 text-lg font-semibold text-[var(--am-text-primary)]"
+          className="am-heading-serif mt-2 text-lg text-[var(--am-text-primary)]"
         >
           {question}
         </h2>

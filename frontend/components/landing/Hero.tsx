@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { motion } from "motion/react";
+import { Button } from "@/components/base/buttons/button";
 import { LearningDNAConstellation } from "@/components/three/LearningDNAConstellation";
 
 const previewScores = {
@@ -28,87 +30,129 @@ export function Hero() {
   }, []);
 
   return (
-    <section className="relative isolate overflow-hidden">
-      {/* Deep space background */}
-      <div className="am-deep-space absolute inset-0 -z-10" />
-      <div className="absolute inset-0 -z-10 opacity-30" style={{ backgroundImage: "linear-gradient(rgba(80,70,229,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(80,70,229,0.04) 1px, transparent 1px)", backgroundSize: "64px 64px" }} />
+    <section className="relative isolate overflow-hidden bg-[var(--am-bg)]">
+      {/* Subtle warm background decoration */}
+      <div className="pointer-events-none absolute right-0 top-0 -z-10 h-[80vh] w-[60vw] opacity-[0.03]"
+        style={{ background: "radial-gradient(ellipse at 70% 30%, #544443 0%, transparent 70%)" }}
+      />
 
-      {/* Ambient glow */}
-      <div className="pointer-events-none absolute left-1/3 top-0 -z-10 h-[60vh] w-[50vw] opacity-20" style={{ background: "radial-gradient(ellipse at center, rgba(80,70,229,0.3) 0%, transparent 70%)" }} />
-
-      <div className="mx-auto max-w-7xl px-5 pt-24 pb-20 sm:px-8 lg:px-10 lg:pt-32 lg:pb-28">
-        <div className="grid items-center gap-14 lg:grid-cols-[1.1fr_0.9fr]">
+      <div className="mx-auto max-w-7xl px-5 pt-20 pb-16 sm:px-8 lg:px-10 lg:pt-24 lg:pb-24">
+        <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_0.95fr]">
           {/* Left: Copy */}
           <div className="max-w-2xl">
-            <p className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--am-primary)]/20 bg-[var(--am-primary)]/8 px-4 py-2 text-sm font-medium text-[var(--am-primary)]">
-              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: "#22d3ee" }} />
-              Adaptive AI tutoring, reimagined
-            </p>
+            <motion.p
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="mb-6 inline-flex items-center gap-2 rounded-full border border-[var(--am-primary)]/20 bg-[var(--am-primary-light)] px-4 py-2 text-sm font-medium text-[var(--am-primary)]"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--am-primary)]" />
+              Adaptive learning, reimagined
+            </motion.p>
 
-            <h1 className="text-[clamp(2.5rem,5.5vw,4.5rem)] font-semibold tracking-tight text-white leading-[1.08]">
-              <span className="block">Changes how it teaches</span>
-              <span className="mt-2 block bg-gradient-to-r from-[var(--am-dna-visual)] via-[var(--am-primary)] to-[var(--am-dna-analogies)] bg-clip-text text-transparent">
-                based on how you understand.
-              </span>
-            </h1>
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
+              className="am-heading-serif text-[clamp(2.75rem,6.5vw,5rem)] leading-[1.05] text-[var(--am-text-primary)]"
+            >
+              <span className="block">Learning should</span>
+              <span className="block text-[var(--am-primary)]">adapt to you.</span>
+            </motion.h1>
 
-            <p className="mt-6 max-w-xl text-lg leading-8 text-white/65">
-              AdaptiveMind builds a unique Learning DNA profile from your preferences —
-              then shapes every explanation, example, and challenge around the way you learn best.
-            </p>
+            <motion.p
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+              className="mt-6 max-w-xl text-lg leading-8 text-[var(--am-text-secondary)]"
+            >
+              AdaptiveMind discovers how you understand, then changes how every lesson is explained —
+              through visuals, examples, analogies, stories, or challenges.
+            </motion.p>
 
-            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-              <Link
+            <motion.div
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
+              className="mt-10 flex flex-col gap-3 sm:flex-row"
+            >
+              <Button
                 href="/assessment"
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-[var(--am-primary)] px-7 py-3.5 text-base font-semibold text-white shadow-xl shadow-[var(--am-primary)]/25 transition-all duration-[var(--am-duration-quick)] hover:-translate-y-0.5 hover:bg-[var(--am-primary-hover)] hover:shadow-2xl hover:shadow-[var(--am-primary)]/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                color="primary"
+                size="lg"
+                iconTrailing={
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M5 12h14M12 5l7 7-7 7" />
+                  </svg>
+                }
               >
-                {hasResult ? "Update my Learning DNA" : "Discover your Learning DNA"}
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="opacity-60">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </Link>
+                {hasResult ? "Update my Learning DNA" : "Discover my Learning DNA"}
+              </Button>
 
-              <Link
+              <Button
                 href="/tutor"
-                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 bg-white/8 px-7 py-3.5 text-base font-semibold text-white backdrop-blur-sm transition-all duration-[var(--am-duration-quick)] hover:bg-white/15 hover:border-white/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+                color="secondary"
+                size="lg"
               >
                 Try the adaptive tutor
-              </Link>
-            </div>
+              </Button>
+            </motion.div>
 
-            {/* Continue learning — only for returning users */}
+            {/* Returning user link */}
             {hasResult && (
-              <Link href="/dashboard" className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-white/50 transition-colors hover:text-white/80">
-                <span className="h-1.5 w-1.5 rounded-full bg-[var(--am-success)]" aria-hidden="true" />
-                Continue where you left off
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M5 12h14M12 5l7 7-7 7" />
-                </svg>
-              </Link>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+              >
+                <Button
+                  href="/dashboard"
+                  color="link-gray"
+                  size="sm"
+                  className="mt-5"
+                  iconLeading={
+                    <span className="h-1.5 w-1.5 rounded-full bg-[var(--am-success)]" aria-hidden="true" />
+                  }
+                  iconTrailing={
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
+                  }
+                >
+                  Continue where you left off
+                </Button>
+              </motion.div>
             )}
           </div>
 
           {/* Right: Interactive constellation + preview card */}
-          <div className="relative">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
+            className="relative"
+          >
             <div className="relative">
-              <LearningDNAConstellation scores={previewScores} activeDimension="analogies" />
+              <div className="am-surface-round overflow-hidden p-4 sm:p-6">
+                <LearningDNAConstellation scores={previewScores} activeDimension="analogies" />
+              </div>
 
               {/* Floating teaching mode card */}
-              <div className={`absolute -bottom-3 -right-3 left-4 overflow-hidden rounded-[var(--am-radius-xl)] border border-white/10 bg-[#0a0f20]/90 p-4 backdrop-blur-xl transition-all duration-[var(--am-duration-slow)] sm:left-auto sm:w-72 ${hasScrolled ? "translate-y-2 opacity-60" : "translate-y-0 opacity-100"}`}>
+              <div className={`absolute -bottom-2 -right-2 left-4 overflow-hidden rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-surface)]/95 p-4 shadow-[var(--am-shadow-lg)] backdrop-blur-xl transition-all duration-[var(--am-duration-slow)] sm:left-auto sm:w-72 ${hasScrolled ? "translate-y-2 opacity-60" : "translate-y-0 opacity-100"}`}>
                 <div className="flex items-center justify-between gap-2">
                   <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--am-dna-analogies)]">
                     <span className="h-2 w-2 rounded-full bg-[var(--am-dna-analogies)]" />
                     Teaching mode: analogy
                   </span>
-                  <span className="rounded bg-white/8 px-2 py-0.5 text-[10px] font-medium text-white/50">LIVE</span>
+                  <span className="am-pill text-[10px] py-0.5 px-2">LIVE</span>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-white/80">
+                <p className="mt-2 text-sm leading-6 text-[var(--am-text-secondary)]">
                   &ldquo;Think of a leaf as a small solar-powered kitchen: sunlight is the power,
                   water and CO₂ are the ingredients, and glucose is the meal it prepares.&rdquo;
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </div>
     </section>

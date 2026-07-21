@@ -15,7 +15,22 @@ export const studyPlanSettingsStorageKey = "adaptivemind-study-plan-settings";
 
 export function prioritizeTopics(mastery: TopicMastery[], history: LessonHistoryEntry[]): string[] { const ranked = [...mastery].sort((a, b) => (a.masteryLevel === "needs-review" ? -2 : a.masteryLevel === "developing" ? -1 : 0) - (b.masteryLevel === "needs-review" ? -2 : b.masteryLevel === "developing" ? -1 : 0) || a.latestScore - b.latestScore).map((item) => item.topic); const recommendation = history[0] ? getLessonRecommendation(history[0].topic)?.topic : undefined; return [...new Set([...ranked, ...(recommendation ? [recommendation] : []), ...history.map((item) => item.topic), "Build consistent study habits"])].slice(0, 6); }
 export function buildStudyPlanInput(scores: LearningScores, mastery: TopicMastery[], history: LessonHistoryEntry[]) { return { scores, mastery, history, topics: prioritizeTopics(mastery, history) }; }
-export function allocateStudyTime(minutes: number, intensity: StudyIntensity): number[] { const base = intensity === "light" ? 2 : intensity === "focused" ? 4 : 3; const each = Math.max(5, Math.floor(minutes / base)); return Array.from({ length: base }, (_, index) => index === base - 1 ? Math.max(5, minutes - each * (base - 1)) : each); }
+export function allocateStudyTime(minutes: number, intensity: StudyIntensity): number[] {
+  const base = intensity === "light" ? 2 : intensity === "focused" ? 4 : 3;
+  const each = Math.max(5, Math.floor(minutes / base));
+  const allocated = Array.from({ length: base }, (_, index) =>
+    index === base - 1 ? Math.max(5, minutes - each * (base - 1)) : each,
+  );
+  const total = allocated.reduce((sum, m) => sum + m, 0);
+  if (total > minutes) {
+    const excess = Math.min(total - minutes, allocated.length * 5);
+    for (let i = allocated.length - 1; i >= 0 && excess > 0; i--) {
+      const cut = Math.min(allocated[i] - 5, excess);
+      allocated[i] -= cut;
+    }
+  }
+  return allocated;
+}
 export function generateStudyPlan(settings: StudyPlanSettings, scores: LearningScores, mastery: TopicMastery[], history: LessonHistoryEntry[]): StudyPlan { const input = buildStudyPlanInput(scores, mastery, history); const approach = (Object.keys(scores) as LearningDimension[]).sort((a, b) => scores[b] - scores[a]).slice(0, 2); const taskTypes: StudyTaskType[] = ["review", "lesson", "practice", "understanding-check", "reflection"]; const days = Array.from({ length: settings.durationDays }, (_, index) => { const topic = input.topics[index % input.topics.length] ?? "Build consistent study habits"; const chunks = allocateStudyTime(settings.minutesPerDay, settings.intensity); const tasks = chunks.map((minutes, taskIndex) => ({ id: `task-${index + 1}-${taskIndex + 1}`, topic, type: taskTypes[(index + taskIndex) % taskTypes.length], minutes, reason: `${taskIndex === 0 ? "Focus" : "Reinforce"} this using ${approach.join(" and ")} because these are currently strong learning preferences.`, teachingApproach: approach, completed: false })); return { dayNumber: index + 1, date: new Date(Date.now() + index * 86400000).toISOString(), totalMinutes: tasks.reduce((sum, task) => sum + task.minutes, 0), focus: topic, tasks }; }); return { id: `plan-${Date.now()}`, createdAt: new Date().toISOString(), goal: settings.goal, durationDays: settings.durationDays, minutesPerDay: settings.minutesPerDay, intensity: settings.intensity, days, summary: input.history.length ? "This plan prioritizes current review needs and your next learning step." : "This starter plan is based mainly on your selected goal and current Learning DNA preferences." }; }
 export function calculatePlanSummary(plan: StudyPlan) { const tasks = plan.days.flatMap((day) => day.tasks); const completed = tasks.filter((task) => task.completed); return { totalTasks: tasks.length, completedTasks: completed.length, totalMinutes: tasks.reduce((sum, task) => sum + task.minutes, 0), completedMinutes: completed.reduce((sum, task) => sum + task.minutes, 0), percentage: tasks.length ? Math.round(completed.length / tasks.length * 100) : 0, currentDay: plan.days.find((day) => day.tasks.some((task) => !task.completed))?.dayNumber ?? plan.durationDays }; }
 export function validateStudyPlan(plan: StudyPlan): boolean { return plan.days.length === plan.durationDays && plan.minutesPerDay >= 5 && plan.days.every((day) => day.totalMinutes <= plan.minutesPerDay && day.tasks.every((task) => task.minutes > 0)); }

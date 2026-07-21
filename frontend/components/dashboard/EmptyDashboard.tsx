@@ -10,13 +10,13 @@ export function EmptyDashboard() {
       variants={fadeIn}
       initial="hidden"
       animate="visible"
-      className="rounded-[var(--am-radius-2xl)] border border-dashed border-[var(--am-border)] bg-[var(--am-bg-elevated)]/60 p-8 text-center shadow-sm sm:p-10"
+      className="am-card p-8 text-center sm:p-10 border-dashed"
     >
       <motion.div variants={slideUp}>
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-text-muted)]">
+        <p className="am-label text-[var(--am-text-muted)]">
           Your journey starts here
         </p>
-        <h2 className="mt-3 text-2xl font-semibold text-[var(--am-text-primary)]">
+        <h2 className="am-heading-serif mt-3 text-2xl text-[var(--am-text-primary)]">
           Your first lesson will give this space momentum.
         </h2>
         <p className="mx-auto mt-3 max-w-lg text-sm leading-6 text-[var(--am-text-secondary)]">

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import { learningDimensionLabels, learningDimensions, type LearningDimension, type LearningScores } from "@/lib/learning-dna";
 import { learningDNAVisuals } from "@/lib/learning-dna-visuals";
+import { ErrorBoundary } from "@/components/am/ErrorBoundary";
 import { SceneFallback } from "./SceneFallback";
 
 const AdaptiveScene = dynamic(() => import("./AdaptiveScene"), { ssr: false });
@@ -38,14 +39,20 @@ export function LearningDNAConstellation({ scores, activeDimension, compact = fa
   return (
     <div
       className={`relative isolate overflow-hidden rounded-[var(--am-radius-2xl)] ${heightClass}`}
-      style={{ background: "radial-gradient(ellipse at 30% 20%, rgba(80,70,229,0.12) 0%, transparent 55%), radial-gradient(ellipse at 70% 80%, rgba(139,92,246,0.08) 0%, transparent 50%), linear-gradient(145deg, #080c1b 0%, #0e1428 50%, #0a0f20 100%)" }}
+      style={{ background: "radial-gradient(ellipse at 30% 20%, rgba(23,81,239,0.06) 0%, transparent 55%), radial-gradient(ellipse at 70% 80%, rgba(124,58,237,0.05) 0%, transparent 50%), linear-gradient(145deg, #F8F7F5 0%, #F3F1EE 50%, #EDEBE8 100%)" }}
       role="region"
-      aria-label={`Interactive Learning DNA constellation showing your learning preferences: ${learningDimensions.map(d => `${learningDimensionLabels[d]}: ${scores[d]}%`).join(", ")}`}
+      aria-label="Interactive Learning DNA constellation showing your five explanation approaches"
     >
       {use3D ? (
-        <div className="absolute inset-0" aria-hidden="true">
-          <AdaptiveScene scores={scores} activeDimension={activeDimension} />
-        </div>
+        <ErrorBoundary fallback={
+          <div className="absolute inset-0" aria-hidden="true">
+            <SceneFallback scores={scores} compact={compact} activeDimension={activeDimension} />
+          </div>
+        }>
+          <div className="absolute inset-0" aria-hidden="true">
+            <AdaptiveScene scores={scores} activeDimension={activeDimension} />
+          </div>
+        </ErrorBoundary>
       ) : (
         <div className="absolute inset-0" aria-hidden="true">
           <SceneFallback scores={scores} compact={compact} activeDimension={activeDimension} />
@@ -53,31 +60,49 @@ export function LearningDNAConstellation({ scores, activeDimension, compact = fa
       )}
 
       {/* Vignette overlay */}
-      <div className="pointer-events-none absolute inset-0 opacity-40" aria-hidden="true"
-        style={{ background: "radial-gradient(ellipse at 50% 50%, transparent 30%, rgba(8,12,27,0.7) 100%)" }}
+      <div className="pointer-events-none absolute inset-0 opacity-20" aria-hidden="true"
+        style={{ background: "radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(248,247,245,0.5) 100%)" }}
       />
 
       {/* Accessible dimension buttons */}
       {!compact && (
         <div className="absolute bottom-3 left-3 right-3 z-10 flex flex-wrap gap-1.5">
-          {learningDimensions.map((dimension) => (
-            <button
-              key={dimension}
-              type="button"
-              onClick={() => onDimensionSelect?.(dimension)}
-              className={`inline-flex items-center gap-1.5 rounded-[var(--am-radius-md)] px-2.5 py-1.5 text-[11px] font-semibold backdrop-blur-sm transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--am-primary)] ${
-                activeDimension === dimension
-                  ? "bg-white/15 text-white border"
-                  : "border border-white/10 bg-black/40 text-white/70 hover:bg-black/60 hover:text-white"
-              }`}
-              style={{ borderColor: activeDimension === dimension ? learningDNAVisuals[dimension].color : undefined }}
-              aria-label={`${learningDimensionLabels[dimension]}: ${scores[dimension]}%. Click to highlight.`}
-            >
-              <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: learningDNAVisuals[dimension].color }} />
-              <span className="hidden sm:inline">{learningDimensionLabels[dimension]}</span>
-              <span>{scores[dimension]}%</span>
-            </button>
-          ))}
+          {learningDimensions.map((dimension) => {
+            const commonClasses = `inline-flex items-center gap-1.5 rounded-[var(--am-radius-md)] px-2.5 py-1.5 text-[11px] font-semibold backdrop-blur-sm ${
+              activeDimension === dimension
+                ? "bg-[var(--am-surface)] text-[var(--am-text-primary)] border shadow-sm"
+                : "border border-[var(--am-border-light)] bg-[var(--am-surface)]/80 text-[var(--am-text-secondary)]"
+            }`;
+            const content = (
+              <>
+                <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: learningDNAVisuals[dimension].color }} />
+                <span className="hidden sm:inline">{learningDimensionLabels[dimension]}</span>
+                <span>{scores[dimension]}%</span>
+              </>
+            );
+            const label = `${learningDimensionLabels[dimension]}: ${scores[dimension]}%${onDimensionSelect ? ". Click to highlight." : ""}`;
+            return onDimensionSelect ? (
+              <button
+                key={dimension}
+                type="button"
+                onClick={() => onDimensionSelect(dimension)}
+                className={`${commonClasses} transition-all hover:bg-[var(--am-warm-bg)] hover:border-[var(--am-border)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--am-primary)]`}
+                style={{ borderColor: activeDimension === dimension ? learningDNAVisuals[dimension].color : undefined }}
+                aria-label={label}
+              >
+                {content}
+              </button>
+            ) : (
+              <span
+                key={dimension}
+                className={`${commonClasses} cursor-default`}
+                style={{ borderColor: activeDimension === dimension ? learningDNAVisuals[dimension].color : undefined }}
+                aria-label={label}
+              >
+                {content}
+              </span>
+            );
+          })}
         </div>
       )}
 
