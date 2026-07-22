@@ -1,10 +1,18 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { MotionProvider } from "@/components/am/MotionProvider";
+import { OnlineStatus } from "@/components/am/OnlineStatus";
+import { ServiceWorkerRegistration } from "@/components/am/ServiceWorkerRegistration";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+
+export const viewport: Viewport = {
+  themeColor: "#8B6F47",
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   title: "AdaptiveMind AI | The AI tutor that learns how you learn",
@@ -12,6 +20,7 @@ export const metadata: Metadata = {
     "AdaptiveMind AI personalizes explanations, lessons, and study plans around each student's unique Learning DNA — not a one-size-fits-all approach.",
   keywords: ["adaptive learning", "AI tutor", "personalized education", "Learning DNA", "adaptive tutoring"],
   authors: [{ name: "AdaptiveMind AI" }],
+  manifest: "/manifest.json",
   openGraph: {
     title: "AdaptiveMind AI | The AI tutor that learns how you learn",
     description: "AdaptiveMind changes how it teaches based on how you understand.",
@@ -35,6 +44,8 @@ export default function RootLayout({
           Skip to main content
         </a>
         <MotionProvider>{children}</MotionProvider>
+        <OnlineStatus />
+        <ServiceWorkerRegistration />
       </body>
     </html>
   );

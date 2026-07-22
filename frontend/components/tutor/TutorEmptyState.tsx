@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { motion } from "motion/react";
 import { Button } from "@/components/base/buttons/button";
 import { fadeIn, slideUp } from "@/lib/motion";
