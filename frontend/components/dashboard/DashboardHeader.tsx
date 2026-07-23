@@ -4,14 +4,14 @@ import { motion } from "motion/react";
 import { slideUp } from "@/lib/motion";
 
 interface DashboardHeaderProps {
-  streak: number;
-  lessonsCompleted: number;
+  activeDays: number;
+  meaningfulActions: number;
   primaryLabel: string;
 }
 
 export function DashboardHeader({
-  streak,
-  lessonsCompleted,
+  activeDays,
+  meaningfulActions,
   primaryLabel,
 }: DashboardHeaderProps) {
   return (
@@ -25,34 +25,31 @@ export function DashboardHeader({
             Your learning space
           </p>
           <h1 className="am-heading-serif mt-2 text-[clamp(1.5rem,3vw,2.25rem)] leading-[1.12]">
-            Welcome back.
+            Your learning dashboard
           </h1>
           <p className="mt-1 text-base text-[var(--am-text-secondary)]">
-            Ready for today&apos;s lesson?
+            Evidence, next steps, and review needs on this device.
           </p>
         </div>
 
-        <div className="flex gap-3">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           <div className="rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-warm-bg)] px-4 py-3 text-center">
             <p className="am-label text-[var(--am-text-muted)]">
-              Streak
+              Active days
             </p>
             <p className="mt-0.5 text-xl font-semibold tabular-nums text-[var(--am-text-primary)]">
-              {streak}
-              <span className="text-sm font-normal text-[var(--am-text-muted)]">
-                d
-              </span>
+              {activeDays}
             </p>
           </div>
           <div className="rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-warm-bg)] px-4 py-3 text-center">
             <p className="am-label text-[var(--am-text-muted)]">
-              Lessons
+              Actions
             </p>
             <p className="mt-0.5 text-xl font-semibold tabular-nums text-[var(--am-text-primary)]">
-              {lessonsCompleted}
+              {meaningfulActions}
             </p>
           </div>
-          <div className="rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-warm-bg)] px-4 py-3 text-center">
+          <div className="col-span-2 rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-warm-bg)] px-4 py-3 text-center sm:col-span-1">
             <p className="am-label text-[var(--am-text-muted)]">
               Approach
             </p>

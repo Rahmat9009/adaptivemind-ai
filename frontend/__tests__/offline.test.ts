@@ -4,6 +4,7 @@
  * Deterministic tests for IndexedDB storage, offline sync, security, and exports.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { primaryNavigationRoutes } from "@/components/layout/navigation";
 
 // ──────────────────────────────────────────
 // Mock IndexedDB
@@ -151,19 +152,14 @@ describe("Security utilities", () => {
 
 describe("App navigation routes", () => {
   it("has all required routes", () => {
-    const routes = [
-      { label: "Home", href: "/" },
-      { label: "Dashboard", href: "/dashboard" },
-      { label: "Tutor", href: "/tutor" },
-      { label: "Planner", href: "/planner" },
-      { label: "Assessment", href: "/assessment" },
-    ];
-    expect(routes).toHaveLength(5);
-    expect(routes.map((r) => r.href)).toContain("/");
-    expect(routes.map((r) => r.href)).toContain("/dashboard");
-    expect(routes.map((r) => r.href)).toContain("/tutor");
-    expect(routes.map((r) => r.href)).toContain("/planner");
-    expect(routes.map((r) => r.href)).toContain("/assessment");
+    const routes = primaryNavigationRoutes.map((route) => route.href);
+    expect(routes).toHaveLength(4);
+    expect(routes).toEqual([
+      "/",
+      "/dashboard",
+      "/tutor",
+      "/planner",
+    ]);
   });
 });
 

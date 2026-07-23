@@ -4,17 +4,17 @@ import { motion } from "motion/react";
 import { staggerContainer, staggerItem } from "@/lib/motion";
 
 interface ProgressCardProps {
-  lessonsCompleted: number;
-  topicsExplored: number;
-  streak: number;
-  lastLessonDate: string | null;
+  meaningfulActions: number;
+  topicsWithEvidence: number;
+  activeDays: number;
+  lastActivityDate: string | null;
 }
 
 export function ProgressCard({
-  lessonsCompleted,
-  topicsExplored,
-  streak,
-  lastLessonDate,
+  meaningfulActions,
+  topicsWithEvidence,
+  activeDays,
+  lastActivityDate,
 }: ProgressCardProps) {
   return (
     <section
@@ -36,37 +36,34 @@ export function ProgressCard({
       >
         <motion.div variants={staggerItem}>
           <p className="text-xs font-medium text-[var(--am-text-muted)]">
-            Lessons completed
+            Meaningful actions
           </p>
           <p className="mt-0.5 text-2xl font-semibold tabular-nums text-[var(--am-text-primary)]">
-            {lessonsCompleted}
+            {meaningfulActions}
           </p>
         </motion.div>
         <motion.div variants={staggerItem}>
           <p className="text-xs font-medium text-[var(--am-text-muted)]">
-            Topics explored
+            Topics with evidence
           </p>
           <p className="mt-0.5 text-2xl font-semibold tabular-nums text-[var(--am-text-primary)]">
-            {topicsExplored}
+            {topicsWithEvidence}
           </p>
         </motion.div>
         <motion.div variants={staggerItem}>
           <p className="text-xs font-medium text-[var(--am-text-muted)]">
-            Current streak
+            Active days in 14
           </p>
           <p className="mt-0.5 text-2xl font-semibold tabular-nums text-[var(--am-text-primary)]">
-            {streak}{" "}
-            <span className="text-sm font-normal text-[var(--am-text-muted)]">
-              day{streak === 1 ? "" : "s"}
-            </span>
+            {activeDays}
           </p>
         </motion.div>
         <motion.div variants={staggerItem}>
           <p className="text-xs font-medium text-[var(--am-text-muted)]">
-            Last lesson
+            Last activity
           </p>
           <p className="mt-0.5 text-sm font-semibold text-[var(--am-text-secondary)]">
-            {lastLessonDate ?? "Not yet started"}
+            {lastActivityDate ?? "Not yet started"}
           </p>
         </motion.div>
       </motion.div>

@@ -5,9 +5,14 @@
 
 import type { LessonHistoryEntry } from "./dashboard-storage";
 import type { StudyPlan } from "./study-planner";
+import {
+  MAX_LEARNING_ACTIVITIES,
+  isLearningActivity,
+  type LearningActivity,
+} from "./learning-activity";
 
 const DB_NAME = "adaptivemind";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 // ── Store names ──────────────────────────────────────
 
@@ -15,6 +20,7 @@ export const STORES = {
   lessons: "lessons",
   plans: "plans",
   offlineQueue: "offline-queue",
+  activities: "activities",
 } as const;
 
 // ── Types ────────────────────────────────────────────
@@ -33,6 +39,7 @@ interface AdaptiveMindDB {
   lessons: LessonHistoryEntry;
   plans: StudyPlan;
   "offline-queue": OfflineProgressItem;
+  activities: LearningActivity;
 }
 
 // ── Core IDB helpers ─────────────────────────────────
@@ -53,6 +60,12 @@ function openDB(): Promise<IDBDatabase> {
           keyPath: "id",
         });
         store.createIndex("synced", "synced", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(STORES.activities)) {
+        const store = db.createObjectStore(STORES.activities, {
+          keyPath: "id",
+        });
+        store.createIndex("occurredAt", "occurredAt", { unique: false });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -246,4 +259,49 @@ export async function clearSyncedOfflineItems(): Promise<void> {
       reject(tx.error);
     };
   });
+}
+
+// ── Meaningful learning activity API ─────────────────
+
+export async function getLearningActivities(): Promise<LearningActivity[]> {
+  const activities = await getAll(STORES.activities);
+  return activities
+    .filter(isLearningActivity)
+    .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt))
+    .slice(0, MAX_LEARNING_ACTIVITIES);
+}
+
+async function trimLearningActivities(): Promise<void> {
+  const activities = (await getAll(STORES.activities))
+    .filter(isLearningActivity)
+    .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
+  const excess = activities.slice(MAX_LEARNING_ACTIVITIES);
+  await Promise.all(
+    excess.map((activity) => remove(STORES.activities, activity.id)),
+  );
+}
+
+export async function saveLearningActivity(
+  activity: LearningActivity,
+): Promise<void> {
+  if (!isLearningActivity(activity)) {
+    throw new Error("Invalid learning activity.");
+  }
+  await put(STORES.activities, activity);
+  await trimLearningActivities();
+}
+
+export async function saveLearningActivities(
+  activities: LearningActivity[],
+): Promise<void> {
+  const valid = activities
+    .filter(isLearningActivity)
+    .slice(0, MAX_LEARNING_ACTIVITIES);
+  if (!valid.length) return;
+  await putAll(STORES.activities, valid);
+  await trimLearningActivities();
+}
+
+export async function removeLearningActivity(id: string): Promise<void> {
+  await remove(STORES.activities, id);
 }

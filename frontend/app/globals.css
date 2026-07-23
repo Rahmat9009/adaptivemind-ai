@@ -677,6 +677,7 @@ html {
 @media print {
   nav, footer { display: none !important; }
   body { background: white; }
+  .am-app-frame { margin-left: 0 !important; padding-bottom: 0 !important; }
 }
 
 /* ========================================

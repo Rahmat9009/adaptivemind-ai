@@ -84,7 +84,7 @@ export function ResultsExperience() {
   }
 
   return (
-    <div id="main-content" className="min-h-screen bg-[var(--am-bg)]">
+    <main id="main-content" className="min-h-screen bg-[var(--am-bg)]">
       <div className="mx-auto max-w-6xl px-5 pt-11 pb-20 sm:px-8 lg:px-10">
         <div className="mx-auto max-w-4xl">
           {/* Header */}
@@ -142,6 +142,6 @@ export function ResultsExperience() {
           </p>
         </div>
       </div>
-    </div>
+    </main>
   );
 }

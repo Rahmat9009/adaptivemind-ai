@@ -84,6 +84,7 @@ import {
 } from "@/lib/explanation-history";
 import { loadPreferenceOverrides } from "@/lib/preference-overrides";
 import { saveCalibrationRecord } from "@/lib/confidence-calibration";
+import { saveLearningActivity } from "@/lib/idb";
 import type {
   SourceGroundingMode,
   TutorSource,
@@ -91,6 +92,7 @@ import type {
 
 const profileStorageKey = "adaptivemind-learning-dna";
 const lessonStorageKey = "adaptivemind-current-lesson";
+const tutorDraftStorageKey = "adaptivemind-tutor-draft";
 const conversationStorageKey = "adaptivemind-lesson-conversation";
 const balancedScores: LearningScores = {
   visual: 50,
@@ -494,6 +496,10 @@ export function TutorShell() {
           ? readLearningHistory().find((entry) => entry.id === restoreId)
           : null;
         sessionStorage.removeItem(historyRestoreStorageKey);
+        const params = new URLSearchParams(window.location.search);
+        const suggestedTopic = params.get("topic");
+        const suggestedSubject = params.get("subject");
+        const suggestedLevel = params.get("level");
         const session = restoredLesson
           ? {
               response: restoredLesson.response,
@@ -504,6 +510,8 @@ export function TutorShell() {
             }
           : startNewTopic
             ? null
+            : suggestedTopic
+              ? null
             : normalizeStoredLesson(
                 JSON.parse(
                   localStorage.getItem(lessonStorageKey) ?? "null",
@@ -539,13 +547,13 @@ export function TutorShell() {
               setConversation(record.turns);
           }
         } else {
-          const params = new URLSearchParams(window.location.search);
-          const suggestedTopic = params.get("topic");
-          const suggestedSubject = params.get("subject");
-          const suggestedLevel = params.get("level");
           if (suggestedTopic) setTopic(suggestedTopic.slice(0, 500));
           if (suggestedSubject) setSubject(suggestedSubject.slice(0, 50));
           if (suggestedLevel) setLevel(suggestedLevel.slice(0, 50));
+        }
+        const savedDraft = localStorage.getItem(tutorDraftStorageKey);
+        if (!startNewTopic && !suggestedTopic && savedDraft?.trim()) {
+          setTopic(savedDraft.slice(0, 500));
         }
       } catch {
         localStorage.removeItem(lessonStorageKey);
@@ -564,6 +572,19 @@ export function TutorShell() {
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
+
+  useEffect(() => {
+    if (!isReady) return;
+    try {
+      if (topic.trim()) {
+        localStorage.setItem(tutorDraftStorageKey, topic.slice(0, 500));
+      } else {
+        localStorage.removeItem(tutorDraftStorageKey);
+      }
+    } catch {
+      // The active Tutor session still works when draft storage is unavailable.
+    }
+  }, [isReady, topic]);
 
   useEffect(() => () => {
     for (const controller of activeRequestsRef.current) controller.abort();
@@ -616,6 +637,7 @@ export function TutorShell() {
           "The tutor returned an incomplete lesson. Please try again.",
         );
       setResponse(payload);
+      localStorage.removeItem(tutorDraftStorageKey);
       setEvaluation(null);
       setConfidenceBefore(null);
       setMasteryReason(null);
@@ -778,6 +800,15 @@ export function TutorShell() {
           evaluatedAt: new Date().toISOString(),
         });
       if (!mastery.lastEvidenceApplied) return;
+      void saveLearningActivity({
+        id: `activity:${evidenceId}`,
+        type: "understanding-check",
+        occurredAt: new Date().toISOString(),
+        topic: topic.trim(),
+        score: payload.evaluation.score,
+      }).catch(() => {
+        // The learning flow remains usable when IndexedDB is unavailable.
+      });
 
       // ── LD2.0 data wiring ──
       // Record outcome in Learning DNA evidence model
@@ -931,6 +962,7 @@ export function TutorShell() {
     setComposerSessionId((current) => current + 1);
     clearConversation();
     localStorage.removeItem(lessonStorageKey);
+    localStorage.removeItem(tutorDraftStorageKey);
   }
 
   function handleTeachingModeChange(mode: TeachingMode) {
@@ -999,6 +1031,15 @@ export function TutorShell() {
       setExplainBackState("feedback");
 
       if (mastery.lastEvidenceApplied) {
+        void saveLearningActivity({
+          id: `activity:${evidenceId}`,
+          type: "explain-back",
+          occurredAt: new Date().toISOString(),
+          topic: topic.trim(),
+          score: evalResult.score,
+        }).catch(() => {
+          // The learning flow remains usable when IndexedDB is unavailable.
+        });
         try {
           const dna = loadLearningDNA2();
           const approach = teachingModeToDimension(
@@ -1182,6 +1223,15 @@ export function TutorShell() {
         },
       );
       if (mastery.lastEvidenceApplied) {
+        void saveLearningActivity({
+          id: `activity:${evidenceId}`,
+          type: "quick-recall",
+          occurredAt: new Date().toISOString(),
+          topic: quickRecallRecord.topic,
+          score: result.score,
+        }).catch(() => {
+          // The learning flow remains usable when IndexedDB is unavailable.
+        });
         const dna = loadLearningDNA2();
         const approach = teachingModeToDimension(
           teachingMode,
@@ -1459,6 +1509,14 @@ export function TutorShell() {
                   hasAttempted={hasAttempted}
                   onAttempt={() => {
                     setHasAttempted(true);
+                    void saveLearningActivity({
+                      id: `activity:challenge:${historyId ?? response.requestId ?? response.lesson.title}`,
+                      type: "challenge-attempt",
+                      occurredAt: new Date().toISOString(),
+                      topic: topic.trim(),
+                    }).catch(() => {
+                      // The challenge remains usable when IndexedDB is unavailable.
+                    });
                     if (timeBeforeFirstAttempt === null) {
                       const elapsed = challengeStartedAt
                         ? Math.max(

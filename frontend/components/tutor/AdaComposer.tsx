@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { prepareImageSource } from "@/lib/client-image-source";
+import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
 import {
   MAX_IMAGE_SOURCE_COUNT,
   MAX_SOURCE_COUNT,
@@ -128,6 +129,18 @@ export function AdaComposer({
   const [isPreparing, setIsPreparing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewUrlsRef = useRef(new Set<string>());
+  const hasUnsubmittedSource =
+    Boolean(linkValue.trim())
+    || attachments.some(
+      (attachment) =>
+        attachment.selected && attachment.status !== "ready",
+    );
+
+  useUnsavedChanges(
+    "ada-pending-sources",
+    hasUnsubmittedSource,
+    "Pending files or links have not been submitted to Ada.",
+  );
 
   useEffect(() => () => {
     for (const url of previewUrlsRef.current) URL.revokeObjectURL(url);

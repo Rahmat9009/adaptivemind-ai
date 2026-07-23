@@ -3,6 +3,7 @@ import "./globals.css";
 import { MotionProvider } from "@/components/am/MotionProvider";
 import { OnlineStatus } from "@/components/am/OnlineStatus";
 import { ServiceWorkerRegistration } from "@/components/am/ServiceWorkerRegistration";
+import { ApplicationFrame } from "@/components/layout/ApplicationFrame";
 
 export const viewport: Viewport = {
   themeColor: "#8B6F47",
@@ -39,7 +40,9 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <MotionProvider>{children}</MotionProvider>
+        <MotionProvider>
+          <ApplicationFrame>{children}</ApplicationFrame>
+        </MotionProvider>
         <OnlineStatus />
         <ServiceWorkerRegistration />
       </body>

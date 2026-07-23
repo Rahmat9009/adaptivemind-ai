@@ -16,6 +16,27 @@ import { getLessonRecommendation } from "@/lib/recommendations";
 import { getMasterySummary } from "@/lib/mastery";
 import { loadLearningDNA2, type LearningDNA2 } from "@/lib/learning-dna-v2";
 import { getDueReviews, getUpcomingReviews } from "@/lib/spaced-review";
+import {
+  getLearningActivities,
+  getPendingOfflineItems,
+  saveLearningActivities,
+} from "@/lib/idb";
+import {
+  deriveActivitiesFromExplanationHistory,
+  getLearningMomentum,
+  type LearningActivity,
+} from "@/lib/learning-activity";
+import {
+  loadExplanationHistory,
+  type ExplanationHistory,
+} from "@/lib/explanation-history";
+import {
+  classifyCalibration,
+  loadCalibrationRecords,
+  type CalibrationSummary,
+} from "@/lib/confidence-calibration";
+import { useOfflineLessons } from "@/hooks/useOfflineLessons";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
 import { DashboardHeader } from "./DashboardHeader";
 import { EmptyDashboard } from "./EmptyDashboard";
 import { LearningDNACard } from "./LearningDNACard";
@@ -23,13 +44,20 @@ import { PersonalizationCard } from "./PersonalizationCard";
 import { ProgressCard } from "./ProgressCard";
 import { QuickActions } from "./QuickActions";
 import { RecentLessons } from "./RecentLessons";
-import { RecommendationCard } from "./RecommendationCard";
 import { MasteryOverview } from "./MasteryOverview";
 import { StudyPlanCard } from "./StudyPlanCard";
 import { readStudyPlan, type StudyPlan } from "@/lib/study-planner";
 import { LearningDNAEvidence } from "./LearningDNAEvidence";
 import { SpacedReviewCard } from "./SpacedReviewCard";
 import { PrivacySummary } from "./PrivacySummary";
+import { ActivityHeatmap } from "./ActivityHeatmap";
+import { ConfidenceInsightCard } from "./ConfidenceInsightCard";
+import { ExplanationHistorySummary } from "./ExplanationHistorySummary";
+import { OfflineLibraryCard } from "./OfflineLibraryCard";
+import {
+  NextLearningAction,
+  type NextLearningActionData,
+} from "./NextLearningAction";
 
 const profileStorageKey = "adaptivemind-learning-dna";
 
@@ -41,20 +69,59 @@ function isLearningScores(value: unknown): value is LearningScores {
   );
 }
 
-function getStreak(history: LessonHistoryEntry[]): number {
-  const dates = new Set(
-    history.map((entry) => new Date(entry.date).toDateString()),
-  );
-  let streak = 0;
-  const day = new Date();
-  while (dates.has(day.toDateString())) {
-    streak += 1;
-    day.setDate(day.getDate() - 1);
+function getNextAction(
+  dueReviews: ReturnType<typeof getDueReviews>,
+  plan: StudyPlan | null,
+  history: LessonHistoryEntry[],
+): NextLearningActionData {
+  const due = dueReviews[0];
+  if (due) {
+    return {
+      label: "Quick recall due",
+      topic: due.topic,
+      reason:
+        "This topic is due for retrieval practice based on its local review schedule.",
+      href: `/tutor?topic=${encodeURIComponent(due.topic)}&review=true`,
+    };
   }
-  return streak;
+
+  const nextTask = plan?.days
+    .flatMap((day) => day.tasks)
+    .find((task) => !task.completed);
+  if (nextTask) {
+    return {
+      label: `Study plan: ${nextTask.type.replace("-", " ")}`,
+      topic: nextTask.topic,
+      reason: nextTask.reason,
+      href: `/tutor?topic=${encodeURIComponent(nextTask.topic)}`,
+    };
+  }
+
+  const latest = history[0];
+  const recommendation = latest
+    ? getLessonRecommendation(latest.topic)
+    : null;
+  if (recommendation) {
+    return {
+      label: "Strengthen recent understanding",
+      topic: recommendation.topic,
+      reason: recommendation.reason,
+      href: `/tutor?topic=${encodeURIComponent(recommendation.topic)}&subject=${encodeURIComponent(recommendation.subject)}&level=${encodeURIComponent(recommendation.level)}`,
+    };
+  }
+
+  return {
+    label: "Start gathering learning evidence",
+    topic: "Choose any educational topic",
+    reason:
+      "No outcome evidence is available yet. Complete one lesson and understanding check to give Ada a reliable starting point.",
+    href: "/tutor",
+  };
 }
 
 export function DashboardShell() {
+  const offlineLessons = useOfflineLessons();
+  const isOnline = useOnlineStatus();
   const [scores, setScores] = useState<LearningScores | null>(null);
   const [history, setHistory] = useState<LessonHistoryEntry[]>([]);
   const [mastery, setMastery] = useState<
@@ -70,10 +137,19 @@ export function DashboardShell() {
   const [dna2, setDna2] = useState<LearningDNA2 | null>(null);
   const [dueReviews, setDueReviews] = useState<ReturnType<typeof getDueReviews>>([]);
   const [upcomingReviews, setUpcomingReviews] = useState<ReturnType<typeof getUpcomingReviews>>([]);
+  const [activities, setActivities] = useState<LearningActivity[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
+  const [pendingOfflineCount, setPendingOfflineCount] = useState(0);
+  const [explanationHistory, setExplanationHistory] =
+    useState<ExplanationHistory>({ concepts: {}, conceptOrder: [] });
+  const [calibration, setCalibration] = useState<CalibrationSummary>(() =>
+    classifyCalibration([]),
+  );
   const [resetConfirm, setResetConfirm] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const timer = window.setTimeout(() => {
       try {
         const stored: unknown = JSON.parse(
@@ -85,22 +161,75 @@ export function DashboardShell() {
           isLearningScores((stored as Record<string, unknown>).scores)
         )
           setScores((stored as Record<string, unknown>).scores as LearningScores);
-        setHistory(readLearningHistory());
+        const loadedHistory = readLearningHistory();
+        const loadedPlan = readStudyPlan();
+        const loadedExplanationHistory = loadExplanationHistory();
+        setHistory(loadedHistory);
         setMastery(getMasterySummary());
-        setStudyPlan(readStudyPlan());
+        setStudyPlan(loadedPlan);
         setDna2(loadLearningDNA2());
         setDueReviews(getDueReviews());
         setUpcomingReviews(getUpcomingReviews());
+        setExplanationHistory(loadedExplanationHistory);
+        setCalibration(classifyCalibration(loadCalibrationRecords()));
         markDashboardVisited();
+
+        const legacyActivities = deriveActivitiesFromExplanationHistory(
+          loadedExplanationHistory,
+        );
+        void Promise.all([
+          getLearningActivities(),
+          getPendingOfflineItems(),
+        ]).then(async ([storedActivities, pendingItems]) => {
+          const knownIds = new Set(
+            storedActivities.map((activity) => activity.id),
+          );
+          const missingLegacy = legacyActivities.filter(
+            (activity) => !knownIds.has(activity.id),
+          );
+          if (missingLegacy.length) {
+            try {
+              await saveLearningActivities(missingLegacy);
+            } catch {
+              // The in-memory dashboard can still show migrated local evidence.
+            }
+          }
+          if (cancelled) return;
+          setActivities(
+            [...storedActivities, ...missingLegacy].sort(
+              (a, b) =>
+                Date.parse(b.occurredAt) - Date.parse(a.occurredAt),
+            ),
+          );
+          setPendingOfflineCount(pendingItems.length);
+          setActivitiesLoading(false);
+        }).catch(() => {
+          if (cancelled) return;
+          setActivities(legacyActivities);
+          setActivitiesLoading(false);
+        });
       } finally {
         setIsReady(true);
       }
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, []);
 
   if (!isReady)
-    return <div className="min-h-screen bg-[var(--am-bg)]" aria-busy="true" />;
+    return (
+      <PageShell>
+        <div
+          className="min-h-48 border-y border-[var(--am-border-light)] py-12 text-center text-sm text-[var(--am-text-muted)]"
+          aria-busy="true"
+          role="status"
+        >
+          Loading your local learning dashboard...
+        </div>
+      </PageShell>
+    );
 
   if (!scores)
     return (
@@ -130,6 +259,9 @@ export function DashboardShell() {
       history: history.slice(0, 20),
       mastery: mastery.entries.slice(0, 20),
       dna2,
+      activities: activities.slice(0, 100),
+      explanationHistory,
+      confidenceCalibration: calibration,
       exportedAt: new Date().toISOString(),
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -153,11 +285,30 @@ export function DashboardShell() {
   }
 
   const profile = buildTeachingProfile(scores);
-  const streak = getStreak(history);
-  const topicsExplored = new Set(
-    history.map((entry) => entry.topic.trim().toLowerCase()),
+  const momentum = getLearningMomentum(activities);
+  const topicsWithEvidence = new Set(
+    activities
+      .map((activity) => activity.topic?.trim().toLowerCase())
+      .filter((topic): topic is string => Boolean(topic)),
   ).size;
-  const latest = history[0];
+  const nextAction = getNextAction(dueReviews, studyPlan, history);
+  const recommendedApproach =
+    dna2?.currentRecommendation ?? profile.primaryDimension;
+  const totalEvidence = dna2
+    ? Object.values(dna2.observedEffectiveness).reduce(
+        (sum, evidence) => sum + evidence.evidenceCount,
+        0,
+      )
+    : 0;
+  const approachReason = dna2?.recommendationReason
+    ?? `This starts from your initial ${profile.primaryDimension} preference. Outcome evidence is still limited.`;
+  const lastActivityDate = momentum.latestActivityAt
+    ? new Date(momentum.latestActivityAt).toLocaleDateString(undefined, {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      })
+    : null;
 
   return (
     <PageShell heading="" subheading="">
@@ -170,12 +321,21 @@ export function DashboardShell() {
         {/* Header */}
         <motion.div variants={staggerItem}>
           <DashboardHeader
-            streak={streak}
-            lessonsCompleted={history.length}
+            activeDays={momentum.activeDaysLast14}
+            meaningfulActions={activities.length}
             primaryLabel={
-              profile.primaryDimension[0].toUpperCase() +
-              profile.primaryDimension.slice(1)
+              recommendedApproach[0].toUpperCase()
+              + recommendedApproach.slice(1)
             }
+          />
+        </motion.div>
+
+        <motion.div variants={staggerItem}>
+          <NextLearningAction
+            action={nextAction}
+            approach={recommendedApproach}
+            approachReason={approachReason}
+            evidenceCount={totalEvidence}
           />
         </motion.div>
 
@@ -190,40 +350,28 @@ export function DashboardShell() {
           <div className="space-y-6">
             <PersonalizationCard scores={scores} />
             <ProgressCard
-              lessonsCompleted={history.length}
-              topicsExplored={topicsExplored}
-              streak={streak}
-              lastLessonDate={
-                latest
-                  ? new Date(latest.date).toLocaleDateString(undefined, {
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })
-                  : null
-              }
+              meaningfulActions={activities.length}
+              topicsWithEvidence={topicsWithEvidence}
+              activeDays={momentum.activeDaysLast14}
+              lastActivityDate={lastActivityDate}
             />
           </div>
         </motion.div>
 
-        {/* Study Plan */}
-        <motion.div variants={staggerItem}>
-          <StudyPlanCard plan={studyPlan} />
+        <motion.div
+          variants={staggerItem}
+          className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]"
+        >
+          <ActivityHeatmap
+            activities={activities}
+            loading={activitiesLoading}
+          />
+          <SpacedReviewCard
+            dueReviews={dueReviews}
+            upcomingReviews={upcomingReviews}
+          />
         </motion.div>
 
-        {/* Learning DNA Evidence */}
-        {dna2 && (
-          <motion.div variants={staggerItem}>
-            <LearningDNAEvidence dna={dna2} />
-          </motion.div>
-        )}
-
-        {/* Spaced Review */}
-        <motion.div variants={staggerItem}>
-          <SpacedReviewCard dueReviews={dueReviews} upcomingReviews={upcomingReviews} />
-        </motion.div>
-
-        {/* Mastery */}
         <motion.div variants={staggerItem}>
           <MasteryOverview
             entries={mastery.entries}
@@ -234,19 +382,40 @@ export function DashboardShell() {
           />
         </motion.div>
 
-        {/* Recommendations + History */}
-        {history.length > 0 ? (
-          <motion.div variants={staggerItem} className="grid gap-8 lg:grid-cols-[1fr_1fr]">
-            <RecommendationCard
-              recommendation={getLessonRecommendation(latest.topic)}
-            />
-            <RecentLessons history={history} />
-          </motion.div>
-        ) : (
-          <motion.div variants={staggerItem}>
-            <EmptyDashboard />
+        <motion.div
+          variants={staggerItem}
+          className="grid gap-8 lg:grid-cols-2"
+        >
+          <StudyPlanCard plan={studyPlan} />
+          <OfflineLibraryCard
+            lessonCount={offlineLessons.lessons.length}
+            pendingCount={pendingOfflineCount}
+            loading={offlineLessons.loading}
+            isOnline={isOnline}
+          />
+        </motion.div>
+
+        {dna2 && (
+          <motion.div
+            variants={staggerItem}
+            className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]"
+          >
+            <LearningDNAEvidence dna={dna2} />
+            <ConfidenceInsightCard summary={calibration} />
           </motion.div>
         )}
+
+        <motion.div
+          variants={staggerItem}
+          className="grid gap-8 lg:grid-cols-2"
+        >
+          <ExplanationHistorySummary history={explanationHistory} />
+          {history.length > 0 ? (
+            <RecentLessons history={history} />
+          ) : (
+            <EmptyDashboard />
+          )}
+        </motion.div>
 
         {/* Privacy & Data */}
         <motion.div variants={staggerItem}>

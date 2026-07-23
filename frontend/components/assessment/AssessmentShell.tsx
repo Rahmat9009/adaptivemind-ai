@@ -125,7 +125,7 @@ export function AssessmentShell() {
   const hasAnyAnswer = answers.some((a) => a !== null);
 
   return (
-    <div id="main-content" className="min-h-screen bg-[var(--am-bg)]">
+    <main id="main-content" className="min-h-screen bg-[var(--am-bg)]">
       {/* Assessment header */}
       <header className="mx-auto max-w-6xl px-5 pt-11 pb-4 sm:px-8 lg:px-10">
         <p className="am-label text-[var(--am-primary)]/70">
@@ -215,6 +215,6 @@ export function AssessmentShell() {
           )}
         </div>
       </div>
-    </div>
+    </main>
   );
 }

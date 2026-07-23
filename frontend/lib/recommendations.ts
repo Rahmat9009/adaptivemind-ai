@@ -12,5 +12,13 @@ const recommendationMap: Record<string, LessonRecommendation> = {
 };
 
 export function getLessonRecommendation(topic: string): LessonRecommendation | null {
-  return recommendationMap[topic.trim().toLowerCase()] ?? null;
+  const displayTopic = topic.trim();
+  if (!displayTopic) return null;
+  return recommendationMap[displayTopic.toLowerCase()] ?? {
+    topic: displayTopic,
+    subject: "General learning",
+    level: "Continue",
+    reason:
+      "Revisit this recent topic with retrieval or application practice so Ada can gather stronger evidence about what you understand.",
+  };
 }

@@ -19,6 +19,11 @@ import {
   type StudyPlanSettings,
   type StudyIntensity,
 } from "@/lib/study-planner";
+import {
+  removeLearningActivity,
+  saveLearningActivity,
+} from "@/lib/idb";
+import { plannerActivityId } from "@/lib/learning-activity";
 
 const profileStorageKey = "adaptivemind-learning-dna";
 const defaults: StudyPlanSettings = {
@@ -96,6 +101,18 @@ export function PlannerShell() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      localStorage.setItem(
+        studyPlanSettingsStorageKey,
+        JSON.stringify(settings),
+      );
+    } catch {
+      // The current planner session still works when storage is unavailable.
+    }
+  }, [ready, settings]);
+
   function createPlan() {
     const next = generateStudyPlan(
       settings,
@@ -114,6 +131,11 @@ export function PlannerShell() {
 
   function toggleTask(dayIndex: number, taskId: string) {
     if (!plan) return;
+    const currentTask = plan.days[dayIndex]?.tasks.find(
+      (task) => task.id === taskId,
+    );
+    if (!currentTask) return;
+    const willComplete = !currentTask.completed;
     const next = {
       ...plan,
       days: plan.days.map((day, index) =>
@@ -131,6 +153,21 @@ export function PlannerShell() {
     };
     saveStudyPlan(next);
     setPlan(next);
+    const activityId = plannerActivityId(plan.id, taskId);
+    if (willComplete) {
+      void saveLearningActivity({
+        id: activityId,
+        type: "planner-task-complete",
+        occurredAt: new Date().toISOString(),
+        topic: currentTask.topic,
+      }).catch(() => {
+        // Planner progress remains local and usable without IndexedDB.
+      });
+    } else {
+      void removeLearningActivity(activityId).catch(() => {
+        // The planner state is still authoritative if activity cleanup fails.
+      });
+    }
   }
 
   if (!ready)
