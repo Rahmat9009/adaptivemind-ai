@@ -1,6 +1,7 @@
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
 import { learningDimensionLabels, type LearningDimension } from "@/lib/learning-dna";
-import type { TeachingMode, TutorFollowUpResponse, TutorLesson, TutorRequest, UnderstandingEvaluation } from "./types";
+import type { TeachingMode, TutorFollowUpResponse, TutorLesson, TutorRequest, UnderstandingEvaluation, ExplainBackEvaluation, HintResponse } from "./types";
+import type { VisualLessonData } from "@/lib/visual-schema";
 
 interface DemoTopic {
   title: string;
@@ -84,12 +85,50 @@ function getReframedExplanation(topic: DemoTopic, styles: LearningDimension[]): 
   return `Start with a real situation, identify the important detail, and then connect it to the rule: ${topic.example}`;
 }
 
+function createDemoVisual(topic: DemoTopic): VisualLessonData {
+  const steps = topic.keyPoints.slice(0, 5).map((description, index) => ({
+    id: `step-${index + 1}`,
+    label: `Step ${index + 1}`,
+    description,
+  }));
+  return {
+    type: "step-sequence",
+    title: `${topic.title}: visual sequence`,
+    summary: topic.coreIdea,
+    steps,
+    connections: steps.slice(1).map((step, index) => ({
+      from: steps[index].id,
+      to: step.id,
+    })),
+    columns: [],
+    series: [],
+    captions: steps.map((step) => step.description),
+    predictionCheckpoints: [],
+    textAlternative: [
+      topic.coreIdea,
+      ...steps.map((step) => `${step.label}: ${step.description}`),
+    ].join(" "),
+  };
+}
+
 export function createDemoLesson(request: TutorRequest): TutorLesson | null {
   const topic = findDemoTopic(request.topic);
   if (!topic) return null;
 
   const profile = buildTeachingProfile(request.scores);
   const baseStyles = getBaseStyles(request, profile);
+
+  if (request.action === "visualize") {
+    return {
+      title: `${topic.title}: visual explanation`,
+      coreIdea: topic.coreIdea,
+      explanation: "Use the sequence to trace how each part connects to the next.",
+      keyPoints: topic.keyPoints.slice(0, 5),
+      checkQuestion: topic.checkQuestion,
+      stylesUsed: ["visual"],
+      visual: createDemoVisual(topic),
+    };
+  }
 
   if (request.action === "simpler") {
     return {
@@ -147,6 +186,10 @@ export function createDemoLesson(request: TutorRequest): TutorLesson | null {
     example: baseStyles.includes("examples") ? topic.example : undefined,
     analogy: baseStyles.includes("analogies") ? topic.analogy : undefined,
     stylesUsed: baseStyles,
+    visual:
+      request.teachingMode === "visual"
+        ? createDemoVisual(topic)
+        : undefined,
   };
 }
 
@@ -196,4 +239,170 @@ export function createDemoFollowUp(request: TutorRequest): TutorFollowUpResponse
   return { answer: "This follow-up needs the live AI provider.", stylesUsed };
 }
 
-export function createDemoEvaluation(request: TutorRequest): UnderstandingEvaluation | null { const topic = findDemoTopic(request.topic); const answer = request.learnerAnswer?.toLowerCase().trim() ?? ""; if (!topic) return null; const stylesUsed = getFollowUpStyles(request); if (!answer || answer.includes("don't know") || answer.includes("not sure")) return { status: "uncertain", score: 20, feedback: "That is a useful place to pause. Start with one concrete clue, then try the question again.", whatWasUnderstood: [], needsReview: ["The core connection in this topic"], nextStep: "simplify", followUpQuestion: "What is one part of the idea you can name?", stylesUsed }; const correct = topic.title === "Photosynthesis" ? answer.includes("energy") && (answer.includes("glucose") || answer.includes("sugar")) : topic.title === "Newton's First Law" ? answer.includes("inertia") || (answer.includes("keep") && answer.includes("moving")) : answer.includes("right triangle") || answer.includes("90"); const misconception = topic.title === "Photosynthesis" ? answer.includes("sunlight is food") : topic.title === "Newton's First Law" ? answer.includes("forward force") || answer.includes("force pushes") : answer.includes("every triangle") || answer.includes("all triangles"); if (misconception) return { status: "misconception", score: 25, feedback: "There is one important mix-up here. Let’s reset just that part with a concrete example.", whatWasUnderstood: [], needsReview: ["The condition that makes the rule work"], misconception: "The explanation applies the key idea too broadly.", nextStep: "example", stylesUsed }; if (correct) return { status: "correct", score: 88, feedback: "Your reasoning identifies the key relationship. The next step is connecting it to a new situation.", whatWasUnderstood: ["The central idea"], needsReview: [], nextStep: "continue", followUpQuestion: "Can you apply that idea to one new example?", stylesUsed }; return { status: "partial", score: 58, feedback: "You are pointing toward the right idea, but one key link is still missing. Let’s clarify that part only.", whatWasUnderstood: ["Part of the main idea"], needsReview: ["How the parts connect"], nextStep: "clarify", stylesUsed }; }
+export function createDemoEvaluation(request: TutorRequest): UnderstandingEvaluation | null {
+  const topic = findDemoTopic(request.topic);
+  const answer = request.learnerAnswer?.toLowerCase().trim() ?? "";
+  if (!topic) return null;
+  const stylesUsed = getFollowUpStyles(request);
+
+  if (!answer || answer.includes("don’t know") || answer.includes("not sure")) {
+    return {
+      status: "uncertain", score: 20,
+      feedback: "That is a useful place to pause. Start with one concrete clue, then try the question again.",
+      whatWasUnderstood: [], needsReview: ["The core connection in this topic"],
+      nextStep: "simplify", followUpQuestion: "What is one part of the idea you can name?",
+      stylesUsed, evaluationConfidence: "high",
+      evidenceFromAnswer: "Learner expressed uncertainty directly.",
+    };
+  }
+
+  const correct = topic.title === "Photosynthesis"
+    ? answer.includes("energy") && (answer.includes("glucose") || answer.includes("sugar"))
+    : topic.title === "Newton’s First Law"
+      ? answer.includes("inertia") || (answer.includes("keep") && answer.includes("moving"))
+      : answer.includes("right triangle") || answer.includes("90");
+
+  const misconception = topic.title === "Photosynthesis"
+    ? answer.includes("sunlight is food")
+    : topic.title === "Newton’s First Law"
+      ? answer.includes("forward force") || answer.includes("force pushes")
+      : answer.includes("every triangle") || answer.includes("all triangles");
+
+  if (misconception) {
+    return {
+      status: "misconception", score: 25,
+      feedback: "There is one important mix-up here. Let’s reset just that part with a concrete example.",
+      whatWasUnderstood: [], needsReview: ["The condition that makes the rule work"],
+      misconception: "The explanation applies the key idea too broadly.",
+      nextStep: "example", stylesUsed, evaluationConfidence: "moderate",
+      evidenceFromAnswer: "The answer contains a common misconception pattern.",
+    };
+  }
+
+  if (correct) {
+    return {
+      status: "correct", score: 88,
+      feedback: "Your reasoning identifies the key relationship. The next step is connecting it to a new situation.",
+      whatWasUnderstood: ["The central idea"], needsReview: [],
+      nextStep: "continue", followUpQuestion: "Can you apply that idea to one new example?",
+      stylesUsed, evaluationConfidence: "high",
+      evidenceFromAnswer: "Answer included key concept terms and correct relationship.",
+    };
+  }
+
+  return {
+    status: "partial", score: 58,
+    feedback: "You are pointing toward the right idea, but one key link is still missing. Let’s clarify that part only.",
+    whatWasUnderstood: ["Part of the main idea"], needsReview: ["How the parts connect"],
+    nextStep: "clarify", stylesUsed, evaluationConfidence: "moderate",
+    evidenceFromAnswer: "Partial understanding indicated by incomplete concept mapping.",
+  };
+}
+
+// ──────────────────────────────────────
+// Demo Explain Back
+// ──────────────────────────────────────
+
+export function createDemoExplainBack(request: {
+  topic: string;
+  learnerResponse: string;
+  lessonContext: string;
+  scores: import("@/lib/learning-dna").LearningScores;
+  teachingMode: TeachingMode;
+}): ExplainBackEvaluation | null {
+  const topic = findDemoTopic(request.topic);
+  const response = request.learnerResponse.toLowerCase().trim();
+  if (!topic || !response) return null;
+
+  const profile = buildTeachingProfile(request.scores);
+  const stylesUsed: LearningDimension[] = [profile.primaryDimension];
+
+  if (response.length < 20) {
+    return {
+      isComplete: false, understood: [], missing: [topic.coreIdea],
+      score: 15, stylesUsed, aiConfidence: "high",
+      followUpQuestion: "Can you try explaining in your own words what happens in this process?",
+    };
+  }
+
+  const hasCoreIdea = response.includes(topic.coreIdea.split(" ").slice(0, 3).join(" ").toLowerCase());
+  const hasDetail = topic.keyPoints.some((kp) => response.includes(kp.split(" ").slice(0, 2).join(" ").toLowerCase()));
+
+  if (hasCoreIdea && hasDetail) {
+    return {
+      isComplete: true, understood: [topic.coreIdea, "Supporting details"], missing: [],
+      score: 85, stylesUsed, aiConfidence: "high",
+    };
+  }
+
+  if (hasCoreIdea) {
+    return {
+      isComplete: false, understood: [topic.coreIdea], missing: topic.keyPoints.slice(0, 2),
+      score: 55, stylesUsed, aiConfidence: "moderate",
+      followUpQuestion: "Good start! Can you add one more detail about how this works?",
+    };
+  }
+
+  return {
+    isComplete: false, understood: ["General awareness of the topic"],
+    missing: [topic.coreIdea, ...topic.keyPoints.slice(0, 2)],
+    score: 30, stylesUsed, aiConfidence: "moderate",
+    misconception: "The explanation did not yet capture the core mechanism.",
+    followUpQuestion: "What do you think is the main thing that happens in this process?",
+  };
+}
+
+// ──────────────────────────────────────
+// Demo Hints
+// ──────────────────────────────────────
+
+export function createDemoHint(request: {
+  topic: string;
+  currentLevel: number;
+  scores: import("@/lib/learning-dna").LearningScores;
+  teachingMode: TeachingMode;
+}): HintResponse | null {
+  const topic = findDemoTopic(request.topic);
+  if (!topic) return null;
+
+  const profile = buildTeachingProfile(request.scores);
+  const stylesUsed: LearningDimension[] = [profile.primaryDimension];
+
+  if (topic.title === "Photosynthesis") {
+    return {
+      hints: [
+        "Think about what a plant needs from its environment to make food.",
+        "Consider the role of light energy in the process.",
+        "Water and carbon dioxide are combined using light energy to create glucose.",
+        "Plants use chlorophyll to capture sunlight, which powers the conversion of water and CO₂ into glucose and oxygen.",
+      ],
+      stylesUsed,
+    };
+  }
+
+  if (topic.title === "Newton’s First Law") {
+    return {
+      hints: [
+        "What happens to an object’s motion when no force acts on it?",
+        "Think about what keeps a moving object going.",
+        "An object at rest stays at rest, and an object in motion stays in motion, unless a force acts on it.",
+        "Newton’s First Law states that objects resist changes to their motion — this tendency is called inertia.",
+      ],
+      stylesUsed,
+    };
+  }
+
+  if (topic.title === "The Pythagorean Theorem") {
+    return {
+      hints: [
+        "What kind of triangle does this theorem apply to?",
+        "Think about the relationship between the sides when you square them.",
+        "For a right triangle: a² + b² = c², where c is the hypotenuse.",
+        "The Pythagorean theorem says the squares of the two shorter sides add up to the square of the longest side in a right triangle.",
+      ],
+      stylesUsed,
+    };
+  }
+
+  return null;
+}

@@ -1,5 +1,72 @@
-interface ProgressCardProps { lessonsCompleted: number; topicsExplored: number; streak: number; lastLessonDate: string | null; }
+"use client";
 
-export function ProgressCard({ lessonsCompleted, topicsExplored, streak, lastLessonDate }: ProgressCardProps) {
-  return <section aria-labelledby="progress-title" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"><h2 id="progress-title" className="text-xl font-semibold text-slate-950">Your progress</h2><dl className="mt-5 grid grid-cols-2 gap-4"><div><dt className="text-sm text-slate-500">Lessons completed</dt><dd className="mt-1 text-2xl font-semibold text-slate-950">{lessonsCompleted}</dd></div><div><dt className="text-sm text-slate-500">Topics explored</dt><dd className="mt-1 text-2xl font-semibold text-slate-950">{topicsExplored}</dd></div><div><dt className="text-sm text-slate-500">Current streak</dt><dd className="mt-1 text-2xl font-semibold text-slate-950">{streak} day{streak === 1 ? "" : "s"}</dd></div><div><dt className="text-sm text-slate-500">Last lesson</dt><dd className="mt-1 text-sm font-semibold leading-6 text-slate-950">{lastLessonDate ?? "Not yet started"}</dd></div></dl></section>;
+import { motion } from "motion/react";
+import { staggerContainer, staggerItem } from "@/lib/motion";
+
+interface ProgressCardProps {
+  meaningfulActions: number;
+  topicsWithEvidence: number;
+  activeDays: number;
+  lastActivityDate: string | null;
+}
+
+export function ProgressCard({
+  meaningfulActions,
+  topicsWithEvidence,
+  activeDays,
+  lastActivityDate,
+}: ProgressCardProps) {
+  return (
+    <section
+      aria-labelledby="progress-title"
+      className="am-card p-6"
+    >
+      <h2
+        id="progress-title"
+        className="am-heading-serif text-xl text-[var(--am-text-primary)]"
+      >
+        Your progress
+      </h2>
+
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="mt-5 grid grid-cols-2 gap-x-6 gap-y-5"
+      >
+        <motion.div variants={staggerItem}>
+          <p className="text-xs font-medium text-[var(--am-text-muted)]">
+            Meaningful actions
+          </p>
+          <p className="mt-0.5 text-2xl font-semibold tabular-nums text-[var(--am-text-primary)]">
+            {meaningfulActions}
+          </p>
+        </motion.div>
+        <motion.div variants={staggerItem}>
+          <p className="text-xs font-medium text-[var(--am-text-muted)]">
+            Topics with evidence
+          </p>
+          <p className="mt-0.5 text-2xl font-semibold tabular-nums text-[var(--am-text-primary)]">
+            {topicsWithEvidence}
+          </p>
+        </motion.div>
+        <motion.div variants={staggerItem}>
+          <p className="text-xs font-medium text-[var(--am-text-muted)]">
+            Active days in 14
+          </p>
+          <p className="mt-0.5 text-2xl font-semibold tabular-nums text-[var(--am-text-primary)]">
+            {activeDays}
+          </p>
+        </motion.div>
+        <motion.div variants={staggerItem}>
+          <p className="text-xs font-medium text-[var(--am-text-muted)]">
+            Last activity
+          </p>
+          <p className="mt-0.5 text-sm font-semibold text-[var(--am-text-secondary)]">
+            {lastActivityDate ?? "Not yet started"}
+          </p>
+        </motion.div>
+      </motion.div>
+    </section>
+  );
 }

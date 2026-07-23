@@ -1,10 +1,38 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { MotionProvider } from "@/components/am/MotionProvider";
+import { OnlineStatus } from "@/components/am/OnlineStatus";
+import { ServiceWorkerRegistration } from "@/components/am/ServiceWorkerRegistration";
+import { OfflineSyncManager } from "@/components/am/OfflineSyncManager";
+import { LocalReminderManager } from "@/components/am/LocalReminderManager";
+import { ReadingPreferencesProvider } from "@/components/am/ReadingPreferencesProvider";
+import { ApplicationFrame } from "@/components/layout/ApplicationFrame";
+
+export const viewport: Viewport = {
+  themeColor: "#1751EF",
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   title: "AdaptiveMind AI | The AI tutor that learns how you learn",
   description:
-    "AdaptiveMind AI personalizes explanations, quizzes, and study plans for every student's unique learning style.",
+    "AdaptiveMind AI personalizes explanations, lessons, and study plans around each student's unique Learning DNA — not a one-size-fits-all approach.",
+  keywords: ["adaptive learning", "AI tutor", "personalized education", "Learning DNA", "adaptive tutoring"],
+  authors: [{ name: "AdaptiveMind AI" }],
+  manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/icon-192.png", sizes: "192x192" }],
+  },
+  openGraph: {
+    title: "AdaptiveMind AI | The AI tutor that learns how you learn",
+    description: "AdaptiveMind changes how it teaches based on how you understand.",
+    type: "website",
+  },
 };
 
 export default function RootLayout({
@@ -13,8 +41,25 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className="h-full font-sans antialiased">
+      <body className="relative min-h-full flex flex-col bg-[var(--am-bg)] text-[var(--am-text-primary)]">
+        {/* Skip navigation — WCAG 2.2 AA */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[9999] focus:rounded-[var(--am-radius-lg)] focus:bg-[var(--am-primary)] focus:px-5 focus:py-3 focus:text-sm focus:font-semibold focus:text-white focus:shadow-lg focus:outline-none"
+        >
+          Skip to main content
+        </a>
+        <ReadingPreferencesProvider>
+          <MotionProvider>
+            <ApplicationFrame>{children}</ApplicationFrame>
+          </MotionProvider>
+        </ReadingPreferencesProvider>
+        <OnlineStatus />
+        <ServiceWorkerRegistration />
+        <OfflineSyncManager />
+        <LocalReminderManager />
+      </body>
     </html>
   );
 }

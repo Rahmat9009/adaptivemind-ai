@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#8B6F47">
+    <title>AdaptiveMind is offline</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        background: #fbfbfb;
+        color: #1e1c1a;
+      }
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        place-items: center;
+      }
+      main {
+        width: min(38rem, calc(100% - 2rem));
+      }
+      h1 {
+        margin: 0;
+        font-family: Georgia, serif;
+        font-size: clamp(1.75rem, 8vw, 2.5rem);
+      }
+      p {
+        max-width: 34rem;
+        margin: 1rem 0 0;
+        line-height: 1.7;
+        color: #625e59;
+      }
+      a {
+        display: inline-block;
+        margin-top: 1.5rem;
+        color: #1751ef;
+        font-weight: 700;
+      }
+      a:focus-visible {
+        outline: 3px solid #1751ef;
+        outline-offset: 4px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You are offline</h1>
+      <p>
+        Saved lessons and your study plan remain available on this device.
+        New Ada responses require a connection.
+      </p>
+      <a href="/dashboard">Open AdaptiveMind</a>
+    </main>
+  </body>
+</html>

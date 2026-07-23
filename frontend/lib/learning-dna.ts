@@ -47,7 +47,7 @@ export const assessmentQuestions: AssessmentQuestion[] = [
       { label: "A diagram that shows the moving parts", description: "I can see how the pieces relate.", contributions: { visual: 2 } },
       { label: "A real situation where it is used", description: "I connect the idea to something practical.", contributions: { examples: 2 } },
       { label: "A comparison to something familiar", description: "A useful parallel makes it click.", contributions: { analogies: 2 } },
-      { label: "A puzzle to work through", description: "I learn best by testing the idea.", contributions: { challenges: 2 } },
+      { label: "A puzzle to work through", description: "Testing the idea feels useful here.", contributions: { challenges: 2 } },
     ],
   },
   {

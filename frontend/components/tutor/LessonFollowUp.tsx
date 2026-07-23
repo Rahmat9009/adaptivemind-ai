@@ -1,7 +1,14 @@
 "use client";
 
 import { type RefObject, useState } from "react";
-import type { TutorConversationTurn, TutorLesson } from "@/lib/ai/types";
+import { motion } from "motion/react";
+import { Button } from "@/components/base/buttons/button";
+import { fadeIn, slideUp, staggerContainer, staggerItem } from "@/lib/motion";
+import type {
+  TutorConversationTurn,
+  TutorLesson,
+} from "@/lib/ai/types";
+import type { TutorSourceAttribution } from "@/lib/sources";
 
 interface LessonFollowUpProps {
   lesson: TutorLesson;
@@ -10,19 +17,31 @@ interface LessonFollowUpProps {
   error: string | null;
   onAsk: (question: string) => Promise<boolean>;
   latestTurnRef: RefObject<HTMLDivElement | null>;
+  sources?: TutorSourceAttribution[];
 }
 
 function getSuggestions(lesson: TutorLesson): string[] {
   return [
     "Can you explain the core idea more simply?",
-    lesson.example ? "Why does this example connect to the topic?" : "Can you give me a concrete example?",
+    lesson.example
+      ? "Why does this example connect to the topic?"
+      : "Can you give me a concrete example?",
     "Can you test my understanding?",
   ];
 }
 
-export function LessonFollowUp({ lesson, conversation, isLoading, error, onAsk, latestTurnRef }: LessonFollowUpProps) {
+export function LessonFollowUp({
+  lesson,
+  conversation,
+  isLoading,
+  error,
+  onAsk,
+  latestTurnRef,
+  sources = [],
+}: LessonFollowUpProps) {
   const [question, setQuestion] = useState("");
   const suggestions = getSuggestions(lesson);
+  const sourceById = new Map(sources.map((source) => [source.id, source]));
 
   async function submitQuestion(value = question) {
     const trimmed = value.trim();
@@ -32,42 +51,172 @@ export function LessonFollowUp({ lesson, conversation, isLoading, error, onAsk, 
   }
 
   return (
-    <section className="mt-8 border-t border-slate-200 pt-8" aria-labelledby="ada-follow-up-heading">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <motion.section
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
+      className="mt-8 border-t border-[var(--am-border-light)] pt-8"
+      aria-labelledby="ada-follow-up-heading"
+    >
+      <motion.div variants={slideUp} className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wider text-teal-700">Lesson follow-up</p>
-          <h2 id="ada-follow-up-heading" className="mt-1 text-xl font-semibold text-slate-950">Ask Ada about this lesson</h2>
+          <p className="am-label text-[var(--am-primary)]/70">
+            Follow-up
+          </p>
+          <h2
+            id="ada-follow-up-heading"
+            className="am-heading-serif mt-1 text-xl text-[var(--am-text-primary)]"
+          >
+            Ask Ada about this lesson
+          </h2>
         </div>
-        <p className="text-sm text-slate-500">Focused answers stay with this lesson.</p>
-      </div>
+        <p className="text-xs text-[var(--am-text-muted)]">
+          Focused answers stay with this lesson.
+        </p>
+      </motion.div>
 
-      {conversation.length > 0 ? <div className="mt-5 space-y-4" aria-live="polite">
-        {conversation.map((turn) => <div key={turn.student.id} className="space-y-3">
-          <div className="ml-auto max-w-[88%] rounded-2xl rounded-br-md bg-slate-900 px-4 py-3 text-sm leading-6 text-white">{turn.student.content}</div>
-          <div className="max-w-[92%] rounded-2xl rounded-bl-md border border-slate-200 bg-white px-4 py-4 text-sm leading-6 text-slate-700 shadow-sm">
-            <p>{turn.response.answer}</p>
-            {turn.response.keyPoint ? <p className="mt-3 border-l-2 border-teal-400 pl-3 font-medium text-slate-800">{turn.response.keyPoint}</p> : null}
-            {turn.response.example ? <p className="mt-3 text-slate-600"><span className="font-semibold text-slate-800">Example: </span>{turn.response.example}</p> : null}
-            {turn.response.analogy ? <p className="mt-3 text-slate-600"><span className="font-semibold text-slate-800">Analogy: </span>{turn.response.analogy}</p> : null}
-            {turn.response.checkQuestion ? <p className="mt-3 rounded-lg bg-teal-50 px-3 py-2 font-medium text-teal-950">Check: {turn.response.checkQuestion}</p> : null}
-          </div>
-        </div>)}
-        <div ref={latestTurnRef} />
-      </div> : null}
+      {/* Conversation history */}
+      {conversation.length > 0 && (
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="visible"
+          className="mt-5 space-y-4"
+          aria-live="polite"
+        >
+          {conversation.map((turn) => (
+            <motion.div
+              key={turn.student.id}
+              variants={staggerItem}
+              className="space-y-2"
+            >
+              <div className="ml-auto max-w-[88%] rounded-[var(--am-radius-xl)] rounded-br-sm bg-[var(--am-text-primary)] px-4 py-3 text-sm leading-6 text-white">
+                {turn.student.content}
+              </div>
+              <div className="max-w-[92%] rounded-[var(--am-radius-xl)] rounded-bl-sm border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] px-4 py-4 text-sm leading-6 text-[var(--am-text-secondary)] shadow-sm">
+                <p>{turn.response.answer}</p>
+                {turn.response.keyPoint && (
+                  <p className="border-l-2 border-[var(--am-primary)] pl-3 mt-3 font-medium text-[var(--am-text-primary)]">
+                    {turn.response.keyPoint}
+                  </p>
+                )}
+                {turn.response.example && (
+                  <p className="mt-3 text-[var(--am-text-secondary)]">
+                    <span className="font-semibold text-[var(--am-text-primary)]">
+                      Example:{" "}
+                    </span>
+                    {turn.response.example}
+                  </p>
+                )}
+                {turn.response.analogy && (
+                  <p className="mt-3 text-[var(--am-text-secondary)]">
+                    <span className="font-semibold text-[var(--am-text-primary)]">
+                      Analogy:{" "}
+                    </span>
+                    {turn.response.analogy}
+                  </p>
+                )}
+                {turn.response.checkQuestion && (
+                  <p className="mt-3 rounded-[var(--am-radius-md)] bg-[var(--am-primary-light)] px-3 py-2 text-sm font-medium text-[var(--am-primary)]">
+                    Check: {turn.response.checkQuestion}
+                  </p>
+                )}
+                {turn.response.sourceGrounding?.statements.length ? (
+                  <ul className="mt-3 space-y-1 border-t border-[var(--am-border-light)] pt-3">
+                    {turn.response.sourceGrounding.statements.map(
+                      (statement, index) => (
+                        <li
+                          key={`${statement.sourceId}-${statement.reference ?? index}`}
+                          className="text-xs leading-5 text-[var(--am-text-muted)]"
+                        >
+                          {statement.statement}{" "}
+                          <span className="font-semibold text-[var(--am-text-secondary)]">
+                            [{sourceById.get(statement.sourceId)?.title
+                              ?? "Attached source"}
+                            {statement.reference
+                              ? `, ${statement.reference}`
+                              : ""}]
+                          </span>
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                ) : null}
+              </div>
+            </motion.div>
+          ))}
+          <div ref={latestTurnRef} />
+        </motion.div>
+      )}
 
-      <div className="mt-5 flex flex-wrap gap-2" aria-label="Suggested questions">
-        {suggestions.map((suggestion) => <button key={suggestion} type="button" onClick={() => void submitQuestion(suggestion)} disabled={isLoading} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-left text-sm font-medium text-slate-700 transition hover:border-teal-300 hover:bg-teal-50 disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2">{suggestion}</button>)}
-      </div>
+      {/* Suggested questions */}
+      <motion.div
+        variants={slideUp}
+        className="mt-5 flex flex-wrap gap-2"
+        aria-label="Suggested questions"
+      >
+        {suggestions.map((suggestion) => (
+          <Button
+            key={suggestion}
+            type="button"
+            color="tertiary"
+            size="xs"
+            isDisabled={isLoading}
+            onClick={() => void submitQuestion(suggestion)}
+          >
+            {suggestion}
+          </Button>
+        ))}
+      </motion.div>
 
-      <form className="mt-4" onSubmit={(event) => { event.preventDefault(); void submitQuestion(); }}>
-        <label htmlFor="lesson-follow-up" className="sr-only">Ask Ada a focused question about this lesson</label>
-        <textarea id="lesson-follow-up" value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void submitQuestion(); } }} maxLength={500} rows={3} placeholder="Ask a focused question about this lesson..." disabled={isLoading} className="w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-teal-500 focus:ring-2 focus:ring-teal-100 disabled:bg-slate-50" />
+      {/* Input */}
+      <motion.form
+        variants={slideUp}
+        className="mt-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void submitQuestion();
+        }}
+      >
+        <label htmlFor="lesson-follow-up" className="sr-only">
+          Ask Ada a focused question about this lesson
+        </label>
+        <textarea
+          id="lesson-follow-up"
+          value={question}
+          onChange={(event) => setQuestion(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              void submitQuestion();
+            }
+          }}
+          maxLength={500}
+          rows={2}
+          placeholder="Ask a focused question about this lesson..."
+          disabled={isLoading}
+          className="w-full resize-y rounded-[var(--am-radius-lg)] border border-[var(--am-border)] bg-[var(--am-bg-reading)] px-4 py-3 text-sm leading-6 text-[var(--am-text-primary)] outline-none transition placeholder:text-[var(--am-text-muted)] focus:border-[var(--am-primary)] focus:ring-2 focus:ring-[var(--am-primary)]/15 disabled:opacity-50"
+        />
         <div className="mt-3 flex items-center justify-between gap-4">
-          <p className="text-xs text-slate-500">Press Enter to ask. Use Shift+Enter for a new line.</p>
-          <button type="submit" disabled={isLoading || !question.trim()} className="rounded-lg bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-55 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-500 focus-visible:ring-offset-2">{isLoading ? "Ada is thinking..." : "Ask"}</button>
+          <p className="text-xs text-[var(--am-text-muted)]">
+            Press Enter to ask. Use Shift+Enter for a new line.
+          </p>
+          <Button
+            type="submit"
+            color="primary"
+            size="sm"
+            isDisabled={isLoading || !question.trim()}
+            isLoading={isLoading}
+          >
+            Ask
+          </Button>
         </div>
-        {error ? <p className="mt-3 text-sm font-medium text-rose-700" role="alert">{error}</p> : null}
-      </form>
-    </section>
+        {error && (
+          <p className="mt-3 text-sm font-medium text-[var(--am-error)]" role="alert">
+            {error}
+          </p>
+        )}
+      </motion.form>
+    </motion.section>
   );
 }

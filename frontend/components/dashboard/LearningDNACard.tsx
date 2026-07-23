@@ -1,8 +1,96 @@
+"use client";
+
+import { motion } from "motion/react";
+import { staggerContainer, staggerItem } from "@/lib/motion";
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
-import { learningDimensionLabels, learningDimensions, type LearningScores } from "@/lib/learning-dna";
+import {
+  learningDimensionLabels,
+  learningDimensions,
+  type LearningDimension,
+  type LearningScores,
+} from "@/lib/learning-dna";
 import { LearningDNAConstellation } from "@/components/three/LearningDNAConstellation";
+
+const dnaColors: Record<LearningDimension, string> = {
+  visual: "#0891B2",
+  examples: "#B45309",
+  analogies: "#7C3AED",
+  stories: "#BE185D",
+  challenges: "#DC2626",
+};
 
 export function LearningDNACard({ scores }: { scores: LearningScores }) {
   const profile = buildTeachingProfile(scores);
-  return <section aria-labelledby="learning-dna-card-title" className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-7"><p className="text-sm font-semibold uppercase tracking-wider text-indigo-700">Current Learning DNA profile</p><h2 id="learning-dna-card-title" className="mt-2 text-2xl font-semibold text-slate-950">{learningDimensionLabels[profile.primaryDimension]}</h2><p className="mt-1 text-sm text-slate-600">Supporting preference: {learningDimensionLabels[profile.secondaryDimension]}</p><div className="mt-5"><LearningDNAConstellation scores={scores} activeDimension={profile.primaryDimension} /></div><div className="mt-6 space-y-4">{learningDimensions.map((dimension) => <div key={dimension}><div className="flex justify-between gap-4 text-sm"><span className="font-medium text-slate-700">{learningDimensionLabels[dimension]}</span><span className="font-semibold tabular-nums text-slate-950">{scores[dimension]}%</span></div><div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-[linear-gradient(90deg,#4f46e5,#38bdf8)]" style={{ width: `${scores[dimension]}%` }} /></div></div>)}</div><p className="mt-6 text-sm leading-6 text-slate-600">You currently understand new ideas best through {learningDimensionLabels[profile.primaryDimension].toLowerCase()}-led explanations, with support from {learningDimensionLabels[profile.secondaryDimension].toLowerCase()}.</p><div className="mt-5 rounded-2xl bg-indigo-50 px-4 py-4 text-sm leading-6 text-indigo-950"><p className="font-semibold">Ada currently prioritizes:</p><p className="mt-1">✓ {learningDimensionLabels[profile.primaryDimension]}<br />✓ {learningDimensionLabels[profile.secondaryDimension]}</p></div></section>;
+
+  return (
+    <section
+      aria-labelledby="learning-dna-card-title"
+      className="am-card p-6 sm:p-7"
+    >
+      <p className="am-label text-[var(--am-text-muted)]">
+        Current Learning DNA
+      </p>
+      <h2
+        id="learning-dna-card-title"
+        className="am-heading-serif mt-2 text-2xl"
+        style={{ color: dnaColors[profile.primaryDimension] }}
+      >
+        {learningDimensionLabels[profile.primaryDimension]}
+      </h2>
+      <p className="mt-1 text-sm text-[var(--am-text-secondary)]">
+        starting approach &middot; supporting:{" "}
+        {learningDimensionLabels[profile.secondaryDimension].toLowerCase()}
+      </p>
+
+      <div className="mt-5">
+        <LearningDNAConstellation
+          scores={scores}
+          activeDimension={profile.primaryDimension}
+        />
+      </div>
+
+      {/* Dimension bars */}
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="mt-6 space-y-3"
+      >
+        {learningDimensions.map((dimension) => (
+          <motion.div key={dimension} variants={staggerItem}>
+            <div className="flex justify-between gap-4 text-sm">
+              <span className="font-medium text-[var(--am-text-secondary)]">
+                {learningDimensionLabels[dimension]}
+              </span>
+              <span
+                className="font-semibold tabular-nums"
+                style={{ color: dnaColors[dimension] }}
+              >
+                {scores[dimension]}%
+              </span>
+            </div>
+            <div className="am-progress-track mt-1.5">
+              <motion.div
+                className="h-full rounded-full"
+                initial={{ width: 0 }}
+                animate={{ width: `${scores[dimension]}%` }}
+                transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                style={{
+                  backgroundColor: dnaColors[dimension],
+                }}
+              />
+            </div>
+          </motion.div>
+        ))}
+      </motion.div>
+
+      <p className="mt-6 text-sm leading-6 text-[var(--am-text-secondary)] border-t border-[var(--am-border-light)] pt-5">
+        Ada will currently try{" "}
+        {learningDimensionLabels[profile.primaryDimension].toLowerCase()}-led
+        explanations first, with support from{" "}
+        {learningDimensionLabels[profile.secondaryDimension].toLowerCase()}.
+        This starting preference will be revised as evidence grows.
+      </p>
+    </section>
+  );
 }
