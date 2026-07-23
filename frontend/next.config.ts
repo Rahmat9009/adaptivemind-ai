@@ -14,10 +14,14 @@ const nextConfig: NextConfig = {
     "pdf-parse",
     "pdfjs-dist",
   ],
-  // Fix workspace root inference: prefer this project's root over user-level lockfiles
-  turbopack: {
-    root: path.resolve(__dirname),
-  },
+  // Fix local workspace inference without conflicting with Vercel's tracing root.
+  ...(process.env.VERCEL
+    ? {}
+    : {
+        turbopack: {
+          root: path.resolve(__dirname),
+        },
+      }),
   async headers() {
     return [
       {
