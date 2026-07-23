@@ -40,7 +40,7 @@ function isLessonResponse(value: unknown): value is TutorApiResponse {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
   const lesson = record.lesson as Record<string, unknown> | undefined;
-  return typeof lesson === "object" && lesson !== null && typeof lesson.title === "string" && typeof lesson.coreIdea === "string" && typeof lesson.explanation === "string" && Array.isArray(lesson.keyPoints) && typeof lesson.checkQuestion === "string" && isStyles(lesson.stylesUsed) && isResponseSource(record.source) && isTeachingMode(record.teachingMode) && ["initial", "simpler", "different", "example", "challenge"].includes(record.action as string);
+  return typeof lesson === "object" && lesson !== null && typeof lesson.title === "string" && typeof lesson.coreIdea === "string" && typeof lesson.explanation === "string" && Array.isArray(lesson.keyPoints) && typeof lesson.checkQuestion === "string" && isStyles(lesson.stylesUsed) && isResponseSource(record.source) && isTeachingMode(record.teachingMode) && ["initial", "simpler", "different", "example", "challenge", "visualize"].includes(record.action as string);
 }
 
 function isHistoryEntry(value: unknown): value is LessonHistoryEntry {

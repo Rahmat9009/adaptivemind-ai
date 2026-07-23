@@ -4,13 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/base/buttons/button";
 import type {
   TeachingMode,
-  TutorAction,
   TutorApiResponse,
   TutorConversationMessage,
   TutorConversationTurn,
   TutorFollowUpApiResponse,
   TutorFollowUpResponse,
   TutorLesson,
+  TutorLessonAction,
   TutorResponseSource,
   UnderstandingEvaluation,
   UnderstandingEvaluationApiResponse,
@@ -173,15 +173,14 @@ function isTutorResponseSource(value: unknown): value is TutorResponseSource {
   );
 }
 
-function isLessonAction(
-  value: unknown,
-): value is Exclude<TutorAction, "followup" | "evaluate"> {
+function isLessonAction(value: unknown): value is TutorLessonAction {
   return (
     value === "initial" ||
     value === "simpler" ||
     value === "different" ||
     value === "example" ||
-    value === "challenge"
+    value === "challenge" ||
+    value === "visualize"
   );
 }
 
@@ -580,7 +579,7 @@ export function TutorShell() {
   }, [conversation.length]);
 
   async function requestLesson(
-    action: Exclude<TutorAction, "followup" | "evaluate">,
+    action: TutorLessonAction,
     submittedSources: TutorSource[] = activeSources,
     submittedSourceMode: SourceGroundingMode | undefined = activeSourceMode,
   ) {

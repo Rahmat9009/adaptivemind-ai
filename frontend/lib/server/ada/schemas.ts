@@ -19,6 +19,7 @@ export const tutorActions = [
   "different",
   "example",
   "challenge",
+  "visualize",
   "followup",
   "evaluate",
   "explain-back",
@@ -150,6 +151,167 @@ const sourceGroundingSchema = z.object({
   }).strict()).max(8),
   outsideKnowledgeUsed: z.boolean(),
 }).strict();
+
+const visualStepSchema = z.object({
+  id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/),
+  label: z.string().trim().min(1).max(80),
+  description: z.string().trim().min(1).max(500),
+  x: z.number().finite().min(0).max(100).optional(),
+  y: z.number().finite().min(0).max(100).optional(),
+  group: z.string().trim().min(1).max(60).optional(),
+}).strict();
+
+const visualConnectionSchema = z.object({
+  from: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/),
+  to: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/),
+  label: z.string().trim().min(1).max(80).optional(),
+}).strict();
+
+const visualGraphPointSchema = z.object({
+  x: z.number().finite().min(-1_000_000).max(1_000_000),
+  y: z.number().finite().min(-1_000_000).max(1_000_000),
+  label: z.string().trim().min(1).max(80).optional(),
+}).strict();
+
+export const visualLessonSchema = z.object({
+  type: z.enum([
+    "process",
+    "cycle",
+    "timeline",
+    "comparison",
+    "flowchart",
+    "graph",
+    "labeled-diagram",
+    "step-sequence",
+    "cause-effect",
+    "simulation",
+  ]),
+  title: z.string().trim().min(1).max(160),
+  summary: z.string().trim().min(1).max(800),
+  steps: z.array(visualStepSchema).max(12).default([]),
+  connections: z.array(visualConnectionSchema).max(20).default([]),
+  columns: z.array(z.object({
+    label: z.string().trim().min(1).max(80),
+    items: z.array(z.string().trim().min(1).max(300)).min(1).max(8),
+  }).strict()).max(4).default([]),
+  series: z.array(z.object({
+    label: z.string().trim().min(1).max(80),
+    points: z.array(visualGraphPointSchema).min(2).max(30),
+  }).strict()).max(4).default([]),
+  xAxisLabel: z.string().trim().min(1).max(80).optional(),
+  yAxisLabel: z.string().trim().min(1).max(80).optional(),
+  captions: z.array(z.string().trim().min(1).max(300)).min(1).max(12),
+  predictionCheckpoints: z.array(z.object({
+    stepId: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/),
+    question: z.string().trim().min(1).max(300),
+  }).strict()).max(4).default([]),
+  simulation: z.object({
+    inputLabel: z.string().trim().min(1).max(80),
+    outputLabel: z.string().trim().min(1).max(80),
+    min: z.number().finite().min(-100_000).max(100_000),
+    max: z.number().finite().min(-100_000).max(100_000),
+    step: z.number().finite().positive().max(100_000),
+    initial: z.number().finite().min(-100_000).max(100_000),
+    unit: z.string().trim().min(1).max(20).optional(),
+    formula: z.enum(["linear", "inverse", "quadratic"]),
+    coefficient: z.number().finite().min(-100_000).max(100_000),
+    offset: z.number().finite().min(-100_000).max(100_000),
+  }).strict().optional(),
+  textAlternative: z.string().trim().min(1).max(4_000),
+}).strict().superRefine((visual, context) => {
+  const ids = new Set<string>();
+  for (const [index, step] of visual.steps.entries()) {
+    if (ids.has(step.id)) {
+      context.addIssue({
+        code: "custom",
+        path: ["steps", index, "id"],
+        message: "Visual step IDs must be unique.",
+      });
+    }
+    ids.add(step.id);
+    if (
+      visual.type === "labeled-diagram"
+      && (step.x === undefined || step.y === undefined)
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["steps", index],
+        message: "Labeled diagram steps need bounded x and y positions.",
+      });
+    }
+  }
+
+  for (const [index, connection] of visual.connections.entries()) {
+    if (!ids.has(connection.from) || !ids.has(connection.to)) {
+      context.addIssue({
+        code: "custom",
+        path: ["connections", index],
+        message: "Visual connections must reference existing step IDs.",
+      });
+    }
+  }
+  for (const [index, checkpoint] of visual.predictionCheckpoints.entries()) {
+    if (!ids.has(checkpoint.stepId)) {
+      context.addIssue({
+        code: "custom",
+        path: ["predictionCheckpoints", index, "stepId"],
+        message: "Prediction checkpoints must reference an existing step.",
+      });
+    }
+  }
+
+  if (visual.type === "comparison" && visual.columns.length < 2) {
+    context.addIssue({
+      code: "custom",
+      path: ["columns"],
+      message: "A comparison needs at least two columns.",
+    });
+  } else if (visual.type === "graph" && visual.series.length < 1) {
+    context.addIssue({
+      code: "custom",
+      path: ["series"],
+      message: "A graph needs at least one data series.",
+    });
+  } else if (visual.type === "simulation") {
+    const simulation = visual.simulation;
+    if (!simulation) {
+      context.addIssue({
+        code: "custom",
+        path: ["simulation"],
+        message: "A simulation needs bounded input and formula data.",
+      });
+    } else {
+      if (
+        simulation.min >= simulation.max
+        || simulation.initial < simulation.min
+        || simulation.initial > simulation.max
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["simulation"],
+          message: "Simulation bounds and initial value are inconsistent.",
+        });
+      }
+      if (
+        simulation.formula === "inverse"
+        && simulation.min <= 0
+        && simulation.max >= 0
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["simulation", "min"],
+          message: "An inverse simulation range cannot cross zero.",
+        });
+      }
+    }
+  } else if (visual.steps.length < 2) {
+    context.addIssue({
+      code: "custom",
+      path: ["steps"],
+      message: "This visual type needs at least two steps or nodes.",
+    });
+  }
+});
 
 export const tutorRequestSchema = z.object({
   requestId: z.string().trim().min(8).max(100).optional(),
@@ -288,6 +450,7 @@ export const tutorLessonSchema = z.object({
   checkQuestion: shortString,
   stylesUsed: z.array(learningDimensionSchema).min(1).max(5),
   sourceGrounding: sourceGroundingSchema.optional(),
+  visual: visualLessonSchema.optional(),
 }).strict();
 
 export const tutorFollowUpSchema = z.object({

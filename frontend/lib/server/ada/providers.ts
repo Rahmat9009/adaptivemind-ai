@@ -6,6 +6,7 @@ import type {
   HintResponse,
   TutorFollowUpResponse,
   TutorLesson,
+  TutorLessonAction,
   TutorRequest,
   UnderstandingEvaluation,
 } from "@/lib/ai/types";
@@ -29,7 +30,7 @@ import {
   parseRetryAfterMs,
   PROVIDER_TIMEOUT_MS,
 } from "./safety";
-import { parseProviderJson } from "./validation";
+import { inspectProviderJson } from "./validation";
 
 export type ProviderRole = "primary" | "fallback";
 
@@ -302,12 +303,18 @@ async function generateStructured<T>(
     signal,
     imageDataUrls,
   );
-  const parsed = parseProviderJson(content, schema);
-  if (parsed) return parsed;
+  const inspection = inspectProviderJson(content, schema);
+  if (inspection.data) return inspection.data;
+  const issueSummary = inspection.issues.length
+    ? inspection.issues.map((issue) => `- ${issue}`).join("\n")
+    : "- response: did not contain a valid JSON object";
 
   const repairPrompt = `${prompt}
 
-Your previous response did not match the required JSON schema. Return only one valid JSON object matching the exact requested shape. Do not add markdown or commentary.`;
+Your previous response did not match the required JSON schema.
+Validation failures:
+${issueSummary}
+Correct those failures. Return only one valid JSON object matching the exact requested shape. Omit inapplicable optional fields instead of returning null. Do not add markdown or commentary.`;
   const repairedContent = await fetchCompletion(
     provider,
     repairPrompt,
@@ -315,8 +322,8 @@ Your previous response did not match the required JSON schema. Return only one v
     signal,
     imageDataUrls,
   );
-  const repaired = parseProviderJson(repairedContent, schema);
-  if (repaired) return repaired;
+  const repaired = inspectProviderJson(repairedContent, schema);
+  if (repaired.data) return repaired.data;
 
   throw new AdaError({
     code: "PROVIDER_RESPONSE_INVALID",
@@ -386,7 +393,14 @@ export async function generateProviderLesson(
   request: TutorRequest,
   signal?: AbortSignal,
 ): Promise<TutorLesson> {
-  if (!["initial", "simpler", "different", "example", "challenge"].includes(request.action)) {
+  if (![
+    "initial",
+    "simpler",
+    "different",
+    "example",
+    "challenge",
+    "visualize",
+  ].includes(request.action)) {
     throw new AdaError({
       code: "INVALID_REQUEST",
       message: "That Ada action cannot generate a lesson.",
@@ -396,7 +410,7 @@ export async function generateProviderLesson(
 
   const prompt = buildTutorSystemPrompt({
     ...request,
-    action: request.action as "initial" | "simpler" | "different" | "example" | "challenge",
+    action: request.action as TutorLessonAction,
   });
   const lesson = await generateStructured(
     provider,
@@ -406,6 +420,17 @@ export async function generateProviderLesson(
     signal,
     sourceImages(request),
   );
+  if (
+    (request.action === "visualize" || request.teachingMode === "visual")
+    && !lesson.visual
+  ) {
+    throw new AdaError({
+      code: "PROVIDER_RESPONSE_INVALID",
+      message: "Ada's response did not include the requested structured visual.",
+      status: 502,
+      retryable: true,
+    });
+  }
   return validateSourceGrounding(lesson, request);
 }
 

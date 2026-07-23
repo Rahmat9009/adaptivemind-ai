@@ -3,23 +3,22 @@
 import { motion } from "motion/react";
 import { Button } from "@/components/base/buttons/button";
 import { staggerContainer, staggerItem } from "@/lib/motion";
-import type { TutorAction } from "@/lib/ai/types";
+import type { TutorLessonAction } from "@/lib/ai/types";
 
 interface LessonActionsProps {
   isLoading: boolean;
-  onAction: (
-    action: Exclude<TutorAction, "initial" | "followup" | "evaluate">,
-  ) => void;
+  onAction: (action: Exclude<TutorLessonAction, "initial">) => void;
   onNewLesson: () => void;
 }
 
 const actions: Array<{
-  action: Exclude<TutorAction, "initial" | "followup" | "evaluate">;
+  action: Exclude<TutorLessonAction, "initial">;
   label: string;
 }> = [
   { action: "different", label: "Explain differently" },
   { action: "simpler", label: "Make it simpler" },
   { action: "example", label: "Give me an example" },
+  { action: "visualize", label: "Create a visual" },
   { action: "challenge", label: "Challenge me" },
 ];
 

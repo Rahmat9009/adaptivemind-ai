@@ -3,10 +3,6 @@ import "./globals.css";
 import { MotionProvider } from "@/components/am/MotionProvider";
 import { OnlineStatus } from "@/components/am/OnlineStatus";
 import { ServiceWorkerRegistration } from "@/components/am/ServiceWorkerRegistration";
-import { Geist } from "next/font/google";
-import { cn } from "@/lib/utils";
-
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const viewport: Viewport = {
   themeColor: "#8B6F47",
@@ -34,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("h-full antialiased", "font-sans", geist.variable)}>
+    <html lang="en" className="h-full font-sans antialiased">
       <body className="relative min-h-full flex flex-col bg-[var(--am-bg)] text-[var(--am-text-primary)]">
         {/* Skip navigation — WCAG 2.2 AA */}
         <a

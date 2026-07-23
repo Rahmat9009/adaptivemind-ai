@@ -14,6 +14,7 @@ function lessonMatchesAction(
 ): boolean {
   if (action === "challenge") return Boolean(lesson.challenge);
   if (action === "example") return Boolean(lesson.practicePrompt);
+  if (action === "visualize") return Boolean(lesson.visual);
   return true;
 }
 

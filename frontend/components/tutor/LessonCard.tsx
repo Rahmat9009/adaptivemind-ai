@@ -11,6 +11,24 @@ const SpeechPlayer = dynamic(
   { ssr: false },
 );
 
+const VisualLessonEngine = dynamic(
+  () =>
+    import("@/components/visuals/VisualLessonEngine").then(
+      (module) => module.VisualLessonEngine,
+    ),
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="mt-7 min-h-48 border-y border-[var(--am-border-light)] py-6 text-sm text-[var(--am-text-muted)]"
+        role="status"
+      >
+        Preparing the visual explanation...
+      </div>
+    ),
+  },
+);
+
 interface LessonCardProps {
   response: TutorApiResponse;
 }
@@ -35,6 +53,7 @@ export function LessonCard({ response }: LessonCardProps) {
     different: "A different lens",
     example: "Worked example",
     challenge: "Reasoning challenge",
+    visualize: "Visual explanation",
   }[action];
 
   return (
@@ -191,6 +210,13 @@ export function LessonCard({ response }: LessonCardProps) {
           {lesson.explanation}
         </p>
       </motion.section>
+
+      {lesson.visual && (
+        <VisualLessonEngine
+          key={`${response.requestId ?? lesson.title}-visual`}
+          visual={lesson.visual}
+        />
+      )}
 
       {/* Example */}
       {lesson.example && (

@@ -5,17 +5,22 @@ import type {
   TutorSource,
   TutorSourceAttribution,
 } from "@/lib/sources";
+import type { VisualLessonData } from "@/lib/visual-schema";
 
 // ──────────────────────────────────────
 // Core actions
 // ──────────────────────────────────────
 
-export type TutorAction =
+export type TutorLessonAction =
   | "initial"
   | "simpler"
   | "different"
   | "example"
   | "challenge"
+  | "visualize";
+
+export type TutorAction =
+  | TutorLessonAction
   | "followup"
   | "evaluate"
   | "explain-back"
@@ -189,13 +194,14 @@ export interface TutorLesson {
   checkQuestion: string;
   stylesUsed: LearningDimension[];
   sourceGrounding?: LessonSourceGrounding;
+  visual?: VisualLessonData;
 }
 
 export interface TutorApiResponse {
   lesson: TutorLesson;
   source: TutorResponseSource;
   teachingMode: TeachingMode;
-  action: Exclude<TutorAction, "followup" | "evaluate" | "explain-back" | "retrieval-check" | "hint" | "review">;
+  action: TutorLessonAction;
   requestId?: string;
   sources?: TutorSourceAttribution[];
   sourceMode?: SourceGroundingMode;

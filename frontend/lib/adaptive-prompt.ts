@@ -8,7 +8,7 @@ import type {
   AdaAdaptationContext,
   AdaLearnerPreferences,
   TeachingMode,
-  TutorAction,
+  TutorLessonAction,
   TutorRequest,
 } from "@/lib/ai/types";
 
@@ -130,7 +130,7 @@ export function buildTutorSystemPrompt({
   subject: string;
   level: string;
   scores: LearningScores;
-  action: Exclude<TutorAction, "followup" | "evaluate" | "explain-back" | "retrieval-check" | "hint" | "review">;
+  action: TutorLessonAction;
   teachingMode: TeachingMode;
   previousStyles?: LearningDimension[];
   previousTeachingMode?: TeachingMode;
@@ -154,16 +154,21 @@ export function buildTutorSystemPrompt({
   const differentDimensions = action === "different" && stylesOutsidePreviousLesson.length === 2
     ? stylesOutsidePreviousLesson
     : preferredDifferentDimensions;
-  const actionInstruction: Record<Exclude<TutorAction, "followup" | "evaluate" | "explain-back" | "retrieval-check" | "hint" | "review">, string> = {
+  const actionInstruction: Record<TutorLessonAction, string> = {
     initial: "Return a complete lesson: core idea, personalized explanation, an optional example or analogy, 3 to 5 key points, and one understanding-check question.",
     simpler: "Rewrite for a younger or less experienced learner. Use short sentences, avoid jargon, explain one idea at a time, include one small example, and make the whole response meaningfully shorter than an initial lesson.",
     different: `Re-explain using a genuinely different method, not a paraphrase. Avoid the previous teaching mode and structure where possible. Prioritize ${learningDimensionLabels[differentDimensions[0]]} and ${learningDimensionLabels[differentDimensions[1]]}, and return those different stylesUsed values where accurate.`,
     example: "Briefly state the core idea, then focus on one concrete worked example step by step. Connect each step to the concept. Do not turn it into a challenge. End with one similar practicePrompt.",
     challenge: "Make this an interactive reasoning exercise, not another explanation or worked example. Briefly set up only the necessary concept. Return a challenge scenario or prediction task, one optional hint, and ask the learner to answer. Do not reveal the complete solution.",
+    visualize: "Create a concise lesson plus a structured visual explanation. Choose the visual type that communicates the actual relationships most accurately. The visual is required.",
   };
   const previousContext = action === "different" && (previousStyles?.length || previousTeachingMode || previousTitle || previousExplanation)
     ? `Previous lesson context (do not repeat it): styles=${previousStyles?.join(", ") ?? "unknown"}; teaching mode=${previousTeachingMode ?? "unknown"}; title=${previousTitle ?? "unknown"}; excerpt=${previousExplanation ?? "none"}.`
     : "";
+  const needsVisual = teachingMode === "visual" || action === "visualize";
+  const visualInstruction = needsVisual
+    ? `A validated visual object is required. Never return HTML, SVG markup, CSS, JavaScript, image URLs, or drawing commands. Use only the structured fields below. Choose graph only for meaningful numeric data and simulation only when its simple formula is educationally accurate. Keep all scientific and historical details supportable. Represent every distinct stage the learner explicitly requests; do not collapse requested stages together. For a step-based visual, include one visible caption per step.`
+    : "A structured visual object is optional. Include it only when it materially improves understanding.";
 
   return `You are Ada, the calm and thoughtful tutor inside AdaptiveMind AI. Create one concise, structured lesson about "${topic}" for a ${level} learner studying ${subject}. Do not pretend to be human, conscious, or emotionally aware. Do not add unnecessary greetings.
 
@@ -174,8 +179,9 @@ ${actionInstruction[action]}
 ${previousContext}
 ${buildLearnerContext({ adaptationContext, learnerPreferences })}
 ${buildSourceContext({ sources, sourceMode })}
+${visualInstruction}
 
-These are starting explanations, not fixed traits about the student's brain. Use calm, direct language. Return only valid JSON with this exact shape:
+These are starting explanations, not fixed traits about the student's brain. Use calm, direct language. Omit every inapplicable optional field; never use null. Return only valid JSON with this exact shape:
 {
   "title": "string",
   "coreIdea": "string",
@@ -189,7 +195,22 @@ These are starting explanations, not fixed traits about the student's brain. Use
   "keyPoints": ["string", "string", "string"],
   "checkQuestion": "string",
   "stylesUsed": ["visual" | "examples" | "analogies" | "stories" | "challenges"],
-  "sourceGrounding": {"statements":[{"statement":"source-supported statement","sourceId":"exact allowed id","reference":"exact allowed reference"}],"outsideKnowledgeUsed":false} or omit only when no source is attached
+  "sourceGrounding": {"statements":[{"statement":"source-supported statement","sourceId":"exact allowed id","reference":"exact allowed reference"}],"outsideKnowledgeUsed":false} or omit only when no source is attached,
+  "visual": {
+    "type": "process|cycle|timeline|comparison|flowchart|graph|labeled-diagram|step-sequence|cause-effect|simulation",
+    "title": "string",
+    "summary": "string",
+    "steps": [{"id":"lowercase-id","label":"string","description":"string","x":0-100 optional,"y":0-100 optional,"group":"string optional"}],
+    "connections": [{"from":"existing-step-id","to":"existing-step-id","label":"string optional"}],
+    "columns": [{"label":"string","items":["string"]}],
+    "series": [{"label":"string","points":[{"x":0,"y":0,"label":"string optional"},{"x":1,"y":1}]}],
+    "xAxisLabel": "string or omitted",
+    "yAxisLabel": "string or omitted",
+    "captions": ["plain text caption"],
+    "predictionCheckpoints": [{"stepId":"existing-step-id","question":"string"}],
+    "simulation": {"inputLabel":"string","outputLabel":"string","min":0,"max":10,"step":1,"initial":1,"unit":"optional","formula":"linear|inverse|quadratic","coefficient":1,"offset":0},
+    "textAlternative": "complete plain-text equivalent"
+  } or omit when not useful and not required
 }`;
 }
 

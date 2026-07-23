@@ -1,6 +1,7 @@
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
 import { learningDimensionLabels, type LearningDimension } from "@/lib/learning-dna";
 import type { TeachingMode, TutorFollowUpResponse, TutorLesson, TutorRequest, UnderstandingEvaluation, ExplainBackEvaluation, HintResponse } from "./types";
+import type { VisualLessonData } from "@/lib/visual-schema";
 
 interface DemoTopic {
   title: string;
@@ -84,12 +85,50 @@ function getReframedExplanation(topic: DemoTopic, styles: LearningDimension[]): 
   return `Start with a real situation, identify the important detail, and then connect it to the rule: ${topic.example}`;
 }
 
+function createDemoVisual(topic: DemoTopic): VisualLessonData {
+  const steps = topic.keyPoints.slice(0, 5).map((description, index) => ({
+    id: `step-${index + 1}`,
+    label: `Step ${index + 1}`,
+    description,
+  }));
+  return {
+    type: "step-sequence",
+    title: `${topic.title}: visual sequence`,
+    summary: topic.coreIdea,
+    steps,
+    connections: steps.slice(1).map((step, index) => ({
+      from: steps[index].id,
+      to: step.id,
+    })),
+    columns: [],
+    series: [],
+    captions: steps.map((step) => step.description),
+    predictionCheckpoints: [],
+    textAlternative: [
+      topic.coreIdea,
+      ...steps.map((step) => `${step.label}: ${step.description}`),
+    ].join(" "),
+  };
+}
+
 export function createDemoLesson(request: TutorRequest): TutorLesson | null {
   const topic = findDemoTopic(request.topic);
   if (!topic) return null;
 
   const profile = buildTeachingProfile(request.scores);
   const baseStyles = getBaseStyles(request, profile);
+
+  if (request.action === "visualize") {
+    return {
+      title: `${topic.title}: visual explanation`,
+      coreIdea: topic.coreIdea,
+      explanation: "Use the sequence to trace how each part connects to the next.",
+      keyPoints: topic.keyPoints.slice(0, 5),
+      checkQuestion: topic.checkQuestion,
+      stylesUsed: ["visual"],
+      visual: createDemoVisual(topic),
+    };
+  }
 
   if (request.action === "simpler") {
     return {
@@ -147,6 +186,10 @@ export function createDemoLesson(request: TutorRequest): TutorLesson | null {
     example: baseStyles.includes("examples") ? topic.example : undefined,
     analogy: baseStyles.includes("analogies") ? topic.analogy : undefined,
     stylesUsed: baseStyles,
+    visual:
+      request.teachingMode === "visual"
+        ? createDemoVisual(topic)
+        : undefined,
   };
 }
 
