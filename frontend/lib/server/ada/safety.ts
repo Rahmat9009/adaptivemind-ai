@@ -1,4 +1,4 @@
-export const MAX_TUTOR_REQUEST_BYTES = 256 * 1024;
+export const MAX_TUTOR_REQUEST_BYTES = 4 * 1024 * 1024;
 export const MAX_PROVIDER_RESPONSE_BYTES = 512 * 1024;
 export const PROVIDER_TIMEOUT_MS = 20_000;
 

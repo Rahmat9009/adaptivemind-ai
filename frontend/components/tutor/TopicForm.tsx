@@ -2,14 +2,18 @@
 
 import { motion } from "motion/react";
 import { Button } from "@/components/base/buttons/button";
-import { InputBase } from "@/components/base/input/input";
 import { fadeIn, slideUp, staggerContainer, staggerItem } from "@/lib/motion";
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
 import type { TeachingMode } from "@/lib/ai/types";
+import type {
+  SourceGroundingMode,
+  TutorSource,
+} from "@/lib/sources";
 import {
   learningDimensionLabels,
   type LearningScores,
 } from "@/lib/learning-dna";
+import { AdaComposer } from "./AdaComposer";
 
 interface TopicFormProps {
   topic: string;
@@ -22,7 +26,10 @@ interface TopicFormProps {
   onSubjectChange: (subject: string) => void;
   onLevelChange: (level: string) => void;
   onTeachingModeChange: (mode: TeachingMode) => void;
-  onSubmit: () => void;
+  onSubmit: (
+    sources: TutorSource[],
+    sourceMode: SourceGroundingMode | undefined,
+  ) => Promise<void> | void;
 }
 
 const suggestions = [
@@ -88,32 +95,22 @@ export function TopicForm({
   );
 
   return (
-    <motion.form
+    <motion.div
       variants={fadeIn}
       initial="hidden"
       animate="visible"
       className="am-card p-5 sm:p-7"
-      onSubmit={(event) => {
-        event.preventDefault();
-        onSubmit();
-      }}
     >
       <motion.div variants={slideUp}>
         <p className="am-label text-[var(--am-text-muted)]">
           What to learn
         </p>
 
-        <label htmlFor="topic" className="sr-only">
-          Ask Ada what you want to learn
-        </label>
-        <InputBase
-          id="topic"
-          value={topic}
-          onChange={(event) => onTopicChange(event.target.value)}
-          maxLength={160}
-          placeholder="For example, explain Newton's First Law"
-          size="lg"
-          className="mt-3"
+        <AdaComposer
+          topic={topic}
+          isLoading={isLoading}
+          onTopicChange={onTopicChange}
+          onSubmit={onSubmit}
         />
       </motion.div>
 
@@ -211,10 +208,10 @@ export function TopicForm({
         </p>
       </motion.fieldset>
 
-      {/* Bottom: suggestions + submit */}
+      {/* Topic suggestions */}
       <motion.div
         variants={slideUp}
-        className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+        className="mt-5"
       >
         <div className="flex flex-wrap gap-2" aria-label="Example topics">
           {suggestions.map((suggestion) => (
@@ -229,17 +226,7 @@ export function TopicForm({
             </Button>
           ))}
         </div>
-
-        <Button
-          type="submit"
-          color="primary"
-          size="md"
-          isDisabled={isLoading || !topic.trim()}
-          isLoading={isLoading}
-        >
-          Teach me
-        </Button>
       </motion.div>
-    </motion.form>
+    </motion.div>
   );
 }

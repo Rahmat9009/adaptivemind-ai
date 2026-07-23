@@ -7,6 +7,11 @@ import type {
   TutorRequest,
   UnderstandingEvaluation,
 } from "@/lib/ai/types";
+import {
+  MAX_PROMPT_SOURCE_CHARACTERS,
+  MAX_SOURCE_COUNT,
+  MAX_TOTAL_IMAGE_DATA_URL_CHARACTERS,
+} from "@/lib/sources";
 
 export const tutorActions = [
   "initial",
@@ -84,9 +89,71 @@ const adaptationContextSchema = z.object({
   confidence: z.number().finite().min(0).max(100),
 }).strict();
 
+const sourceTypeSchema = z.enum([
+  "pdf",
+  "docx",
+  "pptx",
+  "txt",
+  "markdown",
+  "image",
+  "website",
+]);
+
+const sourceSectionSchema = z.object({
+  label: z.string().trim().min(1).max(120),
+  content: z.string().trim().min(1).max(8_000),
+}).strict();
+
+const tutorSourceSchema = z.object({
+  id: z.string().trim().min(8).max(100),
+  title: z.string().trim().min(1).max(160),
+  type: sourceTypeSchema,
+  mimeType: z.string().trim().min(1).max(120),
+  size: z.number().int().positive().max(10 * 1024 * 1024).optional(),
+  url: z.string().url().max(2_048).optional(),
+  domain: z.string().trim().min(1).max(255).optional(),
+  sections: z.array(sourceSectionSchema).max(40),
+  imageDataUrl: z.string()
+    .regex(/^data:image\/(?:jpeg|png|webp);base64,[a-zA-Z0-9+/=]+$/)
+    .max(1_500_000)
+    .optional(),
+  extractionNote: z.string().trim().min(1).max(300).optional(),
+}).strict().superRefine((source, context) => {
+  if (source.type === "image" && !source.imageDataUrl) {
+    context.addIssue({
+      code: "custom",
+      path: ["imageDataUrl"],
+      message: "An image source needs image data.",
+    });
+  }
+  if (source.type !== "image" && source.imageDataUrl) {
+    context.addIssue({
+      code: "custom",
+      path: ["imageDataUrl"],
+      message: "Only image sources may include image data.",
+    });
+  }
+  if (source.type === "website" && (!source.url || !source.domain)) {
+    context.addIssue({
+      code: "custom",
+      path: ["url"],
+      message: "A website source needs its original URL and domain.",
+    });
+  }
+});
+
+const sourceGroundingSchema = z.object({
+  statements: z.array(z.object({
+    statement: z.string().trim().min(1).max(800),
+    sourceId: z.string().trim().min(1).max(100),
+    reference: z.string().trim().min(1).max(2_048).optional(),
+  }).strict()).max(8),
+  outsideKnowledgeUsed: z.boolean(),
+}).strict();
+
 export const tutorRequestSchema = z.object({
   requestId: z.string().trim().min(8).max(100).optional(),
-  topic: z.string().trim().min(2).max(160),
+  topic: z.string().trim().min(2).max(500),
   subject: z.string().trim().max(50).default("General learning"),
   level: z.string().trim().max(50).default("General"),
   scores: learningScoresSchema,
@@ -109,6 +176,8 @@ export const tutorRequestSchema = z.object({
   learnerConfidence: z.number().finite().min(0).max(100).optional(),
   adaptationContext: adaptationContextSchema.optional(),
   learnerPreferences: learnerPreferencesSchema.optional(),
+  sources: z.array(tutorSourceSchema).max(MAX_SOURCE_COUNT).optional(),
+  sourceMode: z.enum(["source-only", "source-plus-background"]).optional(),
   reviewSkillId: z.string().trim().max(100).optional(),
 }).strict().superRefine((value, context) => {
   const requireText = (
@@ -165,6 +234,41 @@ export const tutorRequestSchema = z.object({
       message: "Conversation context is too large.",
     });
   }
+
+  const sourceCharacters = value.sources?.reduce(
+    (total, source) => total + source.sections.reduce(
+      (sectionTotal, section) => sectionTotal + section.content.length,
+      0,
+    ),
+    0,
+  ) ?? 0;
+  if (sourceCharacters > MAX_PROMPT_SOURCE_CHARACTERS) {
+    context.addIssue({
+      code: "custom",
+      path: ["sources"],
+      message: "The extracted source context is too large.",
+    });
+  }
+
+  const imageCharacters = value.sources?.reduce(
+    (total, source) => total + (source.imageDataUrl?.length ?? 0),
+    0,
+  ) ?? 0;
+  if (imageCharacters > MAX_TOTAL_IMAGE_DATA_URL_CHARACTERS) {
+    context.addIssue({
+      code: "custom",
+      path: ["sources"],
+      message: "The attached images are too large.",
+    });
+  }
+
+  if (value.sources?.length && !value.sourceMode) {
+    context.addIssue({
+      code: "custom",
+      path: ["sourceMode"],
+      message: "Choose how Ada may use attached sources.",
+    });
+  }
 });
 
 const compactString = z.string().trim().min(1).max(4_000);
@@ -183,6 +287,7 @@ export const tutorLessonSchema = z.object({
   keyPoints: z.array(shortString).min(1).max(6),
   checkQuestion: shortString,
   stylesUsed: z.array(learningDimensionSchema).min(1).max(5),
+  sourceGrounding: sourceGroundingSchema.optional(),
 }).strict();
 
 export const tutorFollowUpSchema = z.object({
@@ -192,6 +297,7 @@ export const tutorFollowUpSchema = z.object({
   analogy: compactString.optional(),
   checkQuestion: shortString.optional(),
   stylesUsed: z.array(learningDimensionSchema).min(1).max(5),
+  sourceGrounding: sourceGroundingSchema.optional(),
 }).strict();
 
 const aiConfidenceSchema = z.enum([

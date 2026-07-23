@@ -461,6 +461,36 @@ body {
   text-decoration: none;
 }
 
+.am-icon-button {
+  display: inline-flex;
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 2.75rem;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  color: var(--am-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--am-duration-quick) var(--am-ease-out),
+    border-color var(--am-duration-quick) var(--am-ease-out),
+    color var(--am-duration-quick) var(--am-ease-out);
+}
+
+.am-icon-button:hover {
+  border-color: var(--am-border-light);
+  background: var(--am-primary-ghost);
+  color: var(--am-primary);
+}
+
+.am-icon-button:disabled,
+.am-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  transform: none;
+}
+
 .am-btn-primary {
   background: var(--am-primary);
   color: white;

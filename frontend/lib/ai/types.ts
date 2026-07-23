@@ -1,4 +1,10 @@
 import type { LearningDimension, LearningScores } from "@/lib/learning-dna";
+import type {
+  LessonSourceGrounding,
+  SourceGroundingMode,
+  TutorSource,
+  TutorSourceAttribution,
+} from "@/lib/sources";
 
 // ──────────────────────────────────────
 // Core actions
@@ -182,6 +188,7 @@ export interface TutorLesson {
   keyPoints: string[];
   checkQuestion: string;
   stylesUsed: LearningDimension[];
+  sourceGrounding?: LessonSourceGrounding;
 }
 
 export interface TutorApiResponse {
@@ -190,6 +197,8 @@ export interface TutorApiResponse {
   teachingMode: TeachingMode;
   action: Exclude<TutorAction, "followup" | "evaluate" | "explain-back" | "retrieval-check" | "hint" | "review">;
   requestId?: string;
+  sources?: TutorSourceAttribution[];
+  sourceMode?: SourceGroundingMode;
 }
 
 export interface TutorFollowUpResponse {
@@ -199,6 +208,7 @@ export interface TutorFollowUpResponse {
   analogy?: string;
   checkQuestion?: string;
   stylesUsed: LearningDimension[];
+  sourceGrounding?: LessonSourceGrounding;
 }
 
 export interface TutorFollowUpApiResponse {
@@ -207,6 +217,8 @@ export interface TutorFollowUpApiResponse {
   teachingMode: TeachingMode;
   action: "followup";
   requestId?: string;
+  sources?: TutorSourceAttribution[];
+  sourceMode?: SourceGroundingMode;
 }
 
 export interface TutorConversationTurn {
@@ -315,6 +327,8 @@ export interface TutorRequest {
   learnerConfidence?: number;
   adaptationContext?: AdaAdaptationContext;
   learnerPreferences?: AdaLearnerPreferences;
+  sources?: TutorSource[];
+  sourceMode?: SourceGroundingMode;
   /** For review */
   reviewSkillId?: string;
 }

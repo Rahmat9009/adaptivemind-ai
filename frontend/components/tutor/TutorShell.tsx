@@ -84,6 +84,10 @@ import {
 } from "@/lib/explanation-history";
 import { loadPreferenceOverrides } from "@/lib/preference-overrides";
 import { saveCalibrationRecord } from "@/lib/confidence-calibration";
+import type {
+  SourceGroundingMode,
+  TutorSource,
+} from "@/lib/sources";
 
 const profileStorageKey = "adaptivemind-learning-dna";
 const lessonStorageKey = "adaptivemind-current-lesson";
@@ -400,6 +404,10 @@ export function TutorShell() {
   const [peerAgentMessages, setPeerAgentMessages] = useState<PeerAgentMessage[]>([]);
   const [isPeerLoading, setIsPeerLoading] = useState(false);
   const [peerError, setPeerError] = useState<string | null>(null);
+  const [activeSources, setActiveSources] = useState<TutorSource[]>([]);
+  const [activeSourceMode, setActiveSourceMode] =
+    useState<SourceGroundingMode | undefined>(undefined);
+  const [composerSessionId, setComposerSessionId] = useState(0);
   const latestTurnRef = useRef<HTMLDivElement>(null);
   const activeRequestsRef = useRef(new Set<AbortController>());
   const lessonRequestPendingRef = useRef(false);
@@ -536,7 +544,7 @@ export function TutorShell() {
           const suggestedTopic = params.get("topic");
           const suggestedSubject = params.get("subject");
           const suggestedLevel = params.get("level");
-          if (suggestedTopic) setTopic(suggestedTopic.slice(0, 160));
+          if (suggestedTopic) setTopic(suggestedTopic.slice(0, 500));
           if (suggestedSubject) setSubject(suggestedSubject.slice(0, 50));
           if (suggestedLevel) setLevel(suggestedLevel.slice(0, 50));
         }
@@ -573,6 +581,8 @@ export function TutorShell() {
 
   async function requestLesson(
     action: Exclude<TutorAction, "followup" | "evaluate">,
+    submittedSources: TutorSource[] = activeSources,
+    submittedSourceMode: SourceGroundingMode | undefined = activeSourceMode,
   ) {
     if (!profile || !topic.trim() || lessonRequestPendingRef.current) return;
     lessonRequestPendingRef.current = true;
@@ -597,6 +607,10 @@ export function TutorShell() {
             0,
             360,
           ),
+          sources: submittedSources.length ? submittedSources : undefined,
+          sourceMode: submittedSources.length
+            ? submittedSourceMode
+            : undefined,
       });
       if (!isTutorResponse(payload))
         throw new Error(
@@ -617,6 +631,10 @@ export function TutorShell() {
       setHasAttempted(false);
       setChallengeStartedAt(payload.lesson.challenge ? Date.now() : null);
       setTimeBeforeFirstAttempt(null);
+      setActiveSources(submittedSources);
+      setActiveSourceMode(
+        submittedSources.length ? submittedSourceMode : undefined,
+      );
       clearConversation();
       const historyEntry = addLessonToHistory({
         topic: topic.trim(),
@@ -673,6 +691,8 @@ export function TutorShell() {
             stylesUsed: response.lesson.stylesUsed,
           },
           conversation: recentConversation,
+          sources: activeSources.length ? activeSources : undefined,
+          sourceMode: activeSources.length ? activeSourceMode : undefined,
       });
       if (!isFollowUpApiResponse(payload))
         throw new Error(
@@ -907,6 +927,9 @@ export function TutorShell() {
     setQuickRecallResult(null);
     setQuickRecallError(null);
     setIsQuickRecallLoading(false);
+    setActiveSources([]);
+    setActiveSourceMode(undefined);
+    setComposerSessionId((current) => current + 1);
     clearConversation();
     localStorage.removeItem(lessonStorageKey);
   }
@@ -1319,6 +1342,7 @@ export function TutorShell() {
             isBalanced={profile.isBalanced}
           />
           <TopicForm
+            key={composerSessionId}
             topic={topic}
             subject={subject}
             level={level}
@@ -1329,7 +1353,9 @@ export function TutorShell() {
             onSubjectChange={setSubject}
             onLevelChange={setLevel}
             onTeachingModeChange={handleTeachingModeChange}
-            onSubmit={() => requestLesson("initial")}
+            onSubmit={(sources, sourceMode) =>
+              requestLesson("initial", sources, sourceMode)
+            }
           />
 
           {/* Reading Preferences toggle */}
@@ -1555,6 +1581,7 @@ export function TutorShell() {
                 <LessonFollowUp
                   lesson={response.lesson}
                   conversation={conversation}
+                  sources={response.sources}
                   isLoading={isFollowUpLoading}
                   error={followUpError}
                   onAsk={requestFollowUp}

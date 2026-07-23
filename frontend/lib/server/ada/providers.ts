@@ -148,6 +148,7 @@ async function fetchCompletion(
   prompt: string,
   temperature: number,
   signal?: AbortSignal,
+  imageDataUrls: string[] = [],
 ): Promise<string> {
   let lastError: AdaError | null = null;
 
@@ -173,7 +174,18 @@ async function fetchCompletion(
                 { role: "system", content: prompt },
                 {
                   role: "user",
-                  content: "Complete the requested Ada action and return only the required JSON object.",
+                  content: imageDataUrls.length
+                    ? [
+                        {
+                          type: "text",
+                          text: "Complete the requested Ada action using the attached educational images where relevant, and return only the required JSON object.",
+                        },
+                        ...imageDataUrls.map((url) => ({
+                          type: "image_url",
+                          image_url: { url },
+                        })),
+                      ]
+                    : "Complete the requested Ada action and return only the required JSON object.",
                 },
               ],
               response_format: { type: "json_object" },
@@ -281,8 +293,15 @@ async function generateStructured<T>(
   schema: z.ZodType<T>,
   temperature: number,
   signal?: AbortSignal,
+  imageDataUrls: string[] = [],
 ): Promise<T> {
-  const content = await fetchCompletion(provider, prompt, temperature, signal);
+  const content = await fetchCompletion(
+    provider,
+    prompt,
+    temperature,
+    signal,
+    imageDataUrls,
+  );
   const parsed = parseProviderJson(content, schema);
   if (parsed) return parsed;
 
@@ -294,6 +313,7 @@ Your previous response did not match the required JSON schema. Return only one v
     repairPrompt,
     Math.min(temperature, 0.2),
     signal,
+    imageDataUrls,
   );
   const repaired = parseProviderJson(repairedContent, schema);
   if (repaired) return repaired;
@@ -304,6 +324,61 @@ Your previous response did not match the required JSON schema. Return only one v
     status: 502,
     retryable: true,
   });
+}
+
+function sourceImages(request: TutorRequest): string[] {
+  return request.sources?.flatMap((source) =>
+    source.imageDataUrl ? [source.imageDataUrl] : [],
+  ) ?? [];
+}
+
+function validateSourceGrounding<
+  T extends TutorLesson | TutorFollowUpResponse,
+>(response: T, request: TutorRequest): T {
+  const sources = request.sources ?? [];
+  if (!sources.length) return response;
+  if (!response.sourceGrounding) {
+    throw new AdaError({
+      code: "PROVIDER_RESPONSE_INVALID",
+      message: "Ada's response did not identify how it used the attached source.",
+      status: 502,
+      retryable: true,
+    });
+  }
+
+  const allowed = new Map(
+    sources.map((source) => [
+      source.id,
+      new Set([
+        ...source.sections.map((section) => section.label),
+        ...(source.url ? [source.url] : []),
+      ]),
+    ]),
+  );
+  const hasInvalidStatement = response.sourceGrounding.statements.some(
+    (statement) => {
+      const references = allowed.get(statement.sourceId);
+      return !references
+        || !statement.reference
+        || !references.has(statement.reference);
+    },
+  );
+  if (
+    hasInvalidStatement
+    || (
+      request.sourceMode === "source-only"
+      && response.sourceGrounding.outsideKnowledgeUsed
+    )
+  ) {
+    throw new AdaError({
+      code: "PROVIDER_RESPONSE_INVALID",
+      message: "Ada's source citations did not match the attached material.",
+      status: 502,
+      retryable: true,
+    });
+  }
+
+  return response;
 }
 
 export async function generateProviderLesson(
@@ -323,7 +398,15 @@ export async function generateProviderLesson(
     ...request,
     action: request.action as "initial" | "simpler" | "different" | "example" | "challenge",
   });
-  return generateStructured(provider, prompt, tutorLessonSchema, 0.6, signal);
+  const lesson = await generateStructured(
+    provider,
+    prompt,
+    tutorLessonSchema,
+    0.6,
+    signal,
+    sourceImages(request),
+  );
+  return validateSourceGrounding(lesson, request);
 }
 
 export async function generateProviderFollowUp(
@@ -331,13 +414,15 @@ export async function generateProviderFollowUp(
   request: TutorRequest,
   signal?: AbortSignal,
 ): Promise<TutorFollowUpResponse> {
-  return generateStructured(
+  const followUp = await generateStructured(
     provider,
     buildFollowUpSystemPrompt(request),
     tutorFollowUpSchema,
     0.5,
     signal,
+    sourceImages(request),
   );
+  return validateSourceGrounding(followUp, request);
 }
 
 export async function generateProviderEvaluation(

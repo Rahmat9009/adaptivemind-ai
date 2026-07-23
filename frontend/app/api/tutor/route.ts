@@ -7,6 +7,7 @@ import {
   getSafeAdaError,
   MAX_TUTOR_REQUEST_BYTES,
 } from "@/lib/server/ada/safety";
+import { sourceAttribution } from "@/lib/sources";
 
 export const runtime = "nodejs";
 
@@ -81,7 +82,14 @@ export async function POST(request: Request) {
       () => orchestrateAda(parsed.data, request.signal),
     );
     return NextResponse.json(
-      { ...result, requestId },
+      {
+        ...result,
+        requestId,
+        sources: parsed.data.sources?.map(sourceAttribution),
+        sourceMode: parsed.data.sources?.length
+          ? parsed.data.sourceMode
+          : undefined,
+      },
       { headers: responseHeaders(requestId) },
     );
   } catch (error) {

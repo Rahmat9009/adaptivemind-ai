@@ -20,6 +20,8 @@ function lessonMatchesAction(
 export function createLocalFallback(
   request: TutorRequest,
 ): AdaOrchestrationResult | null {
+  if (request.sources?.length) return null;
+
   const base = {
     source: "local-fallback" as const,
     teachingMode: request.teachingMode,

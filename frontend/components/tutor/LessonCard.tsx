@@ -1,9 +1,15 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { motion } from "motion/react";
 import { fadeIn, slideUp } from "@/lib/motion";
 import { learningDimensionLabels, type LearningDimension } from "@/lib/learning-dna";
 import type { TutorApiResponse } from "@/lib/ai/types";
+
+const SpeechPlayer = dynamic(
+  () => import("./SpeechPlayer").then((module) => module.SpeechPlayer),
+  { ssr: false },
+);
 
 interface LessonCardProps {
   response: TutorApiResponse;
@@ -19,6 +25,9 @@ const dnaColors: Record<LearningDimension, string> = {
 
 export function LessonCard({ response }: LessonCardProps) {
   const { lesson, source, action } = response;
+  const sourceById = new Map(
+    (response.sources ?? []).map((item) => [item.id, item]),
+  );
 
   const actionLabel = {
     initial: "Personalized lesson",
@@ -83,6 +92,79 @@ export function LessonCard({ response }: LessonCardProps) {
           {lesson.clarificationQuestion}
         </motion.p>
       )}
+
+      {response.sources?.length ? (
+        <motion.section
+          variants={slideUp}
+          className="mt-6 border-y border-[var(--am-border-light)] py-4"
+          aria-labelledby="lesson-sources-title"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 id="lesson-sources-title" className="am-label text-[var(--am-text-muted)]">
+              Sources used
+            </h3>
+            <span className="text-xs font-medium text-[var(--am-text-secondary)]">
+              {response.sourceMode === "source-only"
+                ? "Source only"
+                : "Source + background knowledge"}
+            </span>
+          </div>
+          <ul className="mt-2 space-y-1 text-sm text-[var(--am-text-secondary)]">
+            {response.sources.map((item) => (
+              <li key={item.id} className="flex flex-wrap gap-x-2">
+                <span className="font-medium text-[var(--am-text-primary)]">
+                  {item.title}
+                </span>
+                <span>
+                  {item.type.toUpperCase()}
+                  {item.domain ? ` · ${item.domain}` : ""}
+                </span>
+                {item.url && (
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-[var(--am-primary)] underline underline-offset-2"
+                  >
+                    Original page
+                  </a>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          {lesson.sourceGrounding?.statements.length ? (
+            <div className="mt-3">
+              <p className="text-xs font-semibold text-[var(--am-text-secondary)]">
+                Source-supported statements
+              </p>
+              <ul className="mt-1 space-y-2">
+                {lesson.sourceGrounding.statements.map((statement, index) => {
+                  const attribution = sourceById.get(statement.sourceId);
+                  return (
+                    <li
+                      key={`${statement.sourceId}-${statement.reference ?? index}`}
+                      className="text-xs leading-5 text-[var(--am-text-secondary)]"
+                    >
+                      {statement.statement}{" "}
+                      <span className="font-semibold text-[var(--am-text-primary)]">
+                        [{attribution?.title ?? "Attached source"}
+                        {statement.reference ? `, ${statement.reference}` : ""}]
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ) : null}
+
+          <p className="mt-3 text-xs leading-5 text-[var(--am-text-muted)]">
+            {lesson.sourceGrounding?.outsideKnowledgeUsed
+              ? "Ada also used background knowledge and marked source-supported statements separately."
+              : "Ada did not report adding outside knowledge to this response."}
+          </p>
+        </motion.section>
+      ) : null}
 
       {/* Core Idea */}
       <motion.section variants={slideUp} className="mt-7">
@@ -202,6 +284,18 @@ export function LessonCard({ response }: LessonCardProps) {
           </p>
         </motion.section>
       )}
+
+      <SpeechPlayer
+        key={response.requestId ?? lesson.title}
+        text={[
+          lesson.title,
+          lesson.coreIdea,
+          lesson.explanation,
+          lesson.example,
+          lesson.analogy,
+          ...lesson.keyPoints,
+        ].filter(Boolean).join(". ")}
+      />
     </motion.article>
   );
 }

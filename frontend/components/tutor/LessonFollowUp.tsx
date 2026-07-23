@@ -8,6 +8,7 @@ import type {
   TutorConversationTurn,
   TutorLesson,
 } from "@/lib/ai/types";
+import type { TutorSourceAttribution } from "@/lib/sources";
 
 interface LessonFollowUpProps {
   lesson: TutorLesson;
@@ -16,6 +17,7 @@ interface LessonFollowUpProps {
   error: string | null;
   onAsk: (question: string) => Promise<boolean>;
   latestTurnRef: RefObject<HTMLDivElement | null>;
+  sources?: TutorSourceAttribution[];
 }
 
 function getSuggestions(lesson: TutorLesson): string[] {
@@ -35,9 +37,11 @@ export function LessonFollowUp({
   error,
   onAsk,
   latestTurnRef,
+  sources = [],
 }: LessonFollowUpProps) {
   const [question, setQuestion] = useState("");
   const suggestions = getSuggestions(lesson);
+  const sourceById = new Map(sources.map((source) => [source.id, source]));
 
   async function submitQuestion(value = question) {
     const trimmed = value.trim();
@@ -117,6 +121,27 @@ export function LessonFollowUp({
                     Check: {turn.response.checkQuestion}
                   </p>
                 )}
+                {turn.response.sourceGrounding?.statements.length ? (
+                  <ul className="mt-3 space-y-1 border-t border-[var(--am-border-light)] pt-3">
+                    {turn.response.sourceGrounding.statements.map(
+                      (statement, index) => (
+                        <li
+                          key={`${statement.sourceId}-${statement.reference ?? index}`}
+                          className="text-xs leading-5 text-[var(--am-text-muted)]"
+                        >
+                          {statement.statement}{" "}
+                          <span className="font-semibold text-[var(--am-text-secondary)]">
+                            [{sourceById.get(statement.sourceId)?.title
+                              ?? "Attached source"}
+                            {statement.reference
+                              ? `, ${statement.reference}`
+                              : ""}]
+                          </span>
+                        </li>
+                      ),
+                    )}
+                  </ul>
+                ) : null}
               </div>
             </motion.div>
           ))}
