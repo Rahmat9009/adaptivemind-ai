@@ -58,9 +58,9 @@ export function LessonCard({ response }: LessonCardProps) {
               {learningDimensionLabels[style]}
             </span>
           ))}
-          {source === "demo" && (
+          {(source === "local-fallback" || source === "demo") && (
             <span className="rounded-full border border-[var(--am-border-light)] bg-[var(--am-bg-reading)] px-2.5 py-1 text-[10px] font-semibold text-[var(--am-text-muted)]">
-              Demo
+              Local fallback
             </span>
           )}
         </div>
@@ -74,6 +74,15 @@ export function LessonCard({ response }: LessonCardProps) {
       >
         {lesson.title}
       </motion.h2>
+
+      {lesson.clarificationQuestion && (
+        <motion.p
+          variants={slideUp}
+          className="mt-4 rounded-[var(--am-radius-lg)] border border-[var(--am-primary)]/25 bg-[var(--am-primary-light)] px-4 py-3 text-sm font-medium leading-6 text-[var(--am-text-primary)]"
+        >
+          {lesson.clarificationQuestion}
+        </motion.p>
+      )}
 
       {/* Core Idea */}
       <motion.section variants={slideUp} className="mt-7">

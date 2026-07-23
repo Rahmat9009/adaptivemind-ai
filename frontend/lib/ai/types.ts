@@ -25,6 +25,13 @@ export type TeachingMode =
   | "story"
   | "challenge";
 
+export type TutorResponseSource =
+  | "live-primary"
+  | "live-fallback"
+  | "local-fallback"
+  | "provider"
+  | "demo";
+
 // ──────────────────────────────────────
 // AI Uncertainty
 // ──────────────────────────────────────
@@ -142,9 +149,10 @@ export interface UnderstandingEvaluation {
 
 export interface UnderstandingEvaluationApiResponse {
   evaluation: UnderstandingEvaluation;
-  source: "provider" | "demo";
+  source: TutorResponseSource;
   teachingMode: TeachingMode;
   action: "evaluate";
+  requestId?: string;
 }
 
 export interface TutorLessonSummary {
@@ -165,6 +173,7 @@ export interface TutorLesson {
   title: string;
   coreIdea: string;
   explanation: string;
+  clarificationQuestion?: string;
   example?: string;
   analogy?: string;
   challenge?: string;
@@ -177,9 +186,10 @@ export interface TutorLesson {
 
 export interface TutorApiResponse {
   lesson: TutorLesson;
-  source: "provider" | "demo";
+  source: TutorResponseSource;
   teachingMode: TeachingMode;
   action: Exclude<TutorAction, "followup" | "evaluate" | "explain-back" | "retrieval-check" | "hint" | "review">;
+  requestId?: string;
 }
 
 export interface TutorFollowUpResponse {
@@ -193,9 +203,10 @@ export interface TutorFollowUpResponse {
 
 export interface TutorFollowUpApiResponse {
   followUp: TutorFollowUpResponse;
-  source: "provider" | "demo";
+  source: TutorResponseSource;
   teachingMode: TeachingMode;
   action: "followup";
+  requestId?: string;
 }
 
 export interface TutorConversationTurn {
@@ -231,9 +242,10 @@ export interface ExplainBackEvaluation {
 
 export interface ExplainBackApiResponse {
   evaluation: ExplainBackEvaluation;
-  source: "provider" | "demo";
+  source: TutorResponseSource;
   teachingMode: TeachingMode;
   action: "explain-back";
+  requestId?: string;
 }
 
 // ──────────────────────────────────────
@@ -261,6 +273,7 @@ export interface HintResponse {
 // ──────────────────────────────────────
 
 export interface TutorRequest {
+  requestId?: string;
   topic: string;
   subject: string;
   level: string;
@@ -282,6 +295,7 @@ export interface TutorRequest {
   learnerResponse?: string;
   /** For hint generation */
   currentHintLevel?: number;
+  challengeContext?: string;
   /** For review */
   reviewSkillId?: string;
 }

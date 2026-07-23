@@ -61,7 +61,7 @@ class MockIDBDatabase {
   private store = new MockIDBObjectStore();
   objectStoreNames = { contains: () => true };
 
-  transaction(storeNames: string, mode: string) {
+  transaction(_storeNames: string, _mode: string) {
     return new MockIDBTransaction(this.store);
   }
 

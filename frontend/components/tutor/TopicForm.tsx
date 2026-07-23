@@ -26,9 +26,9 @@ interface TopicFormProps {
 }
 
 const suggestions = [
-  "Photosynthesis",
-  "Newton's First Law",
-  "The Pythagorean theorem",
+  "Derivatives",
+  "How mitochondria produce ATP",
+  "Causes of the French Revolution",
 ];
 
 const teachingModes: Array<{
@@ -127,8 +127,12 @@ export function TopicForm({
           >
             <option>Science</option>
             <option>Mathematics</option>
+            <option>Computer science</option>
+            <option>Economics</option>
             <option>History</option>
+            <option>Geography</option>
             <option>Literature</option>
+            <option>Language learning</option>
             <option>General learning</option>
           </select>
         </label>
@@ -143,6 +147,8 @@ export function TopicForm({
             <option>University</option>
             <option>Independent learner</option>
             <option>Beginner</option>
+            <option>Intermediate</option>
+            <option>Advanced</option>
           </select>
         </label>
       </motion.div>

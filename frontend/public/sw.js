@@ -1,10 +1,14 @@
-/* AdaptiveMind Service Worker — Application-Shell Caching */
-const CACHE_NAME = "adaptivemind-shell-v1";
-const PRECACHE_URLS = ["/", "/dashboard", "/tutor", "/planner", "/assessment"];
+/* AdaptiveMind service worker: network-first pages, immutable static assets. */
+const CACHE_VERSION = "v2";
+const STATIC_CACHE = `adaptivemind-static-${CACHE_VERSION}`;
+const OFFLINE_CACHE = `adaptivemind-offline-${CACHE_VERSION}`;
+const CACHE_PREFIX = "adaptivemind-";
+const OFFLINE_URL = "/offline.html";
+const PRECACHE_URLS = [OFFLINE_URL, "/manifest.json"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
+    caches.open(OFFLINE_CACHE).then((cache) => cache.addAll(PRECACHE_URLS)),
   );
   self.skipWaiting();
 });
@@ -13,41 +17,56 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
-      )
-    )
+        keys
+          .filter((key) => key.startsWith(CACHE_PREFIX))
+          .filter((key) => key !== STATIC_CACHE && key !== OFFLINE_CACHE)
+          .map((key) => caches.delete(key)),
+      ),
+    ),
   );
   self.clients.claim();
 });
 
+function isCacheableStaticAsset(url) {
+  return url.origin === self.location.origin
+    && (
+      url.pathname.startsWith("/_next/static/")
+      || /\.(?:css|js|woff2?|png|jpg|jpeg|webp|svg|ico)$/i.test(url.pathname)
+    );
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
+  const url = new URL(request.url);
 
-  // Never cache API requests, mutations, or secret-bearing URLs
   if (
-    request.method !== "GET" ||
-    request.url.includes("/api/") ||
-    request.url.includes("supabase") ||
-    request.url.includes("anthropic") ||
-    request.url.includes("openai") ||
-    request.url.includes(".env")
+    request.method !== "GET"
+    || url.origin !== self.location.origin
+    || url.pathname.startsWith("/api/")
   ) {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      const fetched = fetch(request)
-        .then((response) => {
-          if (response && response.status === 200 && response.type === "basic") {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          }
-          return response;
-        })
-        .catch(() => cached);
+  if (request.mode === "navigate") {
+    event.respondWith(
+      fetch(request).catch(async () => {
+        const fallback = await caches.match(OFFLINE_URL);
+        return fallback ?? Response.error();
+      }),
+    );
+    return;
+  }
 
-      return cached || fetched;
-    })
+  if (!isCacheableStaticAsset(url)) return;
+  event.respondWith(
+    caches.match(request).then(async (cached) => {
+      if (cached) return cached;
+      const response = await fetch(request);
+      if (response.ok && response.type === "basic") {
+        const cache = await caches.open(STATIC_CACHE);
+        await cache.put(request, response.clone());
+      }
+      return response;
+    }),
   );
 });

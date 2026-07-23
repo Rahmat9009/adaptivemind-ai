@@ -11,6 +11,7 @@ import type {
   TutorFollowUpApiResponse,
   TutorFollowUpResponse,
   TutorLesson,
+  TutorResponseSource,
   UnderstandingEvaluation,
   UnderstandingEvaluationApiResponse,
   ExplainBackApiResponse,
@@ -152,6 +153,16 @@ function isTeachingMode(value: unknown): value is TeachingMode {
   );
 }
 
+function isTutorResponseSource(value: unknown): value is TutorResponseSource {
+  return (
+    value === "live-primary" ||
+    value === "live-fallback" ||
+    value === "local-fallback" ||
+    value === "provider" ||
+    value === "demo"
+  );
+}
+
 function isLessonAction(
   value: unknown,
 ): value is Exclude<TutorAction, "followup" | "evaluate"> {
@@ -169,7 +180,7 @@ function isTutorResponse(value: unknown): value is TutorApiResponse {
   const record = value as Record<string, unknown>;
   return (
     isTutorLesson(record.lesson) &&
-    (record.source === "provider" || record.source === "demo") &&
+    isTutorResponseSource(record.source) &&
     isTeachingMode(record.teachingMode) &&
     isLessonAction(record.action)
   );
@@ -194,7 +205,7 @@ function isFollowUpApiResponse(
   const record = value as Record<string, unknown>;
   return (
     isFollowUpResponse(record.followUp) &&
-    (record.source === "provider" || record.source === "demo") &&
+    isTutorResponseSource(record.source) &&
     isTeachingMode(record.teachingMode) &&
     record.action === "followup"
   );
@@ -208,7 +219,7 @@ function isEvaluationApiResponse(
   const evaluation = record.evaluation as Record<string, unknown> | undefined;
   return (
     record.action === "evaluate" &&
-    (record.source === "provider" || record.source === "demo") &&
+    isTutorResponseSource(record.source) &&
     typeof evaluation === "object" &&
     evaluation !== null &&
     (evaluation.status === "correct" ||
@@ -229,7 +240,7 @@ function isExplainBackApiResponse(
   const evaluation = record.evaluation as Record<string, unknown> | undefined;
   return (
     record.action === "explain-back" &&
-    (record.source === "provider" || record.source === "demo") &&
+    isTutorResponseSource(record.source) &&
     typeof evaluation === "object" &&
     evaluation !== null &&
     typeof evaluation.isComplete === "boolean" &&
@@ -344,9 +355,8 @@ export function TutorShell() {
   const [evaluation, setEvaluation] = useState<UnderstandingEvaluation | null>(
     null,
   );
-  const [evaluationSource, setEvaluationSource] = useState<
-    "provider" | "demo"
-  >("provider");
+  const [evaluationSource, setEvaluationSource] =
+    useState<TutorResponseSource>("live-primary");
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
   const [explainBackFeedback, setExplainBackFeedback] = useState<ExplainBackFeedback | null>(null);
@@ -369,6 +379,38 @@ export function TutorShell() {
   const [isPeerLoading, setIsPeerLoading] = useState(false);
   const [peerError, setPeerError] = useState<string | null>(null);
   const latestTurnRef = useRef<HTMLDivElement>(null);
+  const activeRequestsRef = useRef(new Set<AbortController>());
+  const lessonRequestPendingRef = useRef(false);
+
+  async function postTutorRequest(
+    body: Omit<Record<string, unknown>, "requestId">,
+  ): Promise<unknown> {
+    const controller = new AbortController();
+    const requestId = crypto.randomUUID();
+    activeRequestsRef.current.add(controller);
+    const timeoutId = window.setTimeout(() => controller.abort(), 35_000);
+
+    try {
+      const apiResponse = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...body, requestId }),
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      const payload: unknown = await apiResponse.json().catch(() => null);
+      if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
+      return payload;
+    } catch (requestError) {
+      if (requestError instanceof DOMException && requestError.name === "AbortError") {
+        throw new Error("Ada took too long to respond. Your previous lesson is still available.");
+      }
+      throw requestError;
+    } finally {
+      window.clearTimeout(timeoutId);
+      activeRequestsRef.current.delete(controller);
+    }
+  }
 
   function clearConversation() {
     setConversation([]);
@@ -461,6 +503,11 @@ export function TutorShell() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => () => {
+    for (const controller of activeRequestsRef.current) controller.abort();
+    activeRequestsRef.current.clear();
+  }, []);
+
   useEffect(() => {
     if (conversation.length)
       latestTurnRef.current?.scrollIntoView({
@@ -472,7 +519,8 @@ export function TutorShell() {
   async function requestLesson(
     action: Exclude<TutorAction, "followup" | "evaluate">,
   ) {
-    if (!profile || !topic.trim()) return;
+    if (!profile || !topic.trim() || lessonRequestPendingRef.current) return;
+    lessonRequestPendingRef.current = true;
     setIsLoading(true);
     setError(null);
     try {
@@ -480,10 +528,7 @@ export function TutorShell() {
       const evaluationContext = evaluation
         ? ` Latest understanding check: ${evaluation.status}; focus: ${evaluation.needsReview.join(", ")}.`
         : "";
-      const apiResponse = await fetch("/api/tutor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = await postTutorRequest({
           topic: topic.trim(),
           subject,
           level,
@@ -497,10 +542,7 @@ export function TutorShell() {
             0,
             360,
           ),
-        }),
       });
-      const payload: unknown = await apiResponse.json();
-      if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
       if (!isTutorResponse(payload))
         throw new Error(
           "The tutor returned an incomplete lesson. Please try again.",
@@ -533,6 +575,7 @@ export function TutorShell() {
           : "Please check your connection and try again.",
       );
     } finally {
+      lessonRequestPendingRef.current = false;
       setIsLoading(false);
     }
   }
@@ -546,10 +589,7 @@ export function TutorShell() {
       .slice(-3)
       .flatMap((turn) => [turn.student, turn.tutor]);
     try {
-      const apiResponse = await fetch("/api/tutor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = await postTutorRequest({
           topic: topic.trim(),
           subject,
           level,
@@ -564,10 +604,7 @@ export function TutorShell() {
             stylesUsed: response.lesson.stylesUsed,
           },
           conversation: recentConversation,
-        }),
       });
-      const payload: unknown = await apiResponse.json();
-      if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
       if (!isFollowUpApiResponse(payload))
         throw new Error(
           "Ada returned an incomplete follow-up. Please try again.",
@@ -604,10 +641,7 @@ export function TutorShell() {
     setIsEvaluating(true);
     setEvaluationError(null);
     try {
-      const apiResponse = await fetch("/api/tutor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = await postTutorRequest({
           topic: topic.trim(),
           subject,
           level,
@@ -618,10 +652,7 @@ export function TutorShell() {
           checkQuestion: response.lesson.checkQuestion,
           lessonCoreIdea: response.lesson.coreIdea,
           lessonContext: response.lesson.explanation.slice(0, 500),
-        }),
       });
-      const payload: unknown = await apiResponse.json();
-      if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
       if (!isEvaluationApiResponse(payload))
         throw new Error("Ada returned an incomplete understanding check.");
       setEvaluation(payload.evaluation);
@@ -741,6 +772,10 @@ export function TutorShell() {
   }
 
   function startNewLesson() {
+    for (const controller of activeRequestsRef.current) controller.abort();
+    activeRequestsRef.current.clear();
+    lessonRequestPendingRef.current = false;
+    setIsLoading(false);
     setResponse(null);
     setError(null);
     setTopic("");
@@ -763,10 +798,7 @@ export function TutorShell() {
     setIsExplainBackLoading(true);
     setExplainBackError(null);
     try {
-      const apiResponse = await fetch("/api/tutor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = await postTutorRequest({
           topic: topic.trim(),
           subject,
           level,
@@ -775,10 +807,7 @@ export function TutorShell() {
           teachingMode,
           learnerResponse,
           lessonContext: response.lesson.explanation.slice(0, 500),
-        }),
       });
-      const payload: unknown = await apiResponse.json();
-      if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
       if (!isExplainBackApiResponse(payload))
         throw new Error("Ada could not evaluate this explanation.");
       const evalResult = payload.evaluation;
@@ -815,10 +844,7 @@ export function TutorShell() {
     if (!profile || !response || !topic.trim()) return;
     setIsHintLoading(true);
     try {
-      const apiResponse = await fetch("/api/tutor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = await postTutorRequest({
           topic: topic.trim(),
           subject,
           level,
@@ -828,10 +854,7 @@ export function TutorShell() {
           currentHintLevel: level ?? hintLevel,
           lessonContext: response.lesson.explanation.slice(0, 500),
           challengeContext: response.lesson.challenge,
-        }),
       });
-      const payload: unknown = await apiResponse.json();
-      if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
       if (payload && typeof payload === "object" && Array.isArray((payload as Record<string, unknown>).hints)) {
         setHints((payload as { hints: [string, string, string, string] }).hints);
         setHintLevel((prev) => Math.min(prev + 1, 3) as 0 | 1 | 2 | 3 | 4);
@@ -860,10 +883,7 @@ export function TutorShell() {
     const userMsg: PeerAgentMessage = { role: "learner", content: explanation };
     setPeerAgentMessages((prev) => [...prev, userMsg]);
     try {
-      const apiResponse = await fetch("/api/tutor", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = await postTutorRequest({
           topic: topic.trim(),
           subject,
           level,
@@ -878,9 +898,7 @@ export function TutorShell() {
             stylesUsed: response.lesson.stylesUsed,
           },
           conversation: [],
-        }),
       });
-      const payload: unknown = await apiResponse.json();
       const answer = payload && typeof payload === "object" && "followUp" in payload
         ? (payload as { followUp: { answer: string } }).followUp?.answer
         : null;
@@ -1031,10 +1049,21 @@ export function TutorShell() {
           {error && <TutorErrorState message={error} />}
 
           {/* Loading */}
-          {isLoading && <TutorLoadingState />}
+          {isLoading && !response && <TutorLoadingState />}
+
+          {isLoading && response && (
+            <p
+              className="mb-3 text-sm text-[var(--am-text-muted)]"
+              role="status"
+              aria-live="polite"
+            >
+              Ada is preparing the updated explanation. Your current lesson
+              remains available.
+            </p>
+          )}
 
           {/* Lesson */}
-          {!isLoading && response && (
+          {response && (
             <>
               <LessonCard response={response} />
               <LessonActions

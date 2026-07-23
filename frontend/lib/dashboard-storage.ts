@@ -28,11 +28,19 @@ function isStyles(value: unknown): value is LearningDimension[] {
   return Array.isArray(value) && value.every((style) => typeof style === "string" && learningDimensions.includes(style as LearningDimension));
 }
 
+function isResponseSource(value: unknown): boolean {
+  return value === "live-primary"
+    || value === "live-fallback"
+    || value === "local-fallback"
+    || value === "provider"
+    || value === "demo";
+}
+
 function isLessonResponse(value: unknown): value is TutorApiResponse {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
   const lesson = record.lesson as Record<string, unknown> | undefined;
-  return typeof lesson === "object" && lesson !== null && typeof lesson.title === "string" && typeof lesson.coreIdea === "string" && typeof lesson.explanation === "string" && Array.isArray(lesson.keyPoints) && typeof lesson.checkQuestion === "string" && isStyles(lesson.stylesUsed) && (record.source === "provider" || record.source === "demo") && isTeachingMode(record.teachingMode) && ["initial", "simpler", "different", "example", "challenge"].includes(record.action as string);
+  return typeof lesson === "object" && lesson !== null && typeof lesson.title === "string" && typeof lesson.coreIdea === "string" && typeof lesson.explanation === "string" && Array.isArray(lesson.keyPoints) && typeof lesson.checkQuestion === "string" && isStyles(lesson.stylesUsed) && isResponseSource(record.source) && isTeachingMode(record.teachingMode) && ["initial", "simpler", "different", "example", "challenge"].includes(record.action as string);
 }
 
 function isHistoryEntry(value: unknown): value is LessonHistoryEntry {

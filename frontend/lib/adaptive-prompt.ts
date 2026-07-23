@@ -106,6 +106,7 @@ These are starting explanations, not fixed traits about the student's brain. Use
   "title": "string",
   "coreIdea": "string",
   "explanation": "string",
+  "clarificationQuestion": "omit unless the topic is genuinely ambiguous; otherwise ask exactly one concise question and keep the lesson provisional",
   "example": "string or omitted",
   "analogy": "string or omitted",
   "challenge": "string or omitted; required for action challenge",
@@ -176,7 +177,7 @@ Lesson excerpt: ${request.lessonContext}
 Learner answer: ${request.learnerAnswer}
 Most effective approaches so far: ${learningDimensionLabels[profile.primaryDimension]} and ${learningDimensionLabels[profile.secondaryDimension]}.
 
-Return valid JSON only: {"status":"correct|partial|misconception|uncertain","score":0,"feedback":"string","whatWasUnderstood":["string"],"needsReview":["string"],"misconception":"string optional","nextStep":"continue|clarify|simplify|example|retry","followUpQuestion":"string optional","stylesUsed":["visual"|"examples"|"analogies"|"stories"|"challenges"],"evaluationConfidence":"high|moderate|uncertain","evidenceFromAnswer":"string","confidenceInsight":"string optional"}`;
+Return valid JSON only. "score" must be an integer percentage from 0 to 100, where correct is 70-100, partial is 30-89, misconception is 0-69, and uncertain is 0-60: {"status":"correct|partial|misconception|uncertain","score":75,"feedback":"string","whatWasUnderstood":["string"],"needsReview":["string"],"misconception":"string optional","nextStep":"continue|clarify|simplify|example|retry","followUpQuestion":"string optional","stylesUsed":["visual"|"examples"|"analogies"|"stories"|"challenges"],"evaluationConfidence":"high|moderate|uncertain","evidenceFromAnswer":"string","confidenceInsight":"string optional"}`;
 }
 
 export function buildExplainBackPrompt(request: {
@@ -200,7 +201,7 @@ Most effective approaches: ${learningDimensionLabels[profile.primaryDimension]} 
 
 Evaluate the explanation for completeness and accuracy. If there is a misconception, name it gently. Suggest a follow-up question to deepen understanding.
 
-Return valid JSON only: {"isComplete":true|false,"understood":["string"],"missing":["string"],"misconception":"string optional","followUpQuestion":"string optional","score":0,"stylesUsed":["visual"|"examples"|"analogies"|"stories"|"challenges"],"aiConfidence":"high|moderate|uncertain|verification-recommended"}`;
+Return valid JSON only. "score" must be a percentage from 0 to 100; isComplete may be true only when score is at least 70: {"isComplete":true|false,"understood":["string"],"missing":["string"],"misconception":"string optional","followUpQuestion":"string optional","score":75,"stylesUsed":["visual"|"examples"|"analogies"|"stories"|"challenges"],"aiConfidence":"high|moderate|uncertain|verification-recommended"}`;
 }
 
 export function buildRetrievalCheckPrompt(request: {

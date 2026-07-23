@@ -2,7 +2,10 @@
 
 import { motion } from "motion/react";
 import { fadeIn, slideUp } from "@/lib/motion";
-import type { UnderstandingEvaluation } from "@/lib/ai/types";
+import type {
+  TutorResponseSource,
+  UnderstandingEvaluation,
+} from "@/lib/ai/types";
 
 const labels = {
   correct: "Strong understanding",
@@ -25,7 +28,7 @@ export function UnderstandingFeedback({
   onAction,
 }: {
   evaluation: UnderstandingEvaluation;
-  source: "provider" | "demo";
+  source: TutorResponseSource;
   onAction: (action: UnderstandingEvaluation["nextStep"]) => void;
 }) {
   return (
@@ -45,9 +48,9 @@ export function UnderstandingFeedback({
         </span>
       </motion.div>
 
-      {source === "demo" && (
+      {(source === "local-fallback" || source === "demo") && (
         <p className="mt-2 text-xs text-[var(--am-text-muted)]">
-          Demo evaluation uses transparent topic matching.
+          This check used Ada&apos;s limited local fallback, not live AI.
         </p>
       )}
 
