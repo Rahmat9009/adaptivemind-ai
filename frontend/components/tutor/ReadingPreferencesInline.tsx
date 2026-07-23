@@ -1,7 +1,10 @@
 "use client";
 
 import { Button } from "@/components/base/buttons/button";
-import { saveReadingSettings, type ReadingSettings } from "./ReadingPreferences";
+import {
+  saveReadingSettings,
+  type ReadingSettings,
+} from "@/lib/reading-preferences";
 
 interface ReadingPreferencesInlineProps {
   settings: ReadingSettings;
@@ -87,7 +90,7 @@ export function ReadingPreferencesInline({
       </fieldset>
 
       {/* Toggles */}
-      <label className="flex cursor-pointer items-center gap-3 text-sm text-[var(--am-text-primary)]">
+      <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-[var(--am-text-primary)]">
         <input
           type="checkbox"
           checked={settings.reducedVisualDensity}
@@ -97,7 +100,7 @@ export function ReadingPreferencesInline({
         <span>Reduced visual density</span>
       </label>
 
-      <label className="flex cursor-pointer items-center gap-3 text-sm text-[var(--am-text-primary)]">
+      <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-[var(--am-text-primary)]">
         <input
           type="checkbox"
           checked={settings.highContrast}
@@ -105,6 +108,18 @@ export function ReadingPreferencesInline({
           className="h-4 w-4 rounded border-[var(--am-border-light)] text-[var(--am-primary)] focus:ring-[var(--am-primary)]"
         />
         <span>Increased contrast</span>
+      </label>
+
+      <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-[var(--am-text-primary)]">
+        <input
+          type="checkbox"
+          checked={settings.reducedMotion}
+          onChange={(event) =>
+            update("reducedMotion", event.target.checked)
+          }
+          className="h-4 w-4 rounded border-[var(--am-border-light)] text-[var(--am-primary)] focus:ring-[var(--am-primary)]"
+        />
+        <span>Reduced motion</span>
       </label>
     </div>
   );

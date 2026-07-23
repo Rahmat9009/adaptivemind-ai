@@ -92,7 +92,7 @@ export function ResultsExperience() {
             <p className="am-label text-[var(--am-primary)]/70">
               Your Learning DNA
             </p>
-            <h1 className="am-heading-serif mt-3 text-[clamp(1.75rem,4vw,2.75rem)] text-[var(--am-text-primary)] leading-[1.08]">
+            <h1 className="am-heading-serif mt-3 text-3xl leading-[1.08] text-[var(--am-text-primary)] sm:text-4xl">
               A profile shaped around how you understand.
             </h1>
             <p className="mt-4 text-base leading-7 text-[var(--am-text-secondary)]">

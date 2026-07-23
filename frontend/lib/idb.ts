@@ -532,14 +532,12 @@ export async function addToOfflineQueue(
   return entry;
 }
 
-export async function getPendingOfflineItems(): Promise<
-  OfflineProgressItem[]
-> {
+export async function getAllOfflineItems(): Promise<OfflineProgressItem[]> {
   const raw = await getAll(STORES.offlineQueue);
   const valid: OfflineProgressItem[] = [];
   for (const value of raw) {
     if (isOfflineProgressItem(value)) {
-      if (!value.synced) valid.push(value);
+      valid.push(value);
       continue;
     }
     if (
@@ -556,6 +554,16 @@ export async function getPendingOfflineItems(): Promise<
   return valid.sort(
     (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt),
   );
+}
+
+export async function getPendingOfflineItems(): Promise<
+  OfflineProgressItem[]
+> {
+  return (await getAllOfflineItems()).filter((item) => !item.synced);
+}
+
+export async function removeOfflineItem(id: string): Promise<void> {
+  await remove(STORES.offlineQueue, id);
 }
 
 export async function markOfflineItemSynced(id: string): Promise<void> {

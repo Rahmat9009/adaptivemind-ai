@@ -263,21 +263,21 @@ body {
 .am-heading-serif {
   font-family: var(--font-editorial);
   font-weight: 400;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.12;
 }
 
 .am-heading-serif-strong {
   font-family: var(--font-editorial);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.08;
 }
 
 .am-heading-sans {
   font-family: var(--font-sans);
   font-weight: 600;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
   line-height: 1.15;
 }
 
@@ -567,7 +567,7 @@ body {
 .am-reading-container h3 {
   font-family: var(--font-editorial);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   line-height: 1.2;
   color: var(--am-text-primary);
 }
@@ -654,6 +654,80 @@ body {
     transition-duration: 0.01ms !important;
   }
   html { scroll-behavior: auto; }
+}
+
+/* ========================================
+   Learner Reading Preferences
+   ======================================== */
+
+html[data-am-text-size="large"] {
+  font-size: 112.5%;
+}
+
+html[data-am-text-size="xlarge"] {
+  font-size: 125%;
+}
+
+html[data-am-line-spacing="relaxed"] .am-preference-scope p,
+html[data-am-line-spacing="relaxed"] .am-preference-scope li {
+  line-height: 1.85;
+}
+
+html[data-am-line-spacing="wide"] .am-preference-scope p,
+html[data-am-line-spacing="wide"] .am-preference-scope li {
+  line-height: 2;
+}
+
+html[data-am-content-width="narrow"] .am-page-shell-header,
+html[data-am-content-width="narrow"] .am-page-shell-content {
+  max-width: 56rem;
+}
+
+html[data-am-content-width="wide"] .am-page-shell-header,
+html[data-am-content-width="wide"] .am-page-shell-content {
+  max-width: 80rem;
+}
+
+html[data-am-density="reduced"] .am-card,
+html[data-am-density="reduced"] .am-glass,
+html[data-am-density="reduced"] .am-glass-strong,
+html[data-am-density="reduced"] .am-glass-card {
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html[data-am-density="reduced"] .am-card:hover,
+html[data-am-density="reduced"] .am-card-interactive:hover,
+html[data-am-density="reduced"] .am-glass-card:hover {
+  box-shadow: none;
+  transform: none;
+}
+
+html[data-am-contrast="high"] {
+  --am-bg: #FFFFFF;
+  --am-warm-bg: #F3F3F3;
+  --am-text-secondary: #242424;
+  --am-text-muted: #3F3F3F;
+  --am-border: #5A5A5A;
+  --am-border-light: #929292;
+  --am-glass-border: rgba(13, 11, 11, 0.45);
+  --am-shadow-sm: none;
+  --am-shadow-md: none;
+  --am-shadow-lg: none;
+}
+
+html[data-am-reduced-motion="true"] {
+  scroll-behavior: auto;
+}
+
+html[data-am-reduced-motion="true"] *,
+html[data-am-reduced-motion="true"] *::before,
+html[data-am-reduced-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
 }
 
 /* ========================================

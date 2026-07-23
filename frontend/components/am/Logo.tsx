@@ -88,7 +88,7 @@ export function Logo({ size = 28, showTagline = false, colored = false, compact 
       {!compact && (
         <span className="flex flex-col leading-tight">
           <span
-            className="font-[var(--font-editorial)] font-bold tracking-tight"
+            className="font-[var(--font-editorial)] font-bold tracking-normal"
             style={{ fontSize: size * 0.7 }}
           >
             AdaptiveMind

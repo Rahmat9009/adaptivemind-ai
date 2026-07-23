@@ -25,7 +25,7 @@ export function QuestionCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
     >
-      <legend className="max-w-2xl text-xl font-semibold tracking-tight text-[var(--am-text-primary)] sm:text-2xl">
+      <legend className="max-w-2xl text-xl font-semibold tracking-normal text-[var(--am-text-primary)] sm:text-2xl">
         {question.prompt}
       </legend>
       <div className="mt-6 grid gap-3">

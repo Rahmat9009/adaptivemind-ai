@@ -63,7 +63,11 @@ import { UnderstandingCheck } from "./UnderstandingCheck";
 import { UnderstandingFeedback } from "./UnderstandingFeedback";
 import { ExplainBack, type ExplainBackFeedback, type ExplainBackState } from "./ExplainBack";
 import { HintLadder } from "./HintLadder";
-import { loadReadingSettings, type ReadingSettings } from "./ReadingPreferences";
+import {
+  defaultReadingSettings,
+  loadReadingSettings,
+  type ReadingSettings,
+} from "@/lib/reading-preferences";
 import { ReadingPreferencesInline } from "./ReadingPreferencesInline";
 import { ConfidenceCoaching } from "./ConfidenceCoaching";
 import { WhyThisMode } from "./WhyThisMode";
@@ -389,7 +393,11 @@ export function TutorShell() {
   const [challengeStartedAt, setChallengeStartedAt] = useState<number | null>(null);
   const [timeBeforeFirstAttempt, setTimeBeforeFirstAttempt] = useState<number | null>(null);
   const [readingSettings, setReadingSettings] = useState<ReadingSettings>(() => {
-    try { return loadReadingSettings(); } catch { return { textSize: "normal" as const, lineSpacing: "normal" as const, contentWidth: "normal" as const, reducedVisualDensity: false, highContrast: false }; }
+    try {
+      return loadReadingSettings();
+    } catch {
+      return { ...defaultReadingSettings };
+    }
   });
   const [showReadingPrefs, setShowReadingPrefs] = useState(false);
   const [hasAttempted, setHasAttempted] = useState(false);

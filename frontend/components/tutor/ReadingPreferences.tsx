@@ -1,75 +1,18 @@
 "use client";
 
-export interface ReadingSettings {
-  textSize: "normal" | "large" | "xlarge";
-  lineSpacing: "normal" | "relaxed" | "wide";
-  contentWidth: "normal" | "narrow" | "wide";
-  reducedVisualDensity: boolean;
-  highContrast: boolean;
-}
+import { Settings2 } from "lucide-react";
+import {
+  saveReadingSettings,
+  type ReadingSettings,
+} from "@/lib/reading-preferences";
 
-const STORAGE_KEY = "adaptivemind-reading-preferences";
-
-const defaults: ReadingSettings = {
-  textSize: "normal",
-  lineSpacing: "normal",
-  contentWidth: "normal",
-  reducedVisualDensity: false,
-  highContrast: false,
-};
-
-const TEXT_SIZE_MAP: Record<string, { heading: string; body: string }> = {
-  normal: { heading: "text-[clamp(1.25rem,2.5vw,1.5rem)]", body: "text-base" },
-  large: { heading: "text-[clamp(1.5rem,3vw,1.75rem)]", body: "text-lg leading-8" },
-  xlarge: { heading: "text-[clamp(1.75rem,3.5vw,2rem)]", body: "text-xl leading-9" },
-};
-
-const LINE_SPACING_MAP: Record<string, string> = {
-  normal: "leading-7",
-  relaxed: "leading-8",
-  wide: "leading-9",
-};
-
-const CONTENT_WIDTH_MAP: Record<string, string> = {
-  normal: "max-w-3xl",
-  narrow: "max-w-2xl",
-  wide: "max-w-4xl",
-};
-
-export function loadReadingSettings(): ReadingSettings {
-  try {
-    const value: unknown = JSON.parse(
-      localStorage.getItem(STORAGE_KEY) ?? "null",
-    );
-    if (typeof value === "object" && value !== null) {
-      return { ...defaults, ...(value as Partial<ReadingSettings>) };
-    }
-  } catch {
-    /* ignore */
-  }
-  return defaults;
-}
-
-export function saveReadingSettings(settings: ReadingSettings): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-}
-
-export function getTextSizeClasses(settings: ReadingSettings): {
-  headingClass: string;
-  bodyClass: string;
-} {
-  const size = TEXT_SIZE_MAP[settings.textSize] ?? TEXT_SIZE_MAP.normal;
-  const spacing =
-    LINE_SPACING_MAP[settings.lineSpacing] ?? LINE_SPACING_MAP.normal;
-  return {
-    headingClass: size.heading,
-    bodyClass: `${size.body} ${spacing}`,
-  };
-}
-
-export function getContentWidthClass(settings: ReadingSettings): string {
-  return CONTENT_WIDTH_MAP[settings.contentWidth] ?? CONTENT_WIDTH_MAP.normal;
-}
+export {
+  getContentWidthClass,
+  getTextSizeClasses,
+  loadReadingSettings,
+  saveReadingSettings,
+  type ReadingSettings,
+} from "@/lib/reading-preferences";
 
 interface ReadingPreferencesProps {
   settings: ReadingSettings;
@@ -102,10 +45,7 @@ export function ReadingPreferences({
         aria-label="Reading preferences"
         aria-expanded={isOpen}
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-        </svg>
+        <Settings2 size={14} aria-hidden="true" />
         <span>Display</span>
       </button>
 
@@ -186,7 +126,7 @@ export function ReadingPreferences({
             </fieldset>
 
             {/* Toggles */}
-            <label className="flex cursor-pointer items-center gap-3 text-sm text-[var(--am-text-primary)]">
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-[var(--am-text-primary)]">
               <input
                 type="checkbox"
                 checked={settings.reducedVisualDensity}
@@ -196,7 +136,7 @@ export function ReadingPreferences({
               <span>Reduced visual density</span>
             </label>
 
-            <label className="flex cursor-pointer items-center gap-3 text-sm text-[var(--am-text-primary)]">
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-[var(--am-text-primary)]">
               <input
                 type="checkbox"
                 checked={settings.highContrast}
@@ -204,6 +144,18 @@ export function ReadingPreferences({
                 className="h-4 w-4 rounded border-[var(--am-border-light)] text-[var(--am-primary)] focus:ring-[var(--am-primary)]"
               />
               <span>Increased contrast</span>
+            </label>
+
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm text-[var(--am-text-primary)]">
+              <input
+                type="checkbox"
+                checked={settings.reducedMotion}
+                onChange={(event) =>
+                  update("reducedMotion", event.target.checked)
+                }
+                className="h-4 w-4 rounded border-[var(--am-border-light)] text-[var(--am-primary)] focus:ring-[var(--am-primary)]"
+              />
+              <span>Reduced motion</span>
             </label>
           </div>
         </div>

@@ -29,7 +29,7 @@ export function Hero() {
   }, []);
 
   return (
-    <section className="relative isolate min-h-screen overflow-hidden bg-[var(--am-bg)] pt-24">
+    <section className="relative isolate min-h-[calc(100svh-4rem)] overflow-hidden bg-[var(--am-bg)] pt-24">
       {/* Warm earth ambient layers */}
       <div className="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
         {/* Deep warm glow from bottom */}
@@ -67,7 +67,7 @@ export function Hero() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: 0.1 }}
-              className="am-heading-serif text-[clamp(2.75rem,6.5vw,5rem)] leading-[1.05] text-[var(--am-text-primary)]"
+              className="am-heading-serif text-5xl leading-[1.05] text-[var(--am-text-primary)] sm:text-6xl lg:text-7xl"
             >
               <span className="block">Learning should</span>
               <span className="block text-[var(--am-earth-dark)]">adapt to you.</span>

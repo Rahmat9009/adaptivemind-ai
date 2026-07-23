@@ -24,7 +24,7 @@ export function DashboardHeader({
           <p className="am-label text-[var(--am-primary)]/70">
             Your learning space
           </p>
-          <h1 className="am-heading-serif mt-2 text-[clamp(1.5rem,3vw,2.25rem)] leading-[1.12]">
+          <h1 className="am-heading-serif mt-2 text-2xl leading-[1.12] sm:text-4xl">
             Your learning dashboard
           </h1>
           <p className="mt-1 text-base text-[var(--am-text-secondary)]">

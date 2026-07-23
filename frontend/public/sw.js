@@ -1,5 +1,5 @@
 /* AdaptiveMind production service worker. AI and source APIs are network-only. */
-const CACHE_VERSION = "core-2026-07-23-v1";
+const CACHE_VERSION = "core-2026-07-23-v2";
 const STATIC_CACHE = `adaptivemind-static-${CACHE_VERSION}`;
 const SHELL_CACHE = `adaptivemind-shell-${CACHE_VERSION}`;
 const CACHE_PREFIX = "adaptivemind-";
@@ -10,6 +10,7 @@ const SHELL_ROUTES = [
   "/tutor",
   "/planner",
   "/downloads",
+  "/privacy",
   "/assessment",
   "/assessment/results",
 ];

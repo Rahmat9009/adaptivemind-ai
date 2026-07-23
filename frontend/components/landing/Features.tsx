@@ -32,7 +32,7 @@ export function Features() {
           <p className="am-label text-[var(--am-primary)]/70">
             One topic, five approaches
           </p>
-          <h2 className="am-heading-serif mt-4 text-[clamp(1.75rem,3.5vw,2.75rem)] text-[var(--am-text-primary)]">
+          <h2 className="am-heading-serif mt-4 text-3xl text-[var(--am-text-primary)] sm:text-4xl">
             The same concept, explained five ways.
           </h2>
           <p className="mt-4 text-base leading-7 text-[var(--am-text-secondary)]">

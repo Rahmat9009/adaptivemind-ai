@@ -146,7 +146,6 @@ export function DashboardShell() {
   const [calibration, setCalibration] = useState<CalibrationSummary>(() =>
     classifyCalibration([]),
   );
-  const [resetConfirm, setResetConfirm] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
@@ -268,37 +267,6 @@ export function DashboardShell() {
         </motion.section>
       </PageShell>
     );
-
-  function handleExportProfile() {
-    const data = {
-      scores,
-      history: history.slice(0, 20),
-      mastery: mastery.entries.slice(0, 20),
-      dna2,
-      activities: activities.slice(0, 100),
-      explanationHistory,
-      confidenceCalibration: calibration,
-      exportedAt: new Date().toISOString(),
-    };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `adaptivemind-profile-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function handleResetData() {
-    localStorage.removeItem(profileStorageKey);
-    localStorage.removeItem("adaptivemind-learning-dna-v2");
-    localStorage.removeItem("adaptivemind-mastery");
-    localStorage.removeItem("adaptivemind-review-cards");
-    localStorage.removeItem("adaptivemind-confidence-records");
-    localStorage.removeItem("adaptivemind-current-lesson");
-    localStorage.removeItem("adaptivemind-lesson-conversation");
-    window.location.reload();
-  }
 
   const profile = buildTeachingProfile(scores);
   const momentum = getLearningMomentum(activities);
@@ -435,13 +403,7 @@ export function DashboardShell() {
 
         {/* Privacy & Data */}
         <motion.div variants={staggerItem}>
-          <PrivacySummary
-            onExport={handleExportProfile}
-            onReset={() => setResetConfirm(true)}
-            resetConfirm={resetConfirm}
-            onConfirmReset={handleResetData}
-            onCancelReset={() => setResetConfirm(false)}
-          />
+          <PrivacySummary />
         </motion.div>
       </motion.div>
     </PageShell>

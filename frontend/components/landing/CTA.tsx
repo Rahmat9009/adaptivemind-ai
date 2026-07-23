@@ -47,7 +47,7 @@ export function CTA() {
 
         <motion.h2
           variants={slideUp}
-          className="am-heading-serif mt-6 text-[clamp(2rem,4vw,3.5rem)] text-white leading-[1.08]"
+          className="am-heading-serif mt-6 text-3xl leading-[1.08] text-white sm:text-5xl"
         >
           {hasResult
             ? "Your Learning DNA is ready. Start growing."

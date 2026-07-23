@@ -428,6 +428,7 @@ describe("Local reminders and real PWA policy", () => {
       "/tutor",
       "/planner",
       "/downloads",
+      "/privacy",
     ]) {
       expect(worker).toContain(`"${route}"`);
     }

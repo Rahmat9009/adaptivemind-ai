@@ -51,7 +51,7 @@ export function HowItWorks() {
           <p className="am-label text-[var(--am-earth-accent)]/70">
             Your learning journey
           </p>
-          <h2 className="am-heading-serif mt-4 text-[clamp(1.75rem,3.5vw,2.75rem)] text-[var(--am-text-primary)]">
+          <h2 className="am-heading-serif mt-4 text-3xl text-[var(--am-text-primary)] sm:text-4xl">
             From first assessment to lasting mastery.
           </h2>
         </motion.div>

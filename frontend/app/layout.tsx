@@ -5,6 +5,7 @@ import { OnlineStatus } from "@/components/am/OnlineStatus";
 import { ServiceWorkerRegistration } from "@/components/am/ServiceWorkerRegistration";
 import { OfflineSyncManager } from "@/components/am/OfflineSyncManager";
 import { LocalReminderManager } from "@/components/am/LocalReminderManager";
+import { ReadingPreferencesProvider } from "@/components/am/ReadingPreferencesProvider";
 import { ApplicationFrame } from "@/components/layout/ApplicationFrame";
 
 export const viewport: Viewport = {
@@ -49,9 +50,11 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <MotionProvider>
-          <ApplicationFrame>{children}</ApplicationFrame>
-        </MotionProvider>
+        <ReadingPreferencesProvider>
+          <MotionProvider>
+            <ApplicationFrame>{children}</ApplicationFrame>
+          </MotionProvider>
+        </ReadingPreferencesProvider>
         <OnlineStatus />
         <ServiceWorkerRegistration />
         <OfflineSyncManager />

@@ -2,6 +2,10 @@
   "name": "frontend",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "npm@11.13.0",
+  "engines": {
+    "node": "24.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -20,7 +24,6 @@
     "clsx": "^2.1.1",
     "exceljs": "^4.4.0",
     "fast-xml-parser": "^5.10.1",
-    "file-saver": "^2.0.5",
     "input-otp": "^1.4.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
@@ -42,7 +45,6 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
-    "@types/file-saver": "^2.0.7",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

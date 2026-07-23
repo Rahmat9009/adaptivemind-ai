@@ -6,12 +6,15 @@ interface PageShellProps {
 
 export function PageShell({ children, heading, subheading }: PageShellProps) {
   return (
-    <main id="main-content" className="min-h-screen bg-[var(--am-bg)]">
+    <main
+      id="main-content"
+      className="am-preference-scope min-h-screen bg-[var(--am-bg)]"
+    >
       <div className="relative">
         {heading && (
-          <div className="relative mx-auto max-w-6xl px-5 pb-2 pt-8 sm:px-8 lg:px-10">
+          <div className="am-page-shell-header relative mx-auto max-w-6xl px-5 pb-2 pt-8 sm:px-8 lg:px-10">
             <p className="am-label mb-1 text-[var(--am-text-muted)]">
-              {subheading || "AdaptiveMind"}
+              AdaptiveMind
             </p>
             <h1 className="am-heading-serif text-3xl text-[var(--am-text-primary)] sm:text-4xl">
               {heading}
@@ -23,7 +26,7 @@ export function PageShell({ children, heading, subheading }: PageShellProps) {
             )}
           </div>
         )}
-        <div className="relative mx-auto max-w-6xl px-5 py-6 sm:px-8 lg:px-10">
+        <div className="am-page-shell-content relative mx-auto max-w-6xl px-5 py-6 sm:px-8 lg:px-10">
           {children}
         </div>
       </div>

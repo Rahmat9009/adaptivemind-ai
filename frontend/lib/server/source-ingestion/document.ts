@@ -14,6 +14,11 @@ import {
   normalizeExtractedText,
 } from "./text";
 
+const MAX_ARCHIVE_ENTRIES = 2_000;
+const MAX_ARCHIVE_EXPANDED_BYTES = 64 * 1024 * 1024;
+const MAX_ARCHIVE_ENTRY_BYTES = 12 * 1024 * 1024;
+const MAX_SLIDE_XML_BYTES = 2 * 1024 * 1024;
+
 function hasPdfMagic(data: Uint8Array): boolean {
   return new TextDecoder("ascii").decode(data.slice(0, 5)) === "%PDF-";
 }
@@ -22,6 +27,29 @@ function hasZipMagic(data: Uint8Array): boolean {
     && data[1] === 0x4b
     && [0x03, 0x05, 0x07].includes(data[2])
     && [0x04, 0x06, 0x08].includes(data[3]);
+}
+
+function validateOfficeArchive(zip: JSZip): void {
+  const entries = Object.values(zip.files);
+  if (entries.length > MAX_ARCHIVE_ENTRIES) {
+    throw new Error("This Office document contains too many archive entries.");
+  }
+  let expandedBytes = 0;
+  for (const entry of entries) {
+    if (entry.dir) continue;
+    const metadata = entry as unknown as {
+      _data?: { uncompressedSize?: number };
+    };
+    const size = metadata._data?.uncompressedSize;
+    if (!Number.isFinite(size)) continue;
+    if ((size ?? 0) > MAX_ARCHIVE_ENTRY_BYTES) {
+      throw new Error("This Office document contains an oversized entry.");
+    }
+    expandedBytes += size ?? 0;
+    if (expandedBytes > MAX_ARCHIVE_EXPANDED_BYTES) {
+      throw new Error("This Office document expands beyond the safe limit.");
+    }
+  }
 }
 
 async function parsePdf(data: Uint8Array): Promise<TutorSourceSection[]> {
@@ -58,6 +86,7 @@ async function parseDocx(data: Uint8Array): Promise<TutorSourceSection[]> {
     throw new Error("The file does not contain a valid DOCX archive.");
   }
   const zip = await JSZip.loadAsync(data);
+  validateOfficeArchive(zip);
   if (!zip.file("word/document.xml")) {
     throw new Error("The archive is not a valid DOCX document.");
   }
@@ -91,6 +120,7 @@ async function parsePptx(data: Uint8Array): Promise<TutorSourceSection[]> {
     throw new Error("The file does not contain a valid PPTX archive.");
   }
   const zip = await JSZip.loadAsync(data);
+  validateOfficeArchive(zip);
   if (!zip.file("ppt/presentation.xml")) {
     throw new Error("The archive is not a valid PPTX presentation.");
   }
@@ -110,8 +140,21 @@ async function parsePptx(data: Uint8Array): Promise<TutorSourceSection[]> {
 
   const sections: TutorSourceSection[] = [];
   for (const slide of slides.slice(0, 100)) {
-    const xml = await zip.file(slide.name)?.async("text");
+    const entry = zip.file(slide.name);
+    const metadata = entry as unknown as {
+      _data?: { uncompressedSize?: number };
+    };
+    if (
+      (metadata?._data?.uncompressedSize ?? 0)
+      > MAX_SLIDE_XML_BYTES
+    ) {
+      throw new Error(`Slide ${slide.number} exceeds the safe text limit.`);
+    }
+    const xml = await entry?.async("text");
     if (!xml) continue;
+    if (new TextEncoder().encode(xml).byteLength > MAX_SLIDE_XML_BYTES) {
+      throw new Error(`Slide ${slide.number} exceeds the safe text limit.`);
+    }
     const textNodes: string[] = [];
     collectTextNodes(parser.parse(xml), textNodes);
     const content = normalizeExtractedText(textNodes.join("\n"));
