@@ -2,61 +2,87 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { StudyPlan } from "@/lib/study-planner";
-import { getAllPlans, savePlan, removePlan } from "@/lib/idb";
-import { addToOfflineQueue } from "@/lib/idb";
+import {
+  getAllPlans,
+  removePlan,
+  savePlan,
+} from "@/lib/idb";
+import {
+  queuePlanTaskToggle,
+  reconcilePlanTaskToggle,
+} from "@/lib/offline-sync";
 
 export function useOfflinePlan() {
   const [plans, setPlans] = useState<StudyPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      setPlans(await getAllPlans());
+      setError(null);
+    } catch (storageError) {
+      setError(
+        storageError instanceof Error
+          ? storageError.message
+          : "The local study plan is unavailable.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    getAllPlans()
-      .then(setPlans)
-      .catch(() => setPlans([]))
-      .finally(() => setLoading(false));
-  }, []);
+    const timer = window.setTimeout(() => void refresh(), 0);
+    return () => window.clearTimeout(timer);
+  }, [refresh]);
 
   const cachePlan = useCallback(async (plan: StudyPlan) => {
     await savePlan(plan);
-    setPlans((prev) => {
-      const exists = prev.some((p) => p.id === plan.id);
-      return exists
-        ? prev.map((p) => (p.id === plan.id ? plan : p))
-        : [plan, ...prev];
+    setPlans((current) => {
+      const next = current.filter((item) => item.id !== plan.id);
+      return [plan, ...next];
     });
   }, []);
 
   const deletePlan = useCallback(async (id: string) => {
     await removePlan(id);
-    setPlans((prev) => prev.filter((p) => p.id !== id));
+    setPlans((current) => current.filter((plan) => plan.id !== id));
   }, []);
 
   const toggleTaskOffline = useCallback(
-    async (planId: string, taskId: string, completed: boolean) => {
-      // Update local plan state
-      setPlans((prev) =>
-        prev.map((plan) => {
-          if (plan.id !== planId) return plan;
-          return {
-            ...plan,
-            days: plan.days.map((day) => ({
-              ...day,
-              tasks: day.tasks.map((task) =>
-                task.id === taskId ? { ...task, completed } : task
-              ),
-            })),
-          };
-        })
+    async (
+      planId: string,
+      taskId: string,
+      completed: boolean,
+    ): Promise<StudyPlan | null> => {
+      const plan = plans.find((item) => item.id === planId);
+      if (!plan) return null;
+      const payload = {
+        planId,
+        taskId,
+        completed,
+        completedAt: completed ? new Date().toISOString() : undefined,
+      };
+      const updated = reconcilePlanTaskToggle(plan, payload);
+      if (!updated) return null;
+      await savePlan(updated);
+      await queuePlanTaskToggle(payload);
+      setPlans((current) =>
+        current.map((item) => (item.id === planId ? updated : item)),
       );
-
-      // Queue for sync
-      await addToOfflineQueue({
-        type: "plan-task-toggle",
-        payload: { planId, taskId, completed },
-      });
+      return updated;
     },
-    []
+    [plans],
   );
 
-  return { plans, loading, cachePlan, deletePlan, toggleTaskOffline };
+  return {
+    plans,
+    loading,
+    error,
+    refresh,
+    cachePlan,
+    deletePlan,
+    toggleTaskOffline,
+  };
 }

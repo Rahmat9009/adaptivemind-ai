@@ -2,38 +2,72 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { LessonHistoryEntry } from "@/lib/dashboard-storage";
-import { getAllLessons, saveLesson, saveLessons, removeLesson } from "@/lib/idb";
+import { getAllLessons, type SavedLessonRecord } from "@/lib/idb";
+import {
+  deleteOfflineLesson,
+  offlineLessonsChangedEvent,
+  saveOfflineLesson,
+} from "@/lib/offline-lessons";
 
 export function useOfflineLessons() {
-  const [lessons, setLessons] = useState<LessonHistoryEntry[]>([]);
+  const [lessons, setLessons] = useState<SavedLessonRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    try {
+      const records = await getAllLessons();
+      setLessons(records);
+      setError(null);
+    } catch (storageError) {
+      setError(
+        storageError instanceof Error
+          ? storageError.message
+          : "Saved lessons are unavailable.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    getAllLessons()
-      .then(setLessons)
-      .catch(() => setLessons([]))
-      .finally(() => setLoading(false));
-  }, []);
+    const timer = window.setTimeout(() => void refresh(), 0);
+    window.addEventListener(offlineLessonsChangedEvent, refresh);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener(offlineLessonsChangedEvent, refresh);
+    };
+  }, [refresh]);
 
-  const cacheLesson = useCallback(async (entry: LessonHistoryEntry) => {
-    await saveLesson(entry);
-    setLessons((prev) => {
-      const exists = prev.some((l) => l.id === entry.id);
-      return exists
-        ? prev.map((l) => (l.id === entry.id ? entry : l))
-        : [entry, ...prev];
-    });
-  }, []);
+  const cacheLesson = useCallback(
+    async (
+      entry: LessonHistoryEntry,
+      whyThisMode?: string,
+    ): Promise<SavedLessonRecord> => {
+      const saved = await saveOfflineLesson(entry, {
+        kind: "manual",
+        whyThisMode,
+      });
+      await refresh();
+      return saved;
+    },
+    [refresh],
+  );
 
-  const cacheLessons = useCallback(async (entries: LessonHistoryEntry[]) => {
-    await saveLessons(entries);
-    setLessons(entries);
-  }, []);
+  const deleteLesson = useCallback(
+    async (id: string) => {
+      await deleteOfflineLesson(id);
+      await refresh();
+    },
+    [refresh],
+  );
 
-  const deleteLesson = useCallback(async (id: string) => {
-    await removeLesson(id);
-    setLessons((prev) => prev.filter((l) => l.id !== id));
-  }, []);
-
-  return { lessons, loading, cacheLesson, cacheLessons, deleteLesson };
+  return {
+    lessons,
+    loading,
+    error,
+    refresh,
+    cacheLesson,
+    deleteLesson,
+  };
 }

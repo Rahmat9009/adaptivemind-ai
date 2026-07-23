@@ -5,6 +5,7 @@ import { motion } from "motion/react";
 import { fadeIn, slideUp } from "@/lib/motion";
 import {
   calculatePlanSummary,
+  isPlanTaskDue,
   type StudyPlan,
 } from "@/lib/study-planner";
 
@@ -55,6 +56,14 @@ export function StudyPlanCard({ plan }: { plan: StudyPlan | null }) {
     plan.days.find((item) => item.tasks.some((task) => !task.completed)) ??
     plan.days[0];
   const next = day?.tasks.find((task) => !task.completed);
+  const dueCount = plan.days.reduce(
+    (count, planDay) =>
+      count
+      + planDay.tasks.filter((task) =>
+        isPlanTaskDue(task, planDay.date),
+      ).length,
+    0,
+  );
 
   return (
     <motion.section
@@ -102,6 +111,11 @@ export function StudyPlanCard({ plan }: { plan: StudyPlan | null }) {
             </p>
           )}
         </div>
+        {dueCount > 0 && (
+          <p className="mt-3 text-sm font-semibold text-[var(--am-warning)]">
+            {dueCount} planner task{dueCount === 1 ? "" : "s"} due
+          </p>
+        )}
 
         <Link href="/planner" className="am-btn am-btn-ghost mt-4 inline-flex items-center gap-1.5">
           Open plan

@@ -29,6 +29,7 @@ import {
   saveHistoryConversation,
   saveHistoryEvaluation,
   startNewTopicStorageKey,
+  type LessonHistoryEntry,
 } from "@/lib/dashboard-storage";
 import {
   createMasteryEvidenceId,
@@ -112,6 +113,7 @@ interface StoredLessonSession {
   subject: string;
   level: string;
   teachingMode: TeachingMode;
+  historyId?: string;
 }
 interface StoredConversation {
   lessonTitle: string;
@@ -310,6 +312,10 @@ function normalizeStoredLesson(
     subject: record.subject,
     level: record.level,
     teachingMode: record.teachingMode,
+    historyId:
+      typeof record.historyId === "string"
+        ? record.historyId.slice(0, 120)
+        : undefined,
   };
 }
 
@@ -507,6 +513,7 @@ export function TutorShell() {
               subject: restoredLesson.subject,
               level: restoredLesson.level,
               teachingMode: restoredLesson.teachingMode,
+              historyId: restoredLesson.id,
             }
           : startNewTopic
             ? null
@@ -523,8 +530,8 @@ export function TutorShell() {
           setSubject(session.subject);
           setLevel(session.level);
           setTeachingMode(session.teachingMode);
+          if (session.historyId) setHistoryId(session.historyId);
           if (restoredLesson) {
-            setHistoryId(restoredLesson.id);
             if (restoredLesson.conversation)
               setConversation(restoredLesson.conversation.slice(-4));
           }
@@ -657,6 +664,16 @@ export function TutorShell() {
         submittedSources.length ? submittedSourceMode : undefined,
       );
       clearConversation();
+      let recommendationReason =
+        "This lesson used the selected teaching approach.";
+      try {
+        recommendationReason =
+          teachingMode === "adaptive"
+            ? loadLearningDNA2().recommendationReason
+            : `You selected ${teachingMode} mode. Ada will use the outcome to improve later recommendations.`;
+      } catch {
+        // The lesson remains usable without Learning DNA metadata.
+      }
       const historyEntry = addLessonToHistory({
         topic: topic.trim(),
         subject,
@@ -664,8 +681,16 @@ export function TutorShell() {
         teachingMode,
         stylesUsed: payload.lesson.stylesUsed,
         response: payload,
+        recommendationReason,
       });
       setHistoryId(historyEntry.id);
+      void import("@/lib/offline-lessons")
+        .then(({ autoCacheOfflineLesson }) =>
+          autoCacheOfflineLesson(historyEntry),
+        )
+        .catch(() => {
+          // Automatic caching is optional and never blocks the live lesson.
+        });
       localStorage.setItem(
         lessonStorageKey,
         JSON.stringify({
@@ -674,6 +699,7 @@ export function TutorShell() {
           subject,
           level,
           teachingMode,
+          historyId: historyEntry.id,
         } satisfies StoredLessonSession),
       );
     } catch (requestError) {
@@ -798,7 +824,23 @@ export function TutorShell() {
           status: payload.evaluation.status,
           masteryLevel: mastery.masteryLevel,
           evaluatedAt: new Date().toISOString(),
+          needsReview: payload.evaluation.needsReview,
+          misconception: payload.evaluation.misconception,
         });
+      if (historyId) {
+        const updatedHistoryEntry = readLearningHistory().find(
+          (entry) => entry.id === historyId,
+        );
+        if (updatedHistoryEntry) {
+          void import("@/lib/offline-lessons")
+            .then(({ refreshOfflineLessonIfSaved }) =>
+              refreshOfflineLessonIfSaved(updatedHistoryEntry),
+            )
+            .catch(() => {
+              // Evaluation remains recorded even if an offline copy cannot update.
+            });
+        }
+      }
       if (!mastery.lastEvidenceApplied) return;
       void saveLearningActivity({
         id: `activity:${evidenceId}`,
@@ -1381,6 +1423,10 @@ export function TutorShell() {
       </PageShell>
     );
 
+  const currentHistoryEntry: LessonHistoryEntry | undefined = historyId
+    ? readLearningHistory().find((entry) => entry.id === historyId)
+    : undefined;
+
   return (
     <PageShell heading="Ada" subheading="Your adaptive tutor">
       <div className="grid gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start">
@@ -1488,7 +1534,10 @@ export function TutorShell() {
           {/* Lesson */}
           {response && (
             <>
-              <LessonCard response={response} />
+              <LessonCard
+                response={response}
+                historyEntry={currentHistoryEntry}
+              />
               <LessonActions
                 isLoading={isLoading}
                 onAction={requestLesson}

@@ -1,123 +1,150 @@
-/**
- * Study Plan PDF Export — AdaptiveMind branding
- */
-
 import jsPDF from "jspdf";
-import type { StudyPlan } from "@/lib/study-planner";
+import {
+  studyPlanGoalLabels,
+  type StudyPlan,
+  type StudyTask,
+} from "@/lib/study-planner";
+import {
+  formatExportDate,
+  safeExportFilename,
+} from "./common";
 
 const BRAND = {
   primary: [139, 111, 71] as [number, number, number],
   dark: [30, 28, 26] as [number, number, number],
-  muted: [120, 115, 108] as [number, number, number],
+  muted: [100, 96, 90] as [number, number, number],
   light: [250, 248, 245] as [number, number, number],
-  success: [34, 139, 87] as [number, number, number],
 };
 
-export function exportPlanPDF(plan: StudyPlan): void {
+function taskDetails(task: StudyTask): string[] {
+  return [
+    `Topic: ${task.topic}`,
+    `Task type: ${task.type.replace("-", " ")}`,
+    `Recommended approach: ${task.teachingApproach.join(", ")}`,
+    `Reason: ${task.reason}`,
+    `Estimated time: ${task.minutes} minutes`,
+    `Mastery target: ${task.masteryTarget ?? 60}%`,
+    `Review date: ${
+      task.reviewDate ? formatExportDate(task.reviewDate) : "Not scheduled"
+    }`,
+    `Status: ${task.completed ? "Completed" : "Pending"}`,
+    `Notes: ${task.notes?.trim() || "____________________________"}`,
+  ];
+}
+
+export function createPlanPdfDocument(plan: StudyPlan): jsPDF {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 20;
-  const contentWidth = pageWidth - 2 * margin;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 18;
+  const contentWidth = pageWidth - margin * 2;
   let y = margin;
 
-  // ── Cover header ──
-  doc.setFillColor(...BRAND.light);
-  doc.rect(0, 0, pageWidth, 60, "F");
+  const addPageHeader = (continuation = false) => {
+    doc.setFillColor(...BRAND.light);
+    doc.rect(0, 0, pageWidth, 42, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.setTextColor(...BRAND.dark);
+    doc.text("AdaptiveMind AI", margin, 17);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(11);
+    doc.setTextColor(...BRAND.primary);
+    doc.text(
+      continuation ? "Study Plan - continued" : "Personal Study Plan",
+      margin,
+      28,
+    );
+    y = 50;
+  };
+  const ensureSpace = (height: number) => {
+    if (y + height <= pageHeight - 18) return;
+    doc.addPage();
+    addPageHeader(true);
+  };
+  const addWrapped = (
+    label: string,
+    value: string,
+    indent = 0,
+  ) => {
+    const prefix = label ? `${label}: ` : "";
+    const lines = doc.splitTextToSize(
+      `${prefix}${value}`,
+      contentWidth - indent,
+    ) as string[];
+    ensureSpace(lines.length * 4.5 + 2);
+    doc.text(lines, margin + indent, y);
+    y += lines.length * 4.5 + 2;
+  };
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.setTextColor(...BRAND.dark);
-  doc.text("AdaptiveMind AI", margin, y + 14);
-
-  doc.setFontSize(12);
+  addPageHeader();
   doc.setFont("helvetica", "normal");
-  doc.setTextColor(...BRAND.muted);
-  doc.text("Personalized Study Plan", margin, y + 24);
-
   doc.setFontSize(9);
-  doc.text(
-    `Created ${new Date(plan.createdAt).toLocaleDateString()} · ${plan.durationDays} days · ${plan.minutesPerDay} min/day · ${plan.intensity}`,
-    margin,
-    y + 32
-  );
-
-  y = 70;
-
-  // ── Summary ──
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.setTextColor(...BRAND.dark);
-  doc.text("Summary", margin, y);
-  y += 7;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
   doc.setTextColor(...BRAND.muted);
-  const summaryLines = doc.splitTextToSize(plan.summary, contentWidth);
-  doc.text(summaryLines, margin, y);
-  y += summaryLines.length * 5 + 8;
+  addWrapped("Goal", studyPlanGoalLabels[plan.goal]);
+  addWrapped("Created", formatExportDate(plan.createdAt));
+  addWrapped("Generated", formatExportDate(new Date()));
+  addWrapped(
+    "Schedule",
+    `${plan.durationDays} days, ${plan.minutesPerDay} minutes per day, ${plan.intensity} intensity`,
+  );
+  addWrapped("Summary", plan.summary);
+  y += 3;
 
-  // ── Days ──
   for (const day of plan.days) {
-    // Check for page break
-    if (y > 260) {
-      doc.addPage();
-      y = margin;
-    }
-
-    // Day header
+    ensureSpace(18);
     doc.setFillColor(...BRAND.primary);
-    doc.roundedRect(margin, y - 4, contentWidth, 10, 2, 2, "F");
+    doc.roundedRect(margin, y, contentWidth, 10, 1.5, 1.5, "F");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.setTextColor(255, 255, 255);
+    const date = day.date ? ` - ${formatExportDate(day.date)}` : "";
     doc.text(
-      `Day ${day.dayNumber} — ${day.focus} (${day.totalMinutes} min)`,
+      `Day ${day.dayNumber}${date}: ${day.focus} (${day.totalMinutes} min)`,
       margin + 4,
-      y + 3
+      y + 6.5,
     );
-    y += 14;
+    y += 15;
 
-    // Tasks
     for (const task of day.tasks) {
-      if (y > 275) {
-        doc.addPage();
-        y = margin;
-      }
-
-      const check = task.completed ? "✓" : "○";
+      ensureSpace(48);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
       doc.setTextColor(...BRAND.dark);
-      doc.text(`${check} ${task.minutes} min`, margin + 4, y);
-
-      doc.setFont("helvetica", "normal");
-      doc.setTextColor(...BRAND.muted);
-      doc.text(`${task.topic} — ${task.type}`, margin + 30, y);
+      doc.text(
+        `${task.completed ? "[x]" : "[ ]"} ${task.topic}`,
+        margin + 3,
+        y,
+      );
       y += 5;
-
-      // Reason (smaller)
-      doc.setFontSize(8);
-      const reasonLines = doc.splitTextToSize(task.reason, contentWidth - 10);
-      doc.text(reasonLines, margin + 30, y);
-      y += reasonLines.length * 4 + 3;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(...BRAND.muted);
+      for (const detail of taskDetails(task)) {
+        addWrapped("", detail, 8);
+      }
+      y += 3;
     }
-
-    y += 4;
   }
 
-  // ── Footer ──
   const pageCount = doc.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
+  for (let page = 1; page <= pageCount; page++) {
+    doc.setPage(page);
+    doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     doc.setTextColor(...BRAND.muted);
     doc.text(
-      `AdaptiveMind AI · Page ${i} of ${pageCount}`,
+      `AdaptiveMind AI - Page ${page} of ${pageCount}`,
       margin,
-      doc.internal.pageSize.getHeight() - 10
+      pageHeight - 8,
     );
   }
 
-  doc.save(`adaptivemind-study-plan-${plan.id}.pdf`);
+  return doc;
+}
+
+export function exportPlanPDF(plan: StudyPlan): void {
+  createPlanPdfDocument(plan).save(
+    safeExportFilename("adaptivemind-study-plan", plan.id, "pdf"),
+  );
 }

@@ -3,10 +3,12 @@ import "./globals.css";
 import { MotionProvider } from "@/components/am/MotionProvider";
 import { OnlineStatus } from "@/components/am/OnlineStatus";
 import { ServiceWorkerRegistration } from "@/components/am/ServiceWorkerRegistration";
+import { OfflineSyncManager } from "@/components/am/OfflineSyncManager";
+import { LocalReminderManager } from "@/components/am/LocalReminderManager";
 import { ApplicationFrame } from "@/components/layout/ApplicationFrame";
 
 export const viewport: Viewport = {
-  themeColor: "#8B6F47",
+  themeColor: "#1751EF",
   width: "device-width",
   initialScale: 1,
 };
@@ -18,6 +20,13 @@ export const metadata: Metadata = {
   keywords: ["adaptive learning", "AI tutor", "personalized education", "Learning DNA", "adaptive tutoring"],
   authors: [{ name: "AdaptiveMind AI" }],
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [{ url: "/icon-192.png", sizes: "192x192" }],
+  },
   openGraph: {
     title: "AdaptiveMind AI | The AI tutor that learns how you learn",
     description: "AdaptiveMind changes how it teaches based on how you understand.",
@@ -45,6 +54,8 @@ export default function RootLayout({
         </MotionProvider>
         <OnlineStatus />
         <ServiceWorkerRegistration />
+        <OfflineSyncManager />
+        <LocalReminderManager />
       </body>
     </html>
   );

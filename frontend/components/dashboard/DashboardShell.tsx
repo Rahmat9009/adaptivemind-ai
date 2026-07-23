@@ -21,6 +21,7 @@ import {
   getPendingOfflineItems,
   saveLearningActivities,
 } from "@/lib/idb";
+import { offlineQueueChangedEvent } from "@/lib/offline-sync";
 import {
   deriveActivitiesFromExplanationHistory,
   getLearningMomentum,
@@ -150,6 +151,17 @@ export function DashboardShell() {
 
   useEffect(() => {
     let cancelled = false;
+    const refreshPendingCount = () => {
+      void getPendingOfflineItems()
+        .then((items) => {
+          if (!cancelled) setPendingOfflineCount(items.length);
+        })
+        .catch(() => undefined);
+    };
+    window.addEventListener(
+      offlineQueueChangedEvent,
+      refreshPendingCount,
+    );
     const timer = window.setTimeout(() => {
       try {
         const stored: unknown = JSON.parse(
@@ -215,6 +227,10 @@ export function DashboardShell() {
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
+      window.removeEventListener(
+        offlineQueueChangedEvent,
+        refreshPendingCount,
+      );
     };
   }, []);
 

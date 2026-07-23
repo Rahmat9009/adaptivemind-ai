@@ -4,8 +4,8 @@
   "description": "The AI tutor that learns how you learn",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FAF8F5",
-  "theme_color": "#8B6F47",
+  "background_color": "#FBFBFB",
+  "theme_color": "#1751EF",
   "orientation": "any",
   "icons": [
     {
@@ -19,6 +19,12 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
     }
   ]
 }

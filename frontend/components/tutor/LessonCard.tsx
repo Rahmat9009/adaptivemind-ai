@@ -5,6 +5,8 @@ import { motion } from "motion/react";
 import { fadeIn, slideUp } from "@/lib/motion";
 import { learningDimensionLabels, type LearningDimension } from "@/lib/learning-dna";
 import type { TutorApiResponse } from "@/lib/ai/types";
+import type { LessonHistoryEntry } from "@/lib/dashboard-storage";
+import { LessonExportActions } from "./LessonExportActions";
 
 const SpeechPlayer = dynamic(
   () => import("./SpeechPlayer").then((module) => module.SpeechPlayer),
@@ -31,6 +33,7 @@ const VisualLessonEngine = dynamic(
 
 interface LessonCardProps {
   response: TutorApiResponse;
+  historyEntry?: LessonHistoryEntry;
 }
 
 const dnaColors: Record<LearningDimension, string> = {
@@ -41,7 +44,10 @@ const dnaColors: Record<LearningDimension, string> = {
   challenges: "#DC2626",
 };
 
-export function LessonCard({ response }: LessonCardProps) {
+export function LessonCard({
+  response,
+  historyEntry,
+}: LessonCardProps) {
   const { lesson, source, action } = response;
   const sourceById = new Map(
     (response.sources ?? []).map((item) => [item.id, item]),
@@ -322,6 +328,7 @@ export function LessonCard({ response }: LessonCardProps) {
           ...lesson.keyPoints,
         ].filter(Boolean).join(". ")}
       />
+      {historyEntry && <LessonExportActions entry={historyEntry} />}
     </motion.article>
   );
 }

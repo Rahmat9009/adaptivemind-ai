@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { CloudOff } from "lucide-react";
 import { motion } from "motion/react";
 import { fadeIn, slideUp, staggerContainer, staggerItem } from "@/lib/motion";
 import { PageShell } from "@/components/am/PageShell";
@@ -11,19 +12,33 @@ import { type LearningScores } from "@/lib/learning-dna";
 import {
   calculatePlanSummary,
   generateStudyPlan,
+  isPlanTaskDue,
+  normalizeStudyPlan,
+  normalizeStudyPlanSettings,
   readStudyPlan,
   saveStudyPlan,
   studyPlanSettingsStorageKey,
+  updatePlanTask,
   type StudyPlan,
   type StudyPlanGoal,
   type StudyPlanSettings,
   type StudyIntensity,
 } from "@/lib/study-planner";
 import {
+  getAllPlans,
   removeLearningActivity,
+  savePlan,
   saveLearningActivity,
 } from "@/lib/idb";
 import { plannerActivityId } from "@/lib/learning-activity";
+import {
+  processOfflineQueue,
+  queuePlanTaskToggle,
+} from "@/lib/offline-sync";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { PlannerExportToolbar } from "./PlannerExportToolbar";
+import { StudyPackBuilder } from "./StudyPackBuilder";
+import { ReminderControls } from "./ReminderControls";
 
 const profileStorageKey = "adaptivemind-learning-dna";
 const defaults: StudyPlanSettings = {
@@ -40,6 +55,15 @@ const emptyScores: LearningScores = {
   stories: 50,
   challenges: 50,
 };
+const weekdayOptions = [
+  { value: 1, label: "Mon" },
+  { value: 2, label: "Tue" },
+  { value: 3, label: "Wed" },
+  { value: 4, label: "Thu" },
+  { value: 5, label: "Fri" },
+  { value: 6, label: "Sat" },
+  { value: 0, label: "Sun" },
+] as const;
 
 function loadScores(): LearningScores {
   try {
@@ -81,24 +105,58 @@ export function PlannerShell() {
   const [plan, setPlan] = useState<StudyPlan | null>(null);
   const [ready, setReady] = useState(false);
   const [confirmReplace, setConfirmReplace] = useState(false);
+  const [persistenceMessage, setPersistenceMessage] =
+    useState<string | null>(null);
+  const isOnline = useOnlineStatus();
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    let cancelled = false;
+    const load = async () => {
+      let localPlan: StudyPlan | null = null;
       try {
         const saved: unknown = JSON.parse(
           localStorage.getItem(studyPlanSettingsStorageKey) ?? "null",
         );
-        if (typeof saved === "object" && saved !== null)
-          setSettings({
-            ...defaults,
-            ...(saved as Partial<StudyPlanSettings>),
-          });
-        setPlan(readStudyPlan());
+        setSettings(normalizeStudyPlanSettings(saved, defaults));
+        localPlan = readStudyPlan();
+        const indexedPlans = await getAllPlans();
+        const candidates = [
+          ...indexedPlans,
+          ...(localPlan ? [localPlan] : []),
+        ];
+        const loadedPlan = candidates.sort(
+          (a, b) =>
+            Date.parse(b.updatedAt ?? b.createdAt)
+            - Date.parse(a.updatedAt ?? a.createdAt),
+        )[0] ?? null;
+        if (loadedPlan && !cancelled) {
+          setPlan(loadedPlan);
+          try {
+            saveStudyPlan(loadedPlan);
+          } catch {
+            // IndexedDB remains the durable copy if localStorage is blocked.
+          }
+          if (!indexedPlans.some((item) => item.id === loadedPlan.id)) {
+            await savePlan(loadedPlan);
+          }
+        }
+      } catch (storageError) {
+        if (!cancelled) {
+          setPlan(localPlan);
+          setPersistenceMessage(
+            storageError instanceof Error
+              ? storageError.message
+              : "The durable local plan is unavailable.",
+          );
+        }
       } finally {
-        setReady(true);
+        if (!cancelled) setReady(true);
       }
-    }, 0);
-    return () => window.clearTimeout(timer);
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -113,6 +171,36 @@ export function PlannerShell() {
     }
   }, [ready, settings]);
 
+  function persistPlan(next: StudyPlan): StudyPlan {
+    const normalized = normalizeStudyPlan({
+      ...next,
+      updatedAt: new Date().toISOString(),
+    });
+    if (!normalized) {
+      setPersistenceMessage("The planner could not save an invalid update.");
+      return next;
+    }
+    let localCopy = normalized;
+    try {
+      localCopy = saveStudyPlan(normalized);
+    } catch {
+      setPersistenceMessage(
+        "The plan is active, but this browser blocked its fallback storage.",
+      );
+    }
+    setPlan(localCopy);
+    void savePlan(localCopy)
+      .then(() => setPersistenceMessage(null))
+      .catch((storageError) =>
+        setPersistenceMessage(
+          storageError instanceof Error
+            ? storageError.message
+            : "The plan could not be saved for offline use.",
+        ),
+      );
+    return localCopy;
+  }
+
   function createPlan() {
     const next = generateStudyPlan(
       settings,
@@ -120,12 +208,7 @@ export function PlannerShell() {
       getTopicMastery(),
       readLearningHistory(),
     );
-    saveStudyPlan(next);
-    localStorage.setItem(
-      studyPlanSettingsStorageKey,
-      JSON.stringify(settings),
-    );
-    setPlan(next);
+    persistPlan(next);
     setConfirmReplace(false);
   }
 
@@ -136,23 +219,38 @@ export function PlannerShell() {
     );
     if (!currentTask) return;
     const willComplete = !currentTask.completed;
-    const next = {
-      ...plan,
-      days: plan.days.map((day, index) =>
-        index !== dayIndex
-          ? day
-          : {
-              ...day,
-              tasks: day.tasks.map((task) =>
-                task.id === taskId
-                  ? { ...task, completed: !task.completed }
-                  : task,
-              ),
-            },
-      ),
-    };
-    saveStudyPlan(next);
-    setPlan(next);
+    if (!isOnline && currentTask.requiresConnection && willComplete) {
+      setPersistenceMessage(
+        "This understanding check needs live Ada evaluation. Reconnect before marking it evaluated.",
+      );
+      return;
+    }
+    const completedAt = willComplete
+      ? new Date().toISOString()
+      : undefined;
+    const next = updatePlanTask(plan, taskId, {
+      completed: willComplete,
+      completedAt,
+    });
+    if (!next) return;
+    const saved = persistPlan(next);
+    void queuePlanTaskToggle({
+        planId: saved.id,
+        taskId,
+        completed: willComplete,
+        completedAt,
+      })
+      .then(() => {
+        if (isOnline) return processOfflineQueue();
+        return undefined;
+      })
+      .catch((queueError) =>
+        setPersistenceMessage(
+          queueError instanceof Error
+            ? queueError.message
+            : "The local planner update could not be queued.",
+        ),
+      );
     const activityId = plannerActivityId(plan.id, taskId);
     if (willComplete) {
       void saveLearningActivity({
@@ -170,12 +268,28 @@ export function PlannerShell() {
     }
   }
 
+  function updateTaskNotes(taskId: string, notes: string) {
+    if (!plan) return;
+    const next = updatePlanTask(plan, taskId, {
+      notes: notes.slice(0, 500),
+    });
+    if (next) persistPlan(next);
+  }
+
   if (!ready)
     return (
-      <div
-        className="min-h-screen bg-[var(--am-bg)]"
-        aria-busy="true"
-      />
+      <PageShell
+        heading="Study Planner"
+        subheading="Your connected learning journey"
+      >
+        <div
+          className="min-h-48 border-y border-[var(--am-border-light)] py-12 text-center text-sm text-[var(--am-text-muted)]"
+          aria-busy="true"
+          role="status"
+        >
+          Loading your local study plan...
+        </div>
+      </PageShell>
     );
 
   const summary = plan ? calculatePlanSummary(plan) : null;
@@ -185,6 +299,27 @@ export function PlannerShell() {
       heading="Study Planner"
       subheading="Your connected learning journey"
     >
+      {!isOnline && (
+        <div
+          className="mb-6 flex items-start gap-3 border-l-4 border-[var(--am-warning)] bg-[var(--am-warm-bg)] px-4 py-3 text-sm leading-6 text-[var(--am-text-secondary)]"
+          role="status"
+        >
+          <CloudOff
+            size={18}
+            className="mt-0.5 shrink-0 text-[var(--am-warning)]"
+            aria-hidden="true"
+          />
+          You are offline. Saved lessons and your study plan remain available.
+          New Ada responses require a connection.
+        </div>
+      )}
+      <p
+        className="mb-4 min-h-5 text-sm text-[var(--am-text-muted)]"
+        role="status"
+        aria-live="polite"
+      >
+        {persistenceMessage ?? ""}
+      </p>
       {/* Plan Setup */}
       <motion.section
         variants={fadeIn}
@@ -226,6 +361,50 @@ export function PlannerShell() {
               </select>
             </label>
           </motion.div>
+
+          <motion.fieldset
+            variants={staggerItem}
+            className="sm:col-span-2 lg:col-span-3"
+          >
+            <legend className="text-sm font-medium text-[var(--am-text-secondary)]">
+              Study days
+            </legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {weekdayOptions.map((day) => {
+                const selected = settings.availableDays.includes(day.value);
+                return (
+                  <label
+                    key={day.value}
+                    className={`flex min-h-11 min-w-12 cursor-pointer items-center justify-center rounded-[var(--am-radius-md)] border px-3 text-xs font-semibold ${
+                      selected
+                        ? "border-[var(--am-primary)] bg-[var(--am-primary-light)] text-[var(--am-primary)]"
+                        : "border-[var(--am-border-light)] bg-[var(--am-bg-reading)] text-[var(--am-text-secondary)]"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="sr-only"
+                      checked={selected}
+                      onChange={() => {
+                        const next = selected
+                          ? settings.availableDays.filter(
+                            (value) => value !== day.value,
+                          )
+                          : [...settings.availableDays, day.value];
+                        if (next.length > 0) {
+                          setSettings({
+                            ...settings,
+                            availableDays: next,
+                          });
+                        }
+                      }}
+                    />
+                    {day.label}
+                  </label>
+                );
+              })}
+            </div>
+          </motion.fieldset>
 
           <motion.div variants={staggerItem}>
             <label className="flex flex-col gap-1.5 text-sm font-medium text-[var(--am-text-secondary)]">
@@ -397,6 +576,9 @@ export function PlannerShell() {
               {summary.completedTasks}/{summary.totalTasks} tasks &middot;{" "}
               {summary.completedMinutes}/{summary.totalMinutes} min
             </p>
+            <PlannerExportToolbar plan={plan} />
+            <StudyPackBuilder plan={plan} />
+            <ReminderControls />
           </motion.div>
 
           {/* Day timeline */}
@@ -435,6 +617,11 @@ export function PlannerShell() {
                         <p className="text-sm text-[var(--am-text-secondary)]">
                           {day.focus}
                         </p>
+                        {day.date && (
+                          <p className="mt-0.5 text-xs text-[var(--am-text-muted)]">
+                            {new Date(day.date).toLocaleDateString()}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <span className="text-sm font-medium tabular-nums text-[var(--am-text-muted)]">
@@ -461,24 +648,35 @@ export function PlannerShell() {
                     {day.tasks.map((task) => (
                       <div
                         key={task.id}
-                        className="flex items-center gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-warm-bg)] px-4 py-3 transition-colors"
+                        className="flex flex-wrap items-start gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-warm-bg)] px-4 py-3 transition-colors"
                       >
                         <button
                           type="button"
                           onClick={() => toggleTask(dayIndex, task.id)}
-                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[10px] transition-colors ${
+                          disabled={
+                            !isOnline
+                            && task.requiresConnection
+                            && !task.completed
+                          }
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded border text-xs transition-colors ${
                             task.completed
                               ? "border-[var(--am-success)] bg-[var(--am-success)] text-white"
                               : "border-[var(--am-border)] hover:border-[var(--am-primary)]"
                           }`}
                           aria-label={`Mark ${task.topic} ${task.type} ${
                             task.completed ? "incomplete" : "complete"
+                          }${
+                            !isOnline
+                            && task.requiresConnection
+                            && !task.completed
+                              ? ". Reconnect for Ada evaluation."
+                              : ""
                           }`}
                         >
                           {task.completed ? "✓" : ""}
                         </button>
 
-                        <div className="flex-1 min-w-0">
+                        <div className="min-w-[12rem] flex-[1_1_16rem]">
                           <p
                             className={`text-sm font-medium ${
                               task.completed
@@ -489,25 +687,67 @@ export function PlannerShell() {
                             {task.type.replace("-", " ")}
                             <span className="font-normal text-[var(--am-text-muted)]">
                               {" "}
-                              · {task.topic}
+                              | {task.topic}
                             </span>
                           </p>
                           <p className="mt-0.5 text-xs text-[var(--am-text-muted)]">
                             {task.reason}
                           </p>
+                          <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-medium text-[var(--am-text-muted)]">
+                            <span>
+                              Target {task.masteryTarget ?? 60}%
+                            </span>
+                            {isPlanTaskDue(task, day.date) && (
+                              <span className="text-[var(--am-warning)]">
+                                Due now
+                              </span>
+                            )}
+                            {task.requiresConnection && (
+                              <span>
+                                {isOnline
+                                  ? "Live Ada check"
+                                  : "Connection required"}
+                              </span>
+                            )}
+                          </div>
+                          <label className="mt-3 block text-xs font-semibold text-[var(--am-text-secondary)]">
+                            Notes
+                            <textarea
+                              value={task.notes ?? ""}
+                              maxLength={500}
+                              rows={2}
+                              onChange={(event) =>
+                                updateTaskNotes(
+                                  task.id,
+                                  event.target.value,
+                                )
+                              }
+                              className="mt-1 block w-full resize-y rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-surface)] px-3 py-2 text-sm font-normal leading-6 text-[var(--am-text-primary)] outline-none focus:border-[var(--am-primary)] focus:ring-2 focus:ring-[var(--am-primary)]/15"
+                              placeholder="Add local study notes"
+                            />
+                          </label>
                         </div>
 
                         <span className="shrink-0 text-xs font-medium tabular-nums text-[var(--am-text-muted)]">
                           {task.minutes}m
                         </span>
 
-                        <Link
-                          href={`/tutor?topic=${encodeURIComponent(task.topic)}`}
-                          className="shrink-0 text-xs font-semibold text-[var(--am-primary)] hover:underline inline-flex items-center gap-1"
-                        >
-                          Study
-                          <ArrowRightIcon />
-                        </Link>
+                        {isOnline ? (
+                          <Link
+                            href={`/tutor?topic=${encodeURIComponent(task.topic)}`}
+                            className="inline-flex min-h-11 shrink-0 items-center gap-1 text-xs font-semibold text-[var(--am-primary)] hover:underline"
+                          >
+                            Study
+                            <ArrowRightIcon />
+                          </Link>
+                        ) : (
+                          <Link
+                            href="/downloads"
+                            className="inline-flex min-h-11 shrink-0 items-center text-xs font-semibold text-[var(--am-primary)] hover:underline"
+                          >
+                            Saved lessons
+                          </Link>
+                        )}
                       </div>
                     ))}
                   </div>

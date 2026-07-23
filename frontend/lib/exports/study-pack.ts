@@ -1,279 +1,326 @@
-/**
- * Offline Study Pack — Combined PDF with cover page, plan, lessons, review questions
- */
-
 import jsPDF from "jspdf";
 import type { LessonHistoryEntry } from "@/lib/dashboard-storage";
-import type { StudyPlan } from "@/lib/study-planner";
+import {
+  studyPlanGoalLabels,
+  type StudyPlan,
+} from "@/lib/study-planner";
+import {
+  buildLessonExportData,
+} from "./lesson-data";
+import {
+  formatExportDate,
+  safeExportFilename,
+} from "./common";
+
+export interface StudyPackReviewItem {
+  id: string;
+  topic: string;
+  question: string;
+}
+
+export interface StudyPackData {
+  plan?: StudyPlan | null;
+  lessons: LessonHistoryEntry[];
+  reviews?: StudyPackReviewItem[];
+  notesPages?: number;
+}
 
 const BRAND = {
   primary: [139, 111, 71] as [number, number, number],
   dark: [30, 28, 26] as [number, number, number],
-  muted: [120, 115, 108] as [number, number, number],
+  muted: [100, 96, 90] as [number, number, number],
   light: [250, 248, 245] as [number, number, number],
 };
 
-interface StudyPackData {
-  plan?: StudyPlan | null;
-  lessons: LessonHistoryEntry[];
+export function createStudyPackDocument(data: StudyPackData): jsPDF {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 18;
+  const contentWidth = pageWidth - margin * 2;
+  let y = margin;
+
+  const addPage = (title: string) => {
+    doc.addPage();
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.setTextColor(...BRAND.dark);
+    doc.text(title, margin, margin);
+    y = margin + 10;
+  };
+  const ensureSpace = (height: number, title = "Study Pack") => {
+    if (y + height < pageHeight - 18) return;
+    addPage(`${title} - continued`);
+  };
+  const addText = (
+    value: string,
+    options: {
+      bold?: boolean;
+      indent?: number;
+      fontSize?: number;
+      section?: string;
+    } = {},
+  ) => {
+    const indent = options.indent ?? 0;
+    doc.setFont(
+      "helvetica",
+      options.bold ? "bold" : "normal",
+    );
+    doc.setFontSize(options.fontSize ?? 9.5);
+    doc.setTextColor(
+      ...(options.bold ? BRAND.dark : BRAND.muted),
+    );
+    const lines = doc.splitTextToSize(
+      value,
+      contentWidth - indent,
+    ) as string[];
+    ensureSpace(
+      lines.length * 4.5 + 2,
+      options.section ?? "Study Pack",
+    );
+    doc.text(lines, margin + indent, y);
+    y += lines.length * 4.5 + 2;
+  };
+
+  doc.setFillColor(...BRAND.light);
+  doc.rect(0, 0, pageWidth, 112, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(27);
+  doc.setTextColor(...BRAND.dark);
+  doc.text("AdaptiveMind AI", margin, 47);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(16);
+  doc.setTextColor(...BRAND.primary);
+  doc.text("Offline Study Pack", margin, 63);
+  doc.setFontSize(9.5);
+  doc.setTextColor(...BRAND.muted);
+  doc.text(`Generated ${formatExportDate(new Date())}`, margin, 77);
+  if (data.plan) {
+    doc.text(
+      `Goal: ${studyPlanGoalLabels[data.plan.goal]}`,
+      margin,
+      85,
+    );
+  }
+  doc.text(
+    `${data.lessons.length} selected lesson${
+      data.lessons.length === 1 ? "" : "s"
+    }, ${data.reviews?.length ?? 0} review activit${
+      data.reviews?.length === 1 ? "y" : "ies"
+    }`,
+    margin,
+    93,
+  );
+  y = 128;
+  addText(
+    "Connectivity notice",
+    { bold: true, section: "Cover" },
+  );
+  addText(
+    "This pack is a fixed offline copy. It does not create new Ada responses or submit understanding checks. Reconnect to request new explanations or AI evaluation.",
+    { section: "Cover" },
+  );
+  y += 4;
+  addText("Contents", { bold: true, section: "Cover" });
+  if (data.plan) addText("[ ] Study plan", { indent: 3 });
+  for (const lesson of data.lessons) {
+    addText(`[ ] ${lesson.response.lesson.title}`, { indent: 3 });
+  }
+  for (const review of data.reviews ?? []) {
+    addText(`[ ] Review: ${review.topic}`, { indent: 3 });
+  }
+  if ((data.notesPages ?? 0) > 0) {
+    addText(
+      `[ ] ${data.notesPages} notes page${
+        data.notesPages === 1 ? "" : "s"
+      }`,
+      { indent: 3 },
+    );
+  }
+
+  if (data.plan) {
+    addPage("Study Plan");
+    addText(`Goal: ${studyPlanGoalLabels[data.plan.goal]}`, {
+      bold: true,
+      section: "Study Plan",
+    });
+    addText(data.plan.summary, { section: "Study Plan" });
+    y += 3;
+    for (const day of data.plan.days) {
+      addText(
+        `Day ${day.dayNumber}${
+          day.date ? ` - ${formatExportDate(day.date)}` : ""
+        }: ${day.focus}`,
+        { bold: true, section: "Study Plan" },
+      );
+      for (const task of day.tasks) {
+        addText(
+          `${task.completed ? "[x]" : "[ ]"} ${task.topic} - ${task.type.replace("-", " ")} (${task.minutes} min)`,
+          { indent: 3, section: "Study Plan" },
+        );
+        addText(
+          `Approach: ${task.teachingApproach.join(", ")}. ${task.reason}`,
+          {
+            indent: 7,
+            fontSize: 8.5,
+            section: "Study Plan",
+          },
+        );
+      }
+      y += 2;
+    }
+  }
+
+  for (const entry of data.lessons) {
+    const lesson = buildLessonExportData(entry);
+    addPage(lesson.title);
+    addText(`Topic: ${lesson.topic}`, {
+      bold: true,
+      section: lesson.title,
+    });
+    addText(`Objective: ${lesson.objective}`, {
+      section: lesson.title,
+    });
+    addText(`Approach: ${lesson.approach}`, {
+      section: lesson.title,
+    });
+    addText(`Why this mode: ${lesson.whyThisMode}`, {
+      section: lesson.title,
+    });
+    y += 2;
+    addText("Explanation", {
+      bold: true,
+      section: lesson.title,
+    });
+    addText(lesson.conciseExplanation, {
+      section: lesson.title,
+    });
+    if (lesson.workedExample) {
+      addText("Worked example", {
+        bold: true,
+        section: lesson.title,
+      });
+      addText(lesson.workedExample, {
+        section: lesson.title,
+      });
+    }
+    if (lesson.visualTitle) {
+      addText(`Visual: ${lesson.visualTitle}`, {
+        bold: true,
+        section: lesson.title,
+      });
+      for (const step of lesson.visualSteps) {
+        addText(`- ${step}`, {
+          indent: 3,
+          section: lesson.title,
+        });
+      }
+      if (lesson.visualTextAlternative) {
+        addText(lesson.visualTextAlternative, {
+          section: lesson.title,
+        });
+      }
+    }
+    addText("Takeaways", {
+      bold: true,
+      section: lesson.title,
+    });
+    for (const takeaway of lesson.takeaways) {
+      addText(`- ${takeaway}`, {
+        indent: 3,
+        section: lesson.title,
+      });
+    }
+    addText(`Quick recall: ${lesson.quickRecallQuestion}`, {
+      bold: true,
+      section: lesson.title,
+    });
+    addText(`Application: ${lesson.applicationQuestion}`, {
+      section: lesson.title,
+    });
+    addText("Sources", {
+      bold: true,
+      section: lesson.title,
+    });
+    if (lesson.sources.length === 0) {
+      addText("No external source was attached.", {
+        indent: 3,
+        section: lesson.title,
+      });
+    } else {
+      for (const source of lesson.sources) {
+        addText(
+          `- ${source.title} (${source.type})${
+            source.reference ? ` - ${source.reference}` : ""
+          }`,
+          { indent: 3, section: lesson.title },
+        );
+      }
+    }
+    addText(lesson.notice, {
+      fontSize: 8,
+      section: lesson.title,
+    });
+  }
+
+  if ((data.reviews?.length ?? 0) > 0) {
+    addPage("Review Activities");
+    addText(
+      "Answer from memory before checking a saved lesson.",
+      { section: "Review Activities" },
+    );
+    for (const [index, review] of (data.reviews ?? []).entries()) {
+      addText(
+        `${index + 1}. [ ] ${review.topic}`,
+        { bold: true, section: "Review Activities" },
+      );
+      addText(review.question, {
+        indent: 3,
+        section: "Review Activities",
+      });
+      ensureSpace(20, "Review Activities");
+      for (let line = 0; line < 3; line++) {
+        doc.setDrawColor(210, 205, 198);
+        doc.line(margin + 3, y, pageWidth - margin, y);
+        y += 7;
+      }
+    }
+  }
+
+  const notesPages = Math.max(
+    0,
+    Math.min(5, Math.floor(data.notesPages ?? 0)),
+  );
+  for (let page = 0; page < notesPages; page++) {
+    addPage(`Notes ${page + 1}`);
+    doc.setDrawColor(210, 205, 198);
+    while (y < pageHeight - 18) {
+      doc.line(margin, y, pageWidth - margin, y);
+      y += 8;
+    }
+  }
+
+  const pageCount = doc.getNumberOfPages();
+  for (let page = 1; page <= pageCount; page++) {
+    doc.setPage(page);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...BRAND.muted);
+    doc.text(
+      `AdaptiveMind AI - Offline Study Pack - Page ${page} of ${pageCount}`,
+      margin,
+      pageHeight - 8,
+    );
+  }
+  return doc;
 }
 
 export function exportStudyPack(data: StudyPackData): void {
-  const doc = new jsPDF();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 20;
-  const contentWidth = pageWidth - 2 * margin;
-  let y = margin;
-
-  // ═══════════════════════════════════════════
-  // COVER PAGE
-  // ═══════════════════════════════════════════
-  doc.setFillColor(...BRAND.light);
-  doc.rect(0, 0, pageWidth, 120, "F");
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(28);
-  doc.setTextColor(...BRAND.dark);
-  doc.text("AdaptiveMind AI", margin, 50);
-
-  doc.setFontSize(16);
-  doc.setFont("helvetica", "normal");
-  doc.setTextColor(...BRAND.primary);
-  doc.text("Offline Study Pack", margin, 65);
-
-  doc.setFontSize(10);
-  doc.setTextColor(...BRAND.muted);
-  doc.text(
-    `Generated ${new Date().toLocaleDateString()} · ${data.lessons.length} lesson${data.lessons.length !== 1 ? "s" : ""}${data.plan ? " · Study plan included" : ""}`,
-    margin,
-    80
+  createStudyPackDocument(data).save(
+    safeExportFilename(
+      "adaptivemind-study-pack",
+      data.plan?.id ?? "selected-lessons",
+      "pdf",
+    ),
   );
-
-  y = 140;
-
-  // ── Table of Contents ──
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(12);
-  doc.setTextColor(...BRAND.dark);
-  doc.text("Contents", margin, y);
-  y += 8;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(...BRAND.muted);
-
-  if (data.plan) {
-    doc.text("1. Study Plan", margin + 4, y);
-    y += 6;
-    doc.text(`   ${data.plan.durationDays} days · ${data.plan.minutesPerDay} min/day · ${data.plan.intensity}`, margin + 4, y);
-    y += 8;
-  }
-
-  data.lessons.forEach((lesson, i) => {
-    const num = data.plan ? i + 2 : i + 1;
-    doc.text(`${num}. ${lesson.response.lesson.title}`, margin + 4, y);
-    y += 5;
-    doc.setFontSize(8);
-    doc.text(
-      `   ${lesson.subject} · ${lesson.level} · ${new Date(lesson.date).toLocaleDateString()}`,
-      margin + 4,
-      y
-    );
-    doc.setFontSize(10);
-    y += 7;
-  });
-
-  // ═══════════════════════════════════════════
-  // STUDY PLAN
-  // ═══════════════════════════════════════════
-  if (data.plan) {
-    doc.addPage();
-    y = margin;
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
-    doc.setTextColor(...BRAND.dark);
-    doc.text("Study Plan", margin, y);
-    y += 8;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(...BRAND.muted);
-    doc.text(
-      `${data.plan.durationDays} days · ${data.plan.minutesPerDay} min/day · ${data.plan.intensity} · Goal: ${data.plan.goal}`,
-      margin,
-      y
-    );
-    y += 10;
-
-    for (const day of data.plan.days) {
-      if (y > 260) {
-        doc.addPage();
-        y = margin;
-      }
-
-      doc.setFillColor(...BRAND.primary);
-      doc.roundedRect(margin, y - 4, contentWidth, 10, 2, 2, "F");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(255, 255, 255);
-      doc.text(
-        `Day ${day.dayNumber} — ${day.focus} (${day.totalMinutes} min)`,
-        margin + 4,
-        y + 3
-      );
-      y += 14;
-
-      for (const task of day.tasks) {
-        if (y > 275) {
-          doc.addPage();
-          y = margin;
-        }
-        const check = task.completed ? "✓" : "○";
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(...BRAND.dark);
-        doc.text(`${check} ${task.minutes} min — ${task.topic} (${task.type})`, margin + 6, y);
-        y += 5;
-      }
-      y += 3;
-    }
-  }
-
-  // ═══════════════════════════════════════════
-  // LESSONS
-  // ═══════════════════════════════════════════
-  for (const entry of data.lessons) {
-    doc.addPage();
-    y = margin;
-
-    const lesson = entry.response.lesson;
-
-    // Lesson header
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(14);
-    doc.setTextColor(...BRAND.dark);
-    doc.text(lesson.title, margin, y);
-    y += 7;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
-    doc.setTextColor(...BRAND.muted);
-    doc.text(
-      `${entry.subject} · ${entry.level} · ${new Date(entry.date).toLocaleDateString()}`,
-      margin,
-      y
-    );
-    y += 10;
-
-    // Core Idea
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(...BRAND.dark);
-    doc.text("Core Idea", margin, y);
-    y += 6;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(...BRAND.muted);
-    const ideaLines = doc.splitTextToSize(lesson.coreIdea, contentWidth);
-    doc.text(ideaLines, margin, y);
-    y += ideaLines.length * 5 + 8;
-
-    // Explanation
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(...BRAND.dark);
-    doc.text("Explanation", margin, y);
-    y += 6;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(...BRAND.muted);
-    const explLines = doc.splitTextToSize(lesson.explanation, contentWidth);
-    doc.text(explLines.slice(0, 20), margin, y);
-    y += Math.min(explLines.length, 20) * 5 + 8;
-
-    // Key Points
-    if (lesson.keyPoints.length > 0) {
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(...BRAND.dark);
-      doc.text("Key Points", margin, y);
-      y += 6;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(10);
-      for (const point of lesson.keyPoints) {
-        const lines = doc.splitTextToSize(`• ${point}`, contentWidth - 6);
-        doc.text(lines, margin + 4, y);
-        y += lines.length * 5 + 2;
-      }
-      y += 4;
-    }
-
-    // Check Question
-    if (lesson.checkQuestion) {
-      if (y > 260) {
-        doc.addPage();
-        y = margin;
-      }
-      doc.setFillColor(...BRAND.primary);
-      doc.roundedRect(margin, y - 4, contentWidth, 12, 2, 2, "F");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(255, 255, 255);
-      doc.text(`Self-check: ${lesson.checkQuestion}`, margin + 4, y + 4);
-      y += 18;
-    }
-  }
-
-  // ── Review Questions Page ──
-  doc.addPage();
-  y = margin;
-
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.setTextColor(...BRAND.dark);
-  doc.text("Review Questions", margin, y);
-  y += 8;
-
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(10);
-  doc.setTextColor(...BRAND.muted);
-  doc.text("Use these questions to test your understanding:", margin, y);
-  y += 10;
-
-  let qNum = 1;
-  for (const entry of data.lessons) {
-    if (entry.response.lesson.checkQuestion) {
-      if (y > 260) {
-        doc.addPage();
-        y = margin;
-      }
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      doc.setTextColor(...BRAND.dark);
-      doc.text(`${qNum}. ${entry.response.lesson.checkQuestion}`, margin + 4, y);
-      y += 6;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.setTextColor(...BRAND.muted);
-      doc.text(`   (${entry.response.lesson.title})`, margin + 4, y);
-      y += 8;
-      qNum++;
-    }
-  }
-
-  // ── Page footers ──
-  const pageCount = doc.getNumberOfPages();
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i);
-    doc.setFontSize(8);
-    doc.setTextColor(...BRAND.muted);
-    doc.text(
-      `AdaptiveMind AI · Study Pack · Page ${i} of ${pageCount}`,
-      margin,
-      doc.internal.pageSize.getHeight() - 10
-    );
-  }
-
-  doc.save(`adaptivemind-study-pack-${Date.now()}.pdf`);
 }

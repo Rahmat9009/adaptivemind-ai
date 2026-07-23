@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { CloudOff, Download, Wifi } from "lucide-react";
 import { motion } from "motion/react";
 import { fadeIn } from "@/lib/motion";
@@ -63,6 +64,10 @@ export function OfflineLibraryCard({
           {pendingCount} local update{pendingCount === 1 ? "" : "s"} pending
         </p>
       )}
+      <Link href="/downloads" className="am-btn am-btn-secondary mt-4">
+        <Download size={16} aria-hidden="true" />
+        Open downloaded lessons
+      </Link>
     </motion.section>
   );
 }
