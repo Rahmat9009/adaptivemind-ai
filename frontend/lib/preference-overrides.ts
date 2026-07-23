@@ -54,7 +54,7 @@ export function loadPreferenceOverrides(): PreferenceOverrides {
     if (!value || typeof value !== "object") return emptyPreferenceOverrides();
 
     const raw = value as Record<string, unknown>;
-    return {
+    return normalizePreferenceOverrides({
       likedDomains: sanitizeStringArray(raw.likedDomains),
       bannedDomains: sanitizeStringArray(raw.bannedDomains),
       dislikedPatterns: sanitizeStringArray(raw.dislikedPatterns),
@@ -62,21 +62,19 @@ export function loadPreferenceOverrides(): PreferenceOverrides {
       conciseStories: typeof raw.conciseStories === "boolean" ? raw.conciseStories : false,
       startChallengesEasy: typeof raw.startChallengesEasy === "boolean" ? raw.startChallengesEasy : false,
       updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : new Date().toISOString(),
-    };
+    });
   } catch {
     return emptyPreferenceOverrides();
   }
 }
 
 export function savePreferenceOverrides(prefs: PreferenceOverrides): void {
-  const clamped: PreferenceOverrides = {
-    ...prefs,
-    likedDomains: clampList(prefs.likedDomains),
-    bannedDomains: clampList(prefs.bannedDomains),
-    dislikedPatterns: clampList(prefs.dislikedPatterns),
-    updatedAt: new Date().toISOString(),
-  };
-  localStorage.setItem(PREFERENCE_OVERRIDES_KEY, JSON.stringify(clamped));
+  const clamped = normalizePreferenceOverrides(prefs);
+  try {
+    localStorage.setItem(PREFERENCE_OVERRIDES_KEY, JSON.stringify(clamped));
+  } catch {
+    // Preferences remain usable for the current session.
+  }
 }
 
 // ──────────────────────────────────────
@@ -100,8 +98,29 @@ function sanitizeDetailPref(
 }
 
 function clampList(items: string[]): string[] {
+  const seen = new Set<string>();
   return items
     .map((s) => s.trim().slice(0, MAX_BAN_LENGTH))
     .filter((s) => s.length > 0)
+    .filter((item) => {
+      const key = item.toLocaleLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
     .slice(0, MAX_BAN_ENTRIES);
+}
+
+export function normalizePreferenceOverrides(
+  value: PreferenceOverrides,
+): PreferenceOverrides {
+  return {
+    likedDomains: clampList(value.likedDomains),
+    bannedDomains: clampList(value.bannedDomains),
+    dislikedPatterns: clampList(value.dislikedPatterns),
+    detailPreference: sanitizeDetailPref(value.detailPreference),
+    conciseStories: Boolean(value.conciseStories),
+    startChallengesEasy: Boolean(value.startChallengesEasy),
+    updatedAt: new Date().toISOString(),
+  };
 }

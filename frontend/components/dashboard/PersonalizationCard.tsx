@@ -58,7 +58,7 @@ export function PersonalizationCard({ scores }: { scores: LearningScores }) {
           uses{" "}
           {learningDimensionLabels[profile.secondaryDimension].toLowerCase()}{" "}
           when it helps make the idea clearer. As you complete lessons, Ada
-          learns which approaches actually work best for you.
+          estimates which approaches appear to improve your understanding.
         </p>
       </motion.div>
     </motion.section>

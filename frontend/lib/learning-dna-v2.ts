@@ -42,6 +42,8 @@ export interface ApproachEvidence {
   weightedEffectiveness: number;
   /** Total pieces of evidence collected */
   evidenceCount: number;
+  /** Recent evidence identifiers used to prevent duplicate submissions */
+  recentEvidenceIds: string[];
   /** When this approach was last used */
   lastUsedAt?: string;
 }
@@ -138,6 +140,7 @@ function emptyApproachEvidence(): ApproachEvidence {
     retries: 0,
     weightedEffectiveness: 50,
     evidenceCount: 0,
+    recentEvidenceIds: [],
   };
 }
 
@@ -202,8 +205,8 @@ export function migrateLearningDNA(
   existingV2: unknown,
   existingV1: unknown,
 ): LearningDNA2 {
-  // If we already have v2 data, return it
-  if (isValidV2(existingV2)) return existingV2;
+  const normalizedV2 = normalizeLearningDNA2(existingV2);
+  if (normalizedV2) return normalizedV2;
 
   const fresh = emptyLearningDNA2();
 
@@ -229,21 +232,123 @@ export function migrateLearningDNA(
   return fresh;
 }
 
-function isValidV2(value: unknown): value is LearningDNA2 {
-  if (typeof value !== "object" || value === null) return false;
+function finiteNumber(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : fallback;
+}
+
+function normalizeLearningDNA2(value: unknown): LearningDNA2 | null {
+  if (typeof value !== "object" || value === null) return null;
   const record = value as Record<string, unknown>;
-  return (
-    record.version === 2 &&
-    typeof record.initialPreferences === "object" &&
-    record.initialPreferences !== null &&
-    typeof record.observedEffectiveness === "object" &&
-    record.observedEffectiveness !== null &&
-    DIMENSIONS.every(
-      (dim) =>
-        typeof (record.initialPreferences as Record<string, unknown>)[dim] === "number" &&
-        typeof (record.observedEffectiveness as Record<string, unknown>)[dim] === "object",
-    )
+  if (
+    record.version !== 2
+    || typeof record.initialPreferences !== "object"
+    || record.initialPreferences === null
+    || typeof record.observedEffectiveness !== "object"
+    || record.observedEffectiveness === null
+  ) {
+    return null;
+  }
+
+  const fresh = emptyLearningDNA2();
+  const initial = record.initialPreferences as Record<string, unknown>;
+  const observed = record.observedEffectiveness as Record<string, unknown>;
+
+  for (const dimension of DIMENSIONS) {
+    fresh.initialPreferences[dimension] = clamp(
+      finiteNumber(initial[dimension], 50),
+      0,
+      100,
+    );
+    const rawEvidence = typeof observed[dimension] === "object"
+      && observed[dimension] !== null
+      ? observed[dimension] as Record<string, unknown>
+      : {};
+    const fallback = emptyApproachEvidence();
+    fresh.observedEffectiveness[dimension] = {
+      statedPreference: clamp(
+        finiteNumber(
+          rawEvidence.statedPreference,
+          fresh.initialPreferences[dimension],
+        ),
+        0,
+        100,
+      ),
+      usageCount: clamp(finiteNumber(rawEvidence.usageCount, 0), 0, 10_000),
+      switchAwayCount: clamp(
+        finiteNumber(rawEvidence.switchAwayCount, 0),
+        0,
+        10_000,
+      ),
+      successfulChecks: clamp(
+        finiteNumber(rawEvidence.successfulChecks, 0),
+        0,
+        10_000,
+      ),
+      totalChecks: clamp(finiteNumber(rawEvidence.totalChecks, 0), 0, 10_000),
+      averageCheckScore: clamp(
+        finiteNumber(rawEvidence.averageCheckScore, 0),
+        0,
+        100,
+      ),
+      averageConfidenceBefore: clamp(
+        finiteNumber(rawEvidence.averageConfidenceBefore, 0),
+        0,
+        100,
+      ),
+      averageConfidenceAfter: clamp(
+        finiteNumber(rawEvidence.averageConfidenceAfter, 0),
+        0,
+        100,
+      ),
+      hintRequests: clamp(
+        finiteNumber(rawEvidence.hintRequests, 0),
+        0,
+        10_000,
+      ),
+      retries: clamp(finiteNumber(rawEvidence.retries, 0), 0, 10_000),
+      weightedEffectiveness: clamp(
+        finiteNumber(rawEvidence.weightedEffectiveness, 50),
+        0,
+        100,
+      ),
+      evidenceCount: clamp(
+        finiteNumber(rawEvidence.evidenceCount, 0),
+        0,
+        10_000,
+      ),
+      recentEvidenceIds: Array.isArray(rawEvidence.recentEvidenceIds)
+        ? rawEvidence.recentEvidenceIds
+            .filter((item): item is string => typeof item === "string")
+            .slice(0, 30)
+        : fallback.recentEvidenceIds,
+      lastUsedAt: typeof rawEvidence.lastUsedAt === "string"
+        ? rawEvidence.lastUsedAt
+        : undefined,
+    };
+  }
+
+  fresh.currentRecommendation = DIMENSIONS.includes(
+    record.currentRecommendation as LearningDimension,
+  )
+    ? record.currentRecommendation as LearningDimension
+    : getRankedDimensions(fresh.initialPreferences)[0];
+  fresh.recommendationConfidence = clamp(
+    finiteNumber(record.recommendationConfidence, 5),
+    0,
+    100,
   );
+  fresh.recommendationReason = typeof record.recommendationReason === "string"
+    ? record.recommendationReason.slice(0, 500)
+    : fresh.recommendationReason;
+  fresh.evidenceSummary = typeof record.evidenceSummary === "string"
+    ? record.evidenceSummary.slice(0, 500)
+    : fresh.evidenceSummary;
+  fresh.updatedAt = typeof record.updatedAt === "string"
+    ? record.updatedAt
+    : fresh.updatedAt;
+  return fresh;
 }
 
 // ──────────────────────────────────────
@@ -251,26 +356,27 @@ function isValidV2(value: unknown): value is LearningDNA2 {
 // ──────────────────────────────────────
 
 export function loadLearningDNA2(): LearningDNA2 {
-  try {
-    const v2Raw = JSON.parse(
-      localStorage.getItem(LEARNING_DNA_V2_STORAGE_KEY) ?? "null",
-    );
-    const v1Raw = JSON.parse(
-      localStorage.getItem(V1_STORAGE_KEY) ?? "null",
-    );
-    const migrated = migrateLearningDNA(v2Raw, v1Raw);
-    // Write back if we migrated
-    saveLearningDNA2(migrated);
-    return migrated;
-  } catch {
-    const fresh = emptyLearningDNA2();
-    saveLearningDNA2(fresh);
-    return fresh;
-  }
+  const read = (key: string): unknown => {
+    try {
+      return JSON.parse(localStorage.getItem(key) ?? "null");
+    } catch {
+      return null;
+    }
+  };
+  const migrated = migrateLearningDNA(
+    read(LEARNING_DNA_V2_STORAGE_KEY),
+    read(V1_STORAGE_KEY),
+  );
+  saveLearningDNA2(migrated);
+  return migrated;
 }
 
 export function saveLearningDNA2(dna: LearningDNA2): void {
-  localStorage.setItem(LEARNING_DNA_V2_STORAGE_KEY, JSON.stringify(dna));
+  try {
+    localStorage.setItem(LEARNING_DNA_V2_STORAGE_KEY, JSON.stringify(dna));
+  } catch {
+    // Learning continues even when browser storage is unavailable.
+  }
 }
 
 // ──────────────────────────────────────
@@ -374,7 +480,7 @@ export function generateRecommendation(
     reason = `Not enough evidence yet. Try lessons in a few different modes to help AdaptiveMind learn what works for you.`;
     evidenceSummary = `Limited evidence (${DIMENSIONS.reduce((s, d) => s + dna.observedEffectiveness[d].evidenceCount, 0)} total observations).`;
   } else if (topEvidence.weightedEffectiveness > secondEffective + 15) {
-    reason = `${capitalize(top)} explanations have been measurably more effective (${topEvidence.weightedEffectiveness}% success rate over ${topEvidence.evidenceCount} uses).`;
+    reason = `${capitalize(top)} explanations have the strongest observed effectiveness so far (${topEvidence.weightedEffectiveness}% estimate over ${topEvidence.evidenceCount} checks).`;
     evidenceSummary = `Based on ${topEvidence.evidenceCount} uses with ${topEvidence.successfulChecks} successful checks.`;
   } else {
     reason = `${capitalize(top)} and ${capitalize(second)} approaches are both working well. Either would be a strong choice.`;
@@ -407,22 +513,32 @@ export function recordCheckOutcome(
     hintCount: number;
     retryCount: number;
     switchedAway: boolean;
+    evidenceId?: string;
   },
 ): LearningDNA2 {
   const ev = dna.observedEffectiveness[approach];
+  if (
+    outcome.evidenceId
+    && ev.recentEvidenceIds.includes(outcome.evidenceId)
+  ) {
+    return dna;
+  }
+  const boundedScore = clamp(outcome.score, 0, 100);
+  const boundedConfidenceBefore = clamp(outcome.confidenceBefore, 0, 100);
+  const boundedConfidenceAfter = clamp(outcome.confidenceAfter, 0, 100);
   const newTotalChecks = ev.totalChecks + 1;
   const newSuccessCount =
-    ev.successfulChecks + (outcome.score >= 60 ? 1 : 0);
+    ev.successfulChecks + (boundedScore >= 70 ? 1 : 0);
 
   const newAverageScore =
-    (ev.averageCheckScore * ev.totalChecks + outcome.score) / newTotalChecks;
+    (ev.averageCheckScore * ev.totalChecks + boundedScore) / newTotalChecks;
 
   const newAvgConfBefore =
-    (ev.averageConfidenceBefore * ev.totalChecks + outcome.confidenceBefore) /
+    (ev.averageConfidenceBefore * ev.totalChecks + boundedConfidenceBefore) /
     newTotalChecks;
 
   const newAvgConfAfter =
-    (ev.averageConfidenceAfter * ev.totalChecks + outcome.confidenceAfter) /
+    (ev.averageConfidenceAfter * ev.totalChecks + boundedConfidenceAfter) /
     newTotalChecks;
 
   // Calculate weighted effectiveness: blend success rate, hint penalty,
@@ -431,9 +547,9 @@ export function recordCheckOutcome(
   const hintPenalty = clamp(1 - outcome.hintCount * 0.1, 0.5, 1);
   const retryPenalty = clamp(1 - outcome.retryCount * 0.1, 0.5, 1);
   const confidenceCalibration =
-    outcome.confidenceAfter > outcome.confidenceBefore + 20
+    boundedConfidenceAfter > boundedConfidenceBefore + 20
       ? 1.1
-      : outcome.confidenceAfter < outcome.confidenceBefore - 20
+      : boundedConfidenceAfter < boundedConfidenceBefore - 20
         ? 0.9
         : 1.0;
 
@@ -457,6 +573,9 @@ export function recordCheckOutcome(
     hintRequests: ev.hintRequests + outcome.hintCount,
     weightedEffectiveness: newEffectiveness,
     evidenceCount: ev.evidenceCount + 1,
+    recentEvidenceIds: outcome.evidenceId
+      ? [outcome.evidenceId, ...ev.recentEvidenceIds].slice(0, 30)
+      : ev.recentEvidenceIds,
     switchAwayCount: ev.switchAwayCount + (outcome.switchedAway ? 1 : 0),
     lastUsedAt: new Date().toISOString(),
   };

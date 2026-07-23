@@ -71,7 +71,7 @@ export function MasteryOverview({
 
           <motion.div variants={staggerItem} className="mt-5 space-y-2">
             {entries.slice(0, 5).map((entry) => {
-              const masteryPct = entry.bestScore;
+              const masteryPct = entry.masteryPercent;
               return (
                 <div
                   key={entry.topicId}
@@ -84,7 +84,7 @@ export function MasteryOverview({
                     <span className="inline-flex items-center rounded-md border border-[var(--am-border-light)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[var(--am-text-muted)]">
                       {entry.masteryLevel.replace("-", " ")}
                     </span>
-                    {entry.bestScore != null && (
+                    {entry.evidenceCount > 0 && (
                       <span className="w-16">
                         <ProgressBarBase value={masteryPct} className="h-1.5" progressClassName="bg-[var(--am-primary)]" />
                       </span>

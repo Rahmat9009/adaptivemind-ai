@@ -3,6 +3,11 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { fadeIn } from "@/lib/motion";
+import { ConfidenceSelector } from "./ConfidenceSelector";
+import {
+  confidenceLevelFromNumber,
+  confidenceLevelToNumber,
+} from "@/lib/confidence-calibration";
 
 export type QuickRecallStatus =
   | "idle"
@@ -28,11 +33,15 @@ interface QuickRecallProps {
   /** Whether the result is being calculated */
   isLoading?: boolean;
   /** Handler for submitting an answer */
-  onSubmit?: (answer: string) => void;
+  onSubmit?: (answer: string, confidence: number) => void;
   /** Handler for retrying */
   onRetry?: () => void;
   /** Handler for starting a full review */
   onFullReview?: () => void;
+  confidence?: number | null;
+  onConfidenceChange?: (confidence: number) => void;
+  error?: string | null;
+  onAccelerate?: () => void;
 }
 
 function statusLabel(s: QuickRecallProps["recallStatus"]): {
@@ -64,6 +73,10 @@ export function QuickRecall({
   onSubmit,
   onRetry,
   onFullReview,
+  confidence = null,
+  onConfidenceChange,
+  error,
+  onAccelerate,
 }: QuickRecallProps) {
   const [answer, setAnswer] = useState("");
   const [phase, setPhase] = useState<QuickRecallStatus>(() =>
@@ -109,6 +122,16 @@ export function QuickRecall({
               : "— No review is scheduled yet."}
       </p>
 
+      {recallStatus === "not-due" && onAccelerate && (
+        <button
+          type="button"
+          onClick={onAccelerate}
+          className="mt-3 text-xs font-semibold text-[var(--am-primary)] underline-offset-4 hover:underline"
+        >
+          Run accelerated demo
+        </button>
+      )}
+
       {/* Idle → Ask */}
       {recallStatus === "due" && phase === "idle" && (
         <button
@@ -134,6 +157,20 @@ export function QuickRecall({
               Loading question…
             </p>
           )}
+          {onConfidenceChange && (
+            <ConfidenceSelector
+              label="recall this without looking back"
+              value={
+                confidence === null
+                  ? null
+                  : confidenceLevelFromNumber(confidence)
+              }
+              onChange={(level) =>
+                onConfidenceChange(confidenceLevelToNumber(level))
+              }
+              timing="before"
+            />
+          )}
           <div className="mt-3 flex items-start gap-2">
             <textarea
               value={answer}
@@ -147,12 +184,18 @@ export function QuickRecall({
             <button
               type="button"
               onClick={() => {
-                if (answer.trim() && onSubmit) {
-                  onSubmit(answer.trim());
+                if (
+                  answer.trim()
+                  && onSubmit
+                  && confidence !== null
+                ) {
+                  onSubmit(answer.trim(), confidence);
                   setPhase("loading");
                 }
               }}
-              disabled={!answer.trim() || isLoading}
+              disabled={
+                !answer.trim() || isLoading || confidence === null
+              }
               className="rounded-[var(--am-radius-md)] bg-[var(--am-primary)] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
             >
               {isLoading ? "Checking…" : "Submit"}
@@ -223,6 +266,27 @@ export function QuickRecall({
             )}
           </div>
         </motion.div>
+      )}
+
+      {phase === "loading" && !result && (
+        <div className="mt-3" role="status" aria-live="polite">
+          {error ? (
+            <>
+              <p className="text-sm text-[var(--am-error)]">{error}</p>
+              <button
+                type="button"
+                onClick={() => setPhase("asking")}
+                className="am-btn am-btn-secondary mt-2 py-1.5 px-3 text-sm"
+              >
+                Try again
+              </button>
+            </>
+          ) : (
+            <p className="text-sm text-[var(--am-text-secondary)]">
+              Ada is checking your recall…
+            </p>
+          )}
+        </div>
       )}
 
       {/* Full review recommended */}

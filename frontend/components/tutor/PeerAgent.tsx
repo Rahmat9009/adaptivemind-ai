@@ -13,9 +13,6 @@ export interface PeerAgentMessage {
 
 const MAX_TURNS = 6;
 
-// Peer prompts for the AI classmate's progression (kept for reference)
-// const PEER_PROMPTS = [...];
-
 export function PeerAgent({
   topic,
   state,
@@ -46,20 +43,20 @@ export function PeerAgent({
       animate="visible"
       className="mt-6 rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-warm-bg)] p-5 sm:p-6"
       role="region"
-      aria-label="Peer agent mode"
+      aria-label="Ada practice learner exercise"
     >
       <div className="flex items-center gap-2">
         <span className="inline-flex items-center gap-1 rounded-[var(--am-radius-md)] bg-[var(--am-primary)]/10 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--am-primary)]">
-          Peer agent
+          Ada role-play
         </span>
         <span className="text-xs text-[var(--am-text-muted)]">
-          Teach a classmate
+          Teach a practice learner
         </span>
       </div>
 
       <p className="mt-2 text-sm leading-6 text-[var(--am-text-secondary)]">
-        Explaining a concept to someone else is one of the most effective ways
-        to solidify your own understanding.
+        Ada will role-play a learner who asks brief follow-up questions so you
+        can test and refine your explanation.
       </p>
 
       {/* Prompt state */}
@@ -69,7 +66,7 @@ export function PeerAgent({
           onClick={onStart}
           className="am-btn am-btn-secondary mt-3 py-1.5 px-3 text-sm"
         >
-          Start peer session
+          Start role-play
         </button>
       )}
 
@@ -103,7 +100,7 @@ export function PeerAgent({
                 }`}
               >
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--am-text-muted)] mb-1">
-                  {msg.role === "peer" ? "Classmate (AI)" : "You"}
+                  {msg.role === "peer" ? "Ada as practice learner" : "You"}
                 </p>
                 {msg.content}
               </motion.div>
@@ -116,16 +113,16 @@ export function PeerAgent({
               <textarea
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Explain this to your classmate…"
+                placeholder="Explain this to the practice learner…"
                 className="min-h-[60px] flex-1 resize-none rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-surface)] p-2.5 text-sm leading-5 text-[var(--am-text-primary)] placeholder:text-[var(--am-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--am-primary)]/30"
-                aria-label="Your explanation to the peer"
+                aria-label="Your explanation to Ada's practice learner"
               />
             </div>
           )}
 
           {isLoading && (
             <p className="text-xs text-[var(--am-text-muted)] italic">
-              Your classmate is thinking…
+              Ada is preparing a follow-up…
             </p>
           )}
 
@@ -188,7 +185,7 @@ export function PeerAgent({
           className="mt-3"
         >
           <p className="text-sm text-[var(--am-text-secondary)]">
-            Peer session ended. You completed {turnCount} turns explaining{' '}
+            Role-play ended. You completed {turnCount} turns explaining{" "}
             <strong>{topic}</strong>.
           </p>
           <button
@@ -196,7 +193,7 @@ export function PeerAgent({
             onClick={onStart}
             className="am-btn am-btn-secondary mt-2 py-1.5 px-3 text-sm"
           >
-            Start another session
+            Start another role-play
           </button>
         </motion.div>
       )}

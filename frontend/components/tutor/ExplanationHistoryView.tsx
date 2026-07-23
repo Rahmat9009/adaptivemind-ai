@@ -152,7 +152,7 @@ export function ExplanationHistoryView({
                 </span>
                 {summary.bestApproach && (
                   <span className="text-[var(--am-primary)]">
-                    Best: {APPROACH_LABELS[summary.bestApproach] ?? summary.bestApproach}
+                    Strongest observed: {APPROACH_LABELS[summary.bestApproach] ?? summary.bestApproach}
                   </span>
                 )}
               </div>
@@ -168,6 +168,10 @@ export function ExplanationHistoryView({
                   ))}
                 </div>
               )}
+              <p className="mt-2 text-[10px] leading-4 text-[var(--am-text-muted)]">
+                These outcomes are limited evidence and do not prove that one
+                approach caused the result.
+              </p>
             </div>
           )}
 
@@ -213,6 +217,9 @@ function RecordRow({ record }: { record: ExplanationRecord }) {
           </>
         )}
       </div>
+      <p className="mt-1 text-[10px] leading-4 text-[var(--am-text-muted)]">
+        Mastery estimate: {record.masteryBefore}% to {record.masteryAfter}%.
+      </p>
     </div>
   );
 }

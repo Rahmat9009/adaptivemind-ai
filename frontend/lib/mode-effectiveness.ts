@@ -13,6 +13,7 @@
  */
 
 import type { LearningDimension } from "@/lib/learning-dna";
+import type { TeachingMode } from "@/lib/ai/types";
 
 const DIMENSIONS: LearningDimension[] = [
   "visual",
@@ -29,6 +30,35 @@ const DIMENSION_NAMES: Record<LearningDimension, string> = {
   stories: "Stories",
   challenges: "Challenges",
 };
+
+const MODE_TO_DIMENSION: Record<
+  Exclude<TeachingMode, "adaptive">,
+  LearningDimension
+> = {
+  visual: "visual",
+  example: "examples",
+  analogy: "analogies",
+  story: "stories",
+  challenge: "challenges",
+};
+
+export function teachingModeToDimension(
+  mode: TeachingMode,
+  adaptiveRecommendation: LearningDimension = "visual",
+): LearningDimension {
+  return mode === "adaptive"
+    ? adaptiveRecommendation
+    : MODE_TO_DIMENSION[mode];
+}
+
+export function dimensionToTeachingMode(
+  dimension: LearningDimension,
+): Exclude<TeachingMode, "adaptive"> {
+  const entry = Object.entries(MODE_TO_DIMENSION).find(
+    ([, candidate]) => candidate === dimension,
+  );
+  return (entry?.[0] ?? "visual") as Exclude<TeachingMode, "adaptive">;
+}
 
 // ──────────────────────────────────────
 // Approach state (survival of checked attempts)

@@ -268,6 +268,22 @@ export interface HintResponse {
   stylesUsed: LearningDimension[];
 }
 
+export interface AdaAdaptationContext {
+  recommendedApproach: LearningDimension;
+  recommendationReason: string;
+  evidenceCount: number;
+  confidence: number;
+}
+
+export interface AdaLearnerPreferences {
+  detailPreference: "concise" | "moderate" | "thorough";
+  conciseStories: boolean;
+  startChallengesEasy: boolean;
+  likedDomains: string[];
+  bannedDomains: string[];
+  dislikedPatterns: string[];
+}
+
 // ──────────────────────────────────────
 // TutorRequest (extended)
 // ──────────────────────────────────────
@@ -296,6 +312,9 @@ export interface TutorRequest {
   /** For hint generation */
   currentHintLevel?: number;
   challengeContext?: string;
+  learnerConfidence?: number;
+  adaptationContext?: AdaAdaptationContext;
+  learnerPreferences?: AdaLearnerPreferences;
   /** For review */
   reviewSkillId?: string;
 }

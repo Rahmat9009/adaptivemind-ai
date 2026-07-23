@@ -41,6 +41,10 @@ export interface QuickRecallRecord {
   fullReviewRecommended: boolean;
   /** Whether the recall was ever completed */
   completed: boolean;
+  /** Focused retrieval/application question saved for offline display */
+  question: string;
+  /** Whether this record uses an accelerated demonstration delay */
+  simulated: boolean;
 }
 
 interface QuickRecallStore {
@@ -59,21 +63,34 @@ export function loadQuickRecalls(): QuickRecallRecord[] {
     if (!value || typeof value !== "object") return [];
     const store = value as QuickRecallStore;
     if (!Array.isArray(store.records)) return [];
-    return store.records.filter(
-      (r) =>
-        typeof r.skillId === "string" &&
-        typeof r.topic === "string" &&
-        typeof r.createdAt === "string" &&
-        typeof r.dueAt === "string",
-    );
+    return store.records
+      .filter(
+        (r) =>
+          typeof r.skillId === "string" &&
+          typeof r.topic === "string" &&
+          typeof r.createdAt === "string" &&
+          typeof r.dueAt === "string",
+      )
+      .map((record) => ({
+        ...record,
+        question: typeof record.question === "string" && record.question.trim()
+          ? record.question.slice(0, 500)
+          : `Without looking back, explain the central idea of ${record.topic} and give one consequence or use.`,
+        simulated: record.simulated === true,
+      }))
+      .slice(-100);
   } catch {
     return [];
   }
 }
 
 export function saveQuickRecalls(records: QuickRecallRecord[]): void {
-  const store: QuickRecallStore = { records };
-  localStorage.setItem(QUICK_RECALL_KEY, JSON.stringify(store));
+  const store: QuickRecallStore = { records: records.slice(-100) };
+  try {
+    localStorage.setItem(QUICK_RECALL_KEY, JSON.stringify(store));
+  } catch {
+    // Review scheduling is optional when local storage is unavailable.
+  }
 }
 
 // ──────────────────────────────────────
@@ -89,6 +106,7 @@ export function scheduleQuickRecall(
   topic: string,
   subject?: string,
   simulatedDelay = false,
+  question?: string,
 ): QuickRecallRecord {
   const records = loadQuickRecalls();
 
@@ -120,6 +138,9 @@ export function scheduleQuickRecall(
     bestScore: 0,
     fullReviewRecommended: false,
     completed: false,
+    question: question?.trim().slice(0, 500)
+      || `Without looking back, explain the central idea of ${topic} and give one consequence or use.`,
+    simulated: simulatedDelay,
   };
 
   records.push(record);
@@ -168,7 +189,7 @@ export function completeQuickRecall(
     retries: record.retries + 1,
     bestScore: Math.max(record.bestScore, score),
     lastCompletedAt: new Date().toISOString(),
-    fullReviewRecommended: score < 40 && record.retries >= MAX_RETRIES,
+    fullReviewRecommended: score < 40,
     completed: true,
   };
 
@@ -220,6 +241,7 @@ export function simulateQuickRecallDue(
   if (existing) {
     // Bump due time to now
     existing.dueAt = new Date(Date.now() - 1000).toISOString();
+    existing.simulated = true;
     saveQuickRecalls(records);
     return existing;
   }

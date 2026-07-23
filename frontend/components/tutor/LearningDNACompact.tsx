@@ -30,7 +30,7 @@ export function LearningDNACompact({
       aria-label="Current learning profile"
     >
       <p className="am-label text-[var(--am-text-muted)]">
-        Learning DNA active
+        Learning DNA
       </p>
       <p className="mt-1.5 text-base font-semibold text-[var(--am-text-primary)]">
         {isBalanced
@@ -40,7 +40,11 @@ export function LearningDNACompact({
       <p className="mt-1 text-xs leading-5 text-[var(--am-text-secondary)]">
         {isBalanced
           ? "A balanced explanation will be used until you complete the assessment."
-          : `Personalized using ${learningDimensionLabels[primary]} + ${learningDimensionLabels[secondary]}.`}
+          : `A starting hypothesis favoring ${learningDimensionLabels[primary]} + ${learningDimensionLabels[secondary]}. Observed check outcomes will gradually carry more weight.`}
+      </p>
+      <p className="mt-2 text-[11px] leading-5 text-[var(--am-text-muted)]">
+        An evolving model of which explanation approaches appear to improve
+        your understanding, not a permanent learning style.
       </p>
       <div className="mt-3">
         <LearningDNAConstellation

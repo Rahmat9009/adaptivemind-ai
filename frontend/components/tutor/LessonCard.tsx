@@ -200,14 +200,6 @@ export function LessonCard({ response }: LessonCardProps) {
           <p className="mt-2 leading-7 text-[var(--am-text-secondary)]">
             {lesson.challenge}
           </p>
-          {lesson.hint && (
-            <details className="mt-4 rounded-[var(--am-radius-md)] bg-[var(--am-bg-elevated)]/80 px-4 py-3 text-sm text-[var(--am-text-secondary)]">
-              <summary className="cursor-pointer font-semibold text-[var(--am-text-primary)]">
-                Optional hint
-              </summary>
-              <p className="mt-2 leading-6">{lesson.hint}</p>
-            </details>
-          )}
         </motion.section>
       )}
     </motion.article>

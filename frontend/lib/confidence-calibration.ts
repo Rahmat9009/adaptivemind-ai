@@ -40,6 +40,36 @@ export interface CalibrationSummary {
   recordCount: number;
 }
 
+export type ConfidencePerformanceCategory =
+  | "aligned"
+  | "underconfident"
+  | "confident-misconception"
+  | "low-confidence-developing";
+
+export function classifyConfidencePerformance({
+  confidence,
+  score,
+  status,
+}: {
+  confidence: number;
+  score: number;
+  status: "correct" | "partial" | "misconception" | "uncertain";
+}): ConfidencePerformanceCategory {
+  if (
+    confidence >= 70
+    && (score < 65 || status === "misconception")
+  ) {
+    return "confident-misconception";
+  }
+  if (confidence <= 55 && score >= 70 && status === "correct") {
+    return "underconfident";
+  }
+  if (confidence <= 55 && (score < 70 || status !== "correct")) {
+    return "low-confidence-developing";
+  }
+  return "aligned";
+}
+
 const CALIBRATION_STORAGE_KEY = "adaptivemind-confidence-calibration";
 
 // ──────────────────────────────────────
@@ -103,7 +133,10 @@ export function classifyCalibration(
   let category: CalibrationCategory;
   let description: string;
 
-  if (Math.abs(gap) < 10) {
+  if (avgPerformance < 50 && avgConfidence < 40) {
+    category = "low-confidence-low-understanding";
+    description = `Your confidence and performance both suggest this material is still being learned. That is a normal part of the process.`;
+  } else if (Math.abs(gap) < 10) {
     category = "well-calibrated";
     description = `Your confidence matches your performance well. Average confidence was ${Math.round(avgConfidence)}% and average score was ${Math.round(avgPerformance)}%.`;
   } else if (gap > 20) {
@@ -112,9 +145,6 @@ export function classifyCalibration(
   } else if (gap < -10) {
     category = "underconfident";
     description = `You tend to underrate your understanding (avg confidence ${Math.round(avgConfidence)}% vs avg score ${Math.round(avgPerformance)}%). You may know more than you think.`;
-  } else if (avgPerformance < 50 && avgConfidence < 40) {
-    category = "low-confidence-low-understanding";
-    description = `Your confidence and performance both suggest this material is still being learned. That is a normal part of the process.`;
   } else {
     category = "well-calibrated";
     description = "Your confidence and performance are reasonably aligned.";

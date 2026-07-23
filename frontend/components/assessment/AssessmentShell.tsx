@@ -132,10 +132,11 @@ export function AssessmentShell() {
           Learning DNA assessment
         </p>
         <h1 className="am-heading-serif mt-2 text-3xl text-[var(--am-text-primary)] sm:text-4xl">
-          How do you learn best?
+          Which approaches should Ada try first?
         </h1>
         <p className="mt-2 max-w-xl text-base leading-7 text-[var(--am-text-secondary)]">
-          Choose what feels most natural. Your first profile takes about two minutes and will evolve as you learn.
+          Choose what feels most useful right now. This starting hypothesis
+          takes about two minutes and will evolve from your learning outcomes.
         </p>
       </header>
 

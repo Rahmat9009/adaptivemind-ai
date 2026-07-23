@@ -67,6 +67,23 @@ const lessonSummarySchema = z.object({
   stylesUsed: z.array(learningDimensionSchema).max(5),
 }).strict();
 
+const learnerPreferenceItemSchema = z.string().trim().min(1).max(80);
+const learnerPreferencesSchema = z.object({
+  detailPreference: z.enum(["concise", "moderate", "thorough"]),
+  conciseStories: z.boolean(),
+  startChallengesEasy: z.boolean(),
+  likedDomains: z.array(learnerPreferenceItemSchema).max(20),
+  bannedDomains: z.array(learnerPreferenceItemSchema).max(20),
+  dislikedPatterns: z.array(learnerPreferenceItemSchema).max(20),
+}).strict();
+
+const adaptationContextSchema = z.object({
+  recommendedApproach: learningDimensionSchema,
+  recommendationReason: z.string().trim().min(1).max(500),
+  evidenceCount: z.number().int().min(0).max(10_000),
+  confidence: z.number().finite().min(0).max(100),
+}).strict();
+
 export const tutorRequestSchema = z.object({
   requestId: z.string().trim().min(8).max(100).optional(),
   topic: z.string().trim().min(2).max(160),
@@ -89,6 +106,9 @@ export const tutorRequestSchema = z.object({
   learnerResponse: z.string().trim().max(1_000).optional(),
   currentHintLevel: z.number().int().min(0).max(3).optional(),
   challengeContext: z.string().trim().max(2_000).optional(),
+  learnerConfidence: z.number().finite().min(0).max(100).optional(),
+  adaptationContext: adaptationContextSchema.optional(),
+  learnerPreferences: learnerPreferencesSchema.optional(),
   reviewSkillId: z.string().trim().max(100).optional(),
 }).strict().superRefine((value, context) => {
   const requireText = (

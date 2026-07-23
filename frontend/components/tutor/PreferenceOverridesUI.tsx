@@ -18,6 +18,7 @@ export function PreferenceOverridesUI() {
   const [expanded, setExpanded] = useState(false);
   const [newBan, setNewBan] = useState("");
   const [newLike, setNewLike] = useState("");
+  const [newDislike, setNewDislike] = useState("");
 
   function update(overrides: Partial<PreferenceOverrides>) {
     if (!prefs) return;
@@ -60,6 +61,24 @@ export function PreferenceOverridesUI() {
   function removeLike(entry: string) {
     if (!prefs) return;
     update({ likedDomains: prefs.likedDomains.filter((l) => l !== entry) });
+  }
+
+  function addDislike() {
+    if (!prefs || !newDislike.trim()) return;
+    const value = newDislike.trim().slice(0, 80);
+    update({
+      dislikedPatterns: [...prefs.dislikedPatterns, value].slice(0, 20),
+    });
+    setNewDislike("");
+  }
+
+  function removeDislike(entry: string) {
+    if (!prefs) return;
+    update({
+      dislikedPatterns: prefs.dislikedPatterns.filter(
+        (pattern) => pattern !== entry,
+      ),
+    });
   }
 
   // removeDislike kept for API completeness with bannedDomains/dislikedPatterns
@@ -163,10 +182,28 @@ export function PreferenceOverridesUI() {
             </span>
           </label>
 
+          <label className="flex items-center gap-3 cursor-pointer">
+            <span className="relative inline-flex h-5 w-9 items-center rounded-full transition-colors">
+              <input
+                type="checkbox"
+                checked={prefs.startChallengesEasy}
+                onChange={(event) =>
+                  update({ startChallengesEasy: event.target.checked })
+                }
+                className="sr-only peer"
+                aria-label="Start challenges easier"
+              />
+              <span className="h-4 w-4 rounded-full bg-[var(--am-surface)] border border-[var(--am-border-light)] transition-all peer-checked:translate-x-4 peer-checked:bg-[var(--am-primary)] peer-checked:border-[var(--am-primary)]" />
+            </span>
+            <span className="text-xs text-[var(--am-text-secondary)]">
+              Start challenges easier
+            </span>
+          </label>
+
           {/* Banned domains */}
           <div>
             <p className="text-[11px] font-medium text-[var(--am-text-muted)] mb-1.5">
-              Ban explanation approaches
+              Avoid analogy domains
               <span className="ml-1 text-[var(--am-text-muted)]">
                 ({prefs.bannedDomains.length}/20)
               </span>
@@ -197,9 +234,9 @@ export function PreferenceOverridesUI() {
                 value={newBan}
                 onChange={(e) => setNewBan(e.target.value.slice(0, 80))}
                 onKeyDown={(e) => e.key === "Enter" && addBan()}
-                placeholder="e.g. political analogies"
+                placeholder="e.g. sports analogies"
                 className="flex-1 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-surface)] px-2.5 py-1 text-[11px] text-[var(--am-text-primary)] placeholder:text-[var(--am-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--am-primary)]/30"
-                aria-label="Add approach to ban list"
+                aria-label="Add analogy domain to avoid"
               />
               <button
                 type="button"
@@ -207,7 +244,7 @@ export function PreferenceOverridesUI() {
                 disabled={!newBan.trim() || prefs.bannedDomains.length >= 20}
                 className="rounded-[var(--am-radius-md)] bg-[var(--am-surface)] px-2 py-1 text-[10px] font-medium text-[var(--am-text-secondary)] border border-[var(--am-border-light)] hover:border-[var(--am-error)]/30 hover:text-[var(--am-error)] disabled:opacity-30"
               >
-                Ban
+                Avoid
               </button>
             </div>
           </div>
@@ -215,7 +252,7 @@ export function PreferenceOverridesUI() {
           {/* Liked domains */}
           <div>
             <p className="text-[11px] font-medium text-[var(--am-text-muted)] mb-1.5">
-              Prefer explanation approaches
+              Preferred analogy domains
               <span className="ml-1 text-[var(--am-text-muted)]">
                 ({prefs.likedDomains.length}/20)
               </span>
@@ -246,7 +283,7 @@ export function PreferenceOverridesUI() {
                 value={newLike}
                 onChange={(e) => setNewLike(e.target.value.slice(0, 80))}
                 onKeyDown={(e) => e.key === "Enter" && addLike()}
-                placeholder="e.g. visual diagrams"
+                placeholder="e.g. nature"
                 className="flex-1 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-surface)] px-2.5 py-1 text-[11px] text-[var(--am-text-primary)] placeholder:text-[var(--am-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--am-primary)]/30"
                 aria-label="Add approach to preference list"
               />
@@ -257,6 +294,63 @@ export function PreferenceOverridesUI() {
                 className="rounded-[var(--am-radius-md)] bg-[var(--am-surface)] px-2 py-1 text-[10px] font-medium text-[var(--am-text-secondary)] border border-[var(--am-border-light)] hover:border-[var(--am-success)]/30 hover:text-[var(--am-success)] disabled:opacity-30"
               >
                 Prefer
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-[11px] font-medium text-[var(--am-text-muted)] mb-1.5">
+              Avoid in explanations
+              <span className="ml-1 text-[var(--am-text-muted)]">
+                ({prefs.dislikedPatterns.length}/20)
+              </span>
+            </p>
+            {prefs.dislikedPatterns.length > 0 && (
+              <div className="flex flex-wrap gap-1 mb-1.5">
+                {prefs.dislikedPatterns.map((entry) => (
+                  <span
+                    key={entry}
+                    className="inline-flex items-center gap-1 rounded-[var(--am-radius-md)] bg-[var(--am-error-light)] px-2 py-0.5 text-[10px] font-medium text-[var(--am-error)]"
+                  >
+                    {entry}
+                    <button
+                      type="button"
+                      onClick={() => removeDislike(entry)}
+                      className="ml-0.5 hover:opacity-70"
+                      aria-label={`Remove ${entry} from avoid list`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={newDislike}
+                onChange={(event) =>
+                  setNewDislike(event.target.value.slice(0, 80))
+                }
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    addDislike();
+                  }
+                }}
+                placeholder="e.g. long introductions"
+                className="flex-1 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-surface)] px-2.5 py-1 text-[11px] text-[var(--am-text-primary)] placeholder:text-[var(--am-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--am-primary)]/30"
+                aria-label="Add an explanation pattern to avoid"
+              />
+              <button
+                type="button"
+                onClick={addDislike}
+                disabled={
+                  !newDislike.trim() || prefs.dislikedPatterns.length >= 20
+                }
+                className="rounded-[var(--am-radius-md)] bg-[var(--am-surface)] px-2 py-1 text-[10px] font-medium text-[var(--am-text-secondary)] border border-[var(--am-border-light)] hover:border-[var(--am-error)]/30 hover:text-[var(--am-error)] disabled:opacity-30"
+              >
+                Avoid
               </button>
             </div>
           </div>

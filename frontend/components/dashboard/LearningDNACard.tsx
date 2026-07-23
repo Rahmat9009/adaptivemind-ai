@@ -85,10 +85,11 @@ export function LearningDNACard({ scores }: { scores: LearningScores }) {
       </motion.div>
 
       <p className="mt-6 text-sm leading-6 text-[var(--am-text-secondary)] border-t border-[var(--am-border-light)] pt-5">
-        You understand new ideas best through{" "}
+        Ada will currently try{" "}
         {learningDimensionLabels[profile.primaryDimension].toLowerCase()}-led
-        explanations, with support from{" "}
+        explanations first, with support from{" "}
         {learningDimensionLabels[profile.secondaryDimension].toLowerCase()}.
+        This starting preference will be revised as evidence grows.
       </p>
     </section>
   );

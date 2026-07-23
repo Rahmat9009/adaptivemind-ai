@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { fadeIn, slideUp } from "@/lib/motion";
 import {
   classifyCalibration,
+  classifyConfidencePerformance,
   generateConfidenceFeedback,
   type CalibrationSummary,
 } from "@/lib/confidence-calibration";
@@ -22,28 +23,34 @@ interface CoachingCase {
 function classifyCoachingCase(
   confidence: number | null,
   score: number,
+  status: "correct" | "partial" | "misconception" | "uncertain",
 ): CoachingCase {
   const conf = confidence ?? 50;
-  if (conf >= 60 && score >= 60) {
+  const category = classifyConfidencePerformance({
+    confidence: conf,
+    score,
+    status,
+  });
+  if (category === "aligned") {
     return {
       case: "high-high",
-      title: "Confidence matches your results",
+      title: "Confidence aligned with performance",
       message: "You were confident and your explanation supported that confidence.",
       nextStep: "This material is solid. Consider moving to the next topic or trying a related challenge.",
     };
   }
-  if (conf < 60 && score >= 60) {
+  if (category === "underconfident") {
     return {
       case: "low-high",
-      title: "You understood more than expected",
+      title: "Understood but underconfident",
       message: "You understood this better than you expected. That is a sign of progress.",
       nextStep: "Building awareness of what you know is part of the learning process. Try the next topic when you are ready.",
     };
   }
-  if (conf >= 60 && score < 60) {
+  if (category === "confident-misconception") {
     return {
       case: "high-low",
-      title: "A helpful checkpoint",
+      title: "Confident, but a misconception remains",
       message: "You felt confident, but one important idea still needs another look.",
       nextStep: "Review the key points above, then try again or explore a different approach.",
     };
@@ -51,7 +58,7 @@ function classifyCoachingCase(
   // low-low
   return {
     case: "low-low",
-    title: "Still building understanding",
+    title: "Low confidence and developing understanding",
     message: "This topic is still developing. Let us reduce the difficulty and rebuild it step by step.",
     nextStep: "Try a simpler explanation or a worked example to strengthen the foundation.",
   };
@@ -61,6 +68,7 @@ export function ConfidenceCoaching({
   confidence,
   score,
   calibrationRecords,
+  status,
 }: {
   /** Self-reported confidence before check (0–100, null if not reported) */
   confidence: number | null;
@@ -69,9 +77,9 @@ export function ConfidenceCoaching({
   /** Calibration records for broader context */
   calibrationRecords: { selfReported: number; actualScore: number }[];
   /** Evaluation status */
-  status: string;
+  status: "correct" | "partial" | "misconception" | "uncertain";
 }) {
-  const coaching = classifyCoachingCase(confidence, score);
+  const coaching = classifyCoachingCase(confidence, score, status);
   const calibration: CalibrationSummary | null =
     calibrationRecords.length >= 2
       ? classifyCalibration(

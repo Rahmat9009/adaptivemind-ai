@@ -3,19 +3,26 @@
 import { motion } from "motion/react";
 import { fadeIn, slideUp } from "@/lib/motion";
 import { useState } from "react";
+import { ConfidenceSelector } from "./ConfidenceSelector";
+import {
+  confidenceLevelFromNumber,
+  confidenceLevelToNumber,
+} from "@/lib/confidence-calibration";
 
 export type ExplainBackState = "prompt" | "writing" | "submitted" | "feedback" | "retry";
 
 interface ExplainBackProps {
   topic: string;
   sentenceStarters?: string[];
-  onSubmit: (response: string) => void;
+  onSubmit: (response: string, confidence: number) => void;
   onRetry: () => void;
   onNext: () => void;
   state: ExplainBackState;
   feedback?: ExplainBackFeedback | null;
   isLoading: boolean;
   error?: string | null;
+  confidence: number | null;
+  onConfidenceChange: (confidence: number) => void;
 }
 
 export interface ExplainBackFeedback {
@@ -24,13 +31,14 @@ export interface ExplainBackFeedback {
   misconception?: string;
   followUpQuestion?: string;
   isComplete: boolean;
+  masteryReason?: string;
 }
 
 const DEFAULT_STARTERS = [
   "The main idea is…",
-  "This works because…",
+  "This happens because…",
   "An example would be…",
-  "The part I am least certain about is…",
+  "The part I am unsure about is…",
 ];
 
 export function ExplainBack({
@@ -43,16 +51,18 @@ export function ExplainBack({
   feedback,
   isLoading,
   error,
+  confidence,
+  onConfidenceChange,
 }: ExplainBackProps) {
   const [response, setResponse] = useState("");
   const [activeStarter, setActiveStarter] = useState<string | null>(null);
 
   function handleSubmit() {
-    if (!response.trim()) return;
+    if (!response.trim() || confidence === null) return;
     const fullResponse = activeStarter
       ? `${activeStarter} ${response}`
       : response;
-    onSubmit(fullResponse);
+    onSubmit(fullResponse, confidence);
   }
 
   function handleStarterClick(starter: string) {
@@ -117,6 +127,19 @@ export function ExplainBack({
           )}
 
           {/* Response field */}
+          <ConfidenceSelector
+            label="explain this idea in your own words"
+            value={
+              confidence === null
+                ? null
+                : confidenceLevelFromNumber(confidence)
+            }
+            onChange={(level) =>
+              onConfidenceChange(confidenceLevelToNumber(level))
+            }
+            timing="before"
+          />
+
           <div className="mt-4">
             <label htmlFor="explain-back-response" className="sr-only">
               Your explanation
@@ -145,12 +168,17 @@ export function ExplainBack({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={!response.trim() || isLoading}
+              disabled={!response.trim() || isLoading || confidence === null}
               className="am-btn am-btn-primary text-sm"
             >
               {isLoading ? "Evaluating…" : "Submit explanation"}
             </button>
           </div>
+          {error && (
+            <p className="mt-3 text-sm font-medium text-[var(--am-error)]" role="alert">
+              {error}
+            </p>
+          )}
         </>
       )}
 
@@ -233,6 +261,19 @@ export function ExplainBack({
                 {feedback.followUpQuestion}
               </p>
             </div>
+          )}
+
+          {feedback.masteryReason && (
+            <p className="mt-4 rounded-[var(--am-radius-md)] bg-[var(--am-bg-reading)] px-3 py-2 text-xs leading-5 text-[var(--am-text-secondary)]">
+              {feedback.masteryReason}
+            </p>
+          )}
+
+          {!feedback.isComplete && (
+            <p className="mt-3 text-xs leading-5 text-[var(--am-text-muted)]">
+              Use the points above as scaffolding, then revise your own
+              explanation. Ada will not replace it with a complete answer.
+            </p>
           )}
 
           {error && (

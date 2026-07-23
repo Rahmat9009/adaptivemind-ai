@@ -28,10 +28,14 @@ function masteryLabel(level: string): { label: string; color: string } {
   switch (level) {
     case "mastered":
       return { label: "Mastered", color: "text-[var(--am-success)]" };
-    case "proficient":
-      return { label: "Proficient", color: "text-[var(--am-primary)]" };
+    case "applied":
+      return { label: "Applied", color: "text-[var(--am-success)]" };
+    case "understood":
+      return { label: "Understood", color: "text-[var(--am-primary)]" };
     case "developing":
       return { label: "Developing", color: "text-[var(--am-warning)]" };
+    case "exploring":
+      return { label: "Exploring", color: "text-[var(--am-warning)]" };
     case "needs-review":
       return { label: "Needs review", color: "text-[var(--am-error)]" };
     default:
@@ -169,9 +173,14 @@ export function LearnerTransparency({
                       {currentMastery.attempts} attempt{currentMastery.attempts !== 1 ? "s" : ""}
                     </span>
                     <span className="text-[var(--am-text-muted)]">
-                      Best: {currentMastery.bestScore}%
+                      Estimated mastery: {currentMastery.masteryPercent}%
                     </span>
                   </div>
+                  <p className="mt-2 text-[11px] leading-5 text-[var(--am-text-muted)]">
+                    This is an approximate model based on{" "}
+                    {currentMastery.evidenceCount} meaningful check
+                    {currentMastery.evidenceCount === 1 ? "" : "s"}.
+                  </p>
                 </div>
               )}
 

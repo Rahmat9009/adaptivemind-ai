@@ -3,12 +3,16 @@
 import { motion } from "motion/react";
 import { fadeIn } from "@/lib/motion";
 import { useState } from "react";
+import {
+  isMeaningfulAttempt,
+  nextHintLevel,
+} from "@/lib/productive-struggle";
 
 export type HintLevel = 0 | 1 | 2 | 3 | 4;
 
 interface HintLadderProps {
   /** Hints in increasing levels of detail */
-  hints: [string, string, string, string]; // nudge, direction, scaffold, full
+  hints: [string, string, string, string] | null; // nudge, direction, scaffold, full
   /** Which hint level is currently revealed (0 = none) */
   currentLevel: HintLevel;
   /** Called when the learner requests the next hint */
@@ -35,6 +39,7 @@ interface HintLadderProps {
   succeededIndependently?: boolean;
   /** Challenge type indicator */
   isChallenge?: boolean;
+  error?: string | null;
 }
 
 const HINT_LABELS: Record<number, string> = {
@@ -58,6 +63,7 @@ export function HintLadder({
   attemptPrompt,
   timeBeforeFirstHint,
   isChallenge = false,
+  error,
 }: HintLadderProps) {
   const [struggleDismissed, setStruggleDismissed] = useState(false);
   const [showStruggleGate, setShowStruggleGate] = useState(!fullSolutionRevealed);
@@ -66,18 +72,23 @@ export function HintLadder({
   const gateUnlocked = hasAttempted || attemptSubmitted;
 
   function handleRequestNext() {
-    const next = Math.min(currentLevel + 1, 4) as HintLevel;
+    const next = nextHintLevel(currentLevel);
     onRequestHint(next);
   }
 
   function handleSubmitAttempt() {
-    if (!attemptInput.trim() || !onAttempt) return;
+    if (!isMeaningfulAttempt(attemptInput) || !onAttempt) return;
     onAttempt(attemptInput.trim());
     setAttemptSubmitted(true);
   }
 
   const hasMoreHints = currentLevel < 4;
   const isGateActive = gateType === "attempt" && !gateUnlocked && isChallenge;
+  const isFullSolutionGateActive =
+    currentLevel >= 3
+    && !fullSolutionRevealed
+    && !struggleDismissed
+    && showStruggleGate;
 
   return (
     <motion.div
@@ -101,7 +112,7 @@ export function HintLadder({
         </div>
 
         {/* Hint request button — hidden behind gate */}
-        {!isGateActive && (
+        {!isGateActive && !isFullSolutionGateActive && (
           <button
             type="button"
             onClick={handleRequestNext}
@@ -123,7 +134,7 @@ export function HintLadder({
       </div>
 
       {/* ── ATTEMPT GATE ── */}
-      {isGateActive && !attemptSubmitted && (
+      {isGateActive && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -155,26 +166,17 @@ export function HintLadder({
             <button
               type="button"
               onClick={handleSubmitAttempt}
-              disabled={!attemptInput.trim()}
+              disabled={!isMeaningfulAttempt(attemptInput)}
               className="rounded-[var(--am-radius-md)] bg-[var(--am-earth-dark)] px-4 py-2 text-xs font-semibold text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-30"
             >
               Submit attempt
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAttemptSubmitted(true);
-              }}
-              className="text-xs font-medium text-[var(--am-text-muted)] hover:text-[var(--am-text-secondary)] transition-colors"
-            >
-              {isChallenge ? "Skip to hints" : "Show hints instead"}
             </button>
           </div>
         </motion.div>
       )}
 
       {/* ── Post-submission success message ── */}
-      {isGateActive && attemptSubmitted && !gateUnlocked && (
+      {!isGateActive && attemptSubmitted && currentLevel === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -185,7 +187,7 @@ export function HintLadder({
       )}
 
       {/* Hint content */}
-      {currentLevel > 0 && (
+      {currentLevel > 0 && hints && (
         <div className="mt-4 space-y-3">
           {Array.from({ length: currentLevel }, (_, i) => {
             const level = (i + 1) as HintLevel;
@@ -236,7 +238,7 @@ export function HintLadder({
       )}
 
       {/* Productive struggle gate (at level 3) */}
-      {currentLevel >= 3 && !fullSolutionRevealed && !struggleDismissed && showStruggleGate && (
+      {isFullSolutionGateActive && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -263,7 +265,8 @@ export function HintLadder({
             <button
               type="button"
               onClick={() => {
-                onRequestFullSolution?.();
+                if (onRequestFullSolution) onRequestFullSolution();
+                else onRequestHint(4);
                 setShowStruggleGate(false);
               }}
               className="rounded-[var(--am-radius-md)] border border-[var(--am-border)] bg-[var(--am-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--am-text-secondary)] hover:border-[var(--am-earth-accent)] hover:text-[var(--am-earth-accent)] transition-colors"
@@ -272,6 +275,12 @@ export function HintLadder({
             </button>
           </div>
         </motion.div>
+      )}
+
+      {error && (
+        <p className="mt-3 text-sm text-[var(--am-error)]" role="alert">
+          {error}
+        </p>
       )}
     </motion.div>
   );

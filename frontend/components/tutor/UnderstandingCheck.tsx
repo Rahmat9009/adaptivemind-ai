@@ -3,25 +3,34 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { fadeIn, slideUp } from "@/lib/motion";
+import { ConfidenceSelector } from "./ConfidenceSelector";
+import {
+  confidenceLevelFromNumber,
+  confidenceLevelToNumber,
+} from "@/lib/confidence-calibration";
 
 interface UnderstandingCheckProps {
   question: string;
   isLoading: boolean;
   error: string | null;
-  onSubmit: (answer: string) => Promise<void>;
+  confidence: number | null;
+  onConfidenceChange: (confidence: number) => void;
+  onSubmit: (answer: string, confidence: number) => Promise<void>;
 }
 
 export function UnderstandingCheck({
   question,
   isLoading,
   error,
+  confidence,
+  onConfidenceChange,
   onSubmit,
 }: UnderstandingCheckProps) {
   const [answer, setAnswer] = useState("");
 
   async function submit(value = answer) {
-    if (!value.trim() || isLoading) return;
-    await onSubmit(value.trim());
+    if (!value.trim() || isLoading || confidence === null) return;
+    await onSubmit(value.trim(), confidence);
     setAnswer("");
   }
 
@@ -46,6 +55,19 @@ export function UnderstandingCheck({
       </motion.div>
 
       <motion.div variants={slideUp}>
+        <ConfidenceSelector
+          label="answer this check without looking back"
+          value={
+            confidence === null
+              ? null
+              : confidenceLevelFromNumber(confidence)
+          }
+          onChange={(level) =>
+            onConfidenceChange(confidenceLevelToNumber(level))
+          }
+          timing="before"
+        />
+
         <textarea
           value={answer}
           onChange={(event) => setAnswer(event.target.value)}
@@ -65,7 +87,7 @@ export function UnderstandingCheck({
         <div className="mt-3 flex flex-wrap gap-3">
           <button
             type="button"
-            disabled={!answer.trim() || isLoading}
+            disabled={!answer.trim() || isLoading || confidence === null}
             onClick={() => void submit()}
             className="am-btn am-btn-primary py-2.5 px-5 text-sm"
           >
@@ -74,7 +96,11 @@ export function UnderstandingCheck({
           <button
             type="button"
             disabled={isLoading}
-            onClick={() => void submit("I don't know yet.")}
+            onClick={() => {
+              if (confidence === null) onConfidenceChange(25);
+              void onSubmit("I don't know yet.", confidence ?? 25);
+              setAnswer("");
+            }}
             className="rounded-full border border-[var(--am-border-light)] bg-[var(--am-bg-elevated)] px-5 py-2.5 text-sm font-semibold text-[var(--am-text-secondary)] transition-colors hover:border-[var(--am-text-muted)] disabled:opacity-40"
           >
             I&apos;m not sure

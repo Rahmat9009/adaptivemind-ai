@@ -30,15 +30,19 @@ import {
   saveHistoryEvaluation,
   startNewTopicStorageKey,
 } from "@/lib/dashboard-storage";
-import { updateTopicMastery } from "@/lib/mastery";
+import {
+  createMasteryEvidenceId,
+  getTopicMastery,
+  normalizeTopicId,
+  updateTopicMastery,
+} from "@/lib/mastery";
 import {
   loadLearningDNA2,
   saveLearningDNA2,
   recordCheckOutcome,
 } from "@/lib/learning-dna-v2";
 import {
-  defaultApproachState,
-  updateApproachState,
+  teachingModeToDimension,
 } from "@/lib/mode-effectiveness";
 import {
   getReviewCard,
@@ -78,6 +82,8 @@ import {
   addExplanationRecord,
   getExplanationHistoryForConcept,
 } from "@/lib/explanation-history";
+import { loadPreferenceOverrides } from "@/lib/preference-overrides";
+import { saveCalibrationRecord } from "@/lib/confidence-calibration";
 
 const profileStorageKey = "adaptivemind-learning-dna";
 const lessonStorageKey = "adaptivemind-current-lesson";
@@ -363,17 +369,33 @@ export function TutorShell() {
   const [explainBackState, setExplainBackState] = useState<ExplainBackState>("prompt");
   const [isExplainBackLoading, setIsExplainBackLoading] = useState(false);
   const [explainBackError, setExplainBackError] = useState<string | null>(null);
+  const [explainBackConfidence, setExplainBackConfidence] = useState<number | null>(null);
+  const [explainBackRetries, setExplainBackRetries] = useState(0);
   const [hintLevel, setHintLevel] = useState<0 | 1 | 2 | 3 | 4>(0);
   const [hints, setHints] = useState<[string, string, string, string] | null>(null);
   const [isHintLoading, setIsHintLoading] = useState(false);
+  const [hintError, setHintError] = useState<string | null>(null);
+  const [challengeStartedAt, setChallengeStartedAt] = useState<number | null>(null);
+  const [timeBeforeFirstAttempt, setTimeBeforeFirstAttempt] = useState<number | null>(null);
   const [readingSettings, setReadingSettings] = useState<ReadingSettings>(() => {
     try { return loadReadingSettings(); } catch { return { textSize: "normal" as const, lineSpacing: "normal" as const, contentWidth: "normal" as const, reducedVisualDensity: false, highContrast: false }; }
   });
   const [showReadingPrefs, setShowReadingPrefs] = useState(false);
   const [hasAttempted, setHasAttempted] = useState(false);
   const [confidenceBefore, setConfidenceBefore] = useState<number | null>(null);
+  const [masteryReason, setMasteryReason] = useState<string | null>(null);
+  const [understandingRetries, setUnderstandingRetries] = useState(0);
+  const [didSwitchMode, setDidSwitchMode] = useState(false);
   const [quickRecallRecord, setQuickRecallRecord] = useState<QuickRecallRecord | null>(null);
   const [quickRecallStatus, setQuickRecallStatus] = useState<"due" | "completed" | "full-review-recommended" | "not-due">("not-due");
+  const [quickRecallConfidence, setQuickRecallConfidence] = useState<number | null>(null);
+  const [isQuickRecallLoading, setIsQuickRecallLoading] = useState(false);
+  const [quickRecallError, setQuickRecallError] = useState<string | null>(null);
+  const [quickRecallResult, setQuickRecallResult] = useState<{
+    score: number;
+    status: "correct" | "partial" | "incorrect";
+    feedback: string;
+  } | null>(null);
   const [peerAgentState, setPeerAgentState] = useState<PeerAgentState>("prompt");
   const [peerAgentMessages, setPeerAgentMessages] = useState<PeerAgentMessage[]>([]);
   const [isPeerLoading, setIsPeerLoading] = useState(false);
@@ -394,7 +416,11 @@ export function TutorShell() {
       const apiResponse = await fetch("/api/tutor", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...body, requestId }),
+        body: JSON.stringify({
+          ...body,
+          ...getLearnerRequestContext(),
+          requestId,
+        }),
         cache: "no-store",
         signal: controller.signal,
       });
@@ -409,6 +435,35 @@ export function TutorShell() {
     } finally {
       window.clearTimeout(timeoutId);
       activeRequestsRef.current.delete(controller);
+    }
+  }
+
+  function getLearnerRequestContext() {
+    try {
+      const dna = loadLearningDNA2();
+      const preferences = loadPreferenceOverrides();
+      const evidenceCount = Object.values(dna.observedEffectiveness).reduce(
+        (sum, evidence) => sum + evidence.evidenceCount,
+        0,
+      );
+      return {
+        adaptationContext: {
+          recommendedApproach: dna.currentRecommendation,
+          recommendationReason: dna.recommendationReason,
+          evidenceCount,
+          confidence: dna.recommendationConfidence,
+        },
+        learnerPreferences: {
+          detailPreference: preferences.detailPreference,
+          conciseStories: preferences.conciseStories,
+          startChallengesEasy: preferences.startChallengesEasy,
+          likedDomains: preferences.likedDomains,
+          bannedDomains: preferences.bannedDomains,
+          dislikedPatterns: preferences.dislikedPatterns,
+        },
+      };
+    } catch {
+      return {};
     }
   }
 
@@ -548,6 +603,20 @@ export function TutorShell() {
           "The tutor returned an incomplete lesson. Please try again.",
         );
       setResponse(payload);
+      setEvaluation(null);
+      setConfidenceBefore(null);
+      setMasteryReason(null);
+      setUnderstandingRetries(0);
+      setExplainBackFeedback(null);
+      setExplainBackState("prompt");
+      setExplainBackConfidence(null);
+      setExplainBackRetries(0);
+      setHints(null);
+      setHintLevel(0);
+      setHintError(null);
+      setHasAttempted(false);
+      setChallengeStartedAt(payload.lesson.challenge ? Date.now() : null);
+      setTimeBeforeFirstAttempt(null);
       clearConversation();
       const historyEntry = addLessonToHistory({
         topic: topic.trim(),
@@ -636,8 +705,9 @@ export function TutorShell() {
     }
   }
 
-  async function evaluateUnderstanding(answer: string) {
+  async function evaluateUnderstanding(answer: string, confidence: number) {
     if (!profile || !response || !topic.trim()) return;
+    setConfidenceBefore(confidence);
     setIsEvaluating(true);
     setEvaluationError(null);
     try {
@@ -649,6 +719,7 @@ export function TutorShell() {
           action: "evaluate",
           teachingMode,
           learnerAnswer: answer,
+          learnerConfidence: confidence,
           checkQuestion: response.lesson.checkQuestion,
           lessonCoreIdea: response.lesson.coreIdea,
           lessonContext: response.lesson.explanation.slice(0, 500),
@@ -657,12 +728,29 @@ export function TutorShell() {
         throw new Error("Ada returned an incomplete understanding check.");
       setEvaluation(payload.evaluation);
       setEvaluationSource(payload.source);
+      const existingMastery = getTopicMastery().find(
+        (entry) => entry.topicId === normalizeTopicId(topic.trim()),
+      );
+      const masteryBefore = existingMastery?.masteryPercent ?? 10;
+      const evidenceId = createMasteryEvidenceId(
+        topic.trim(),
+        `${historyId ?? response.requestId ?? response.lesson.title}:understanding`,
+        answer,
+      );
       const mastery = updateTopicMastery(
         topic.trim(),
         subject,
         payload.evaluation.score,
         payload.evaluation.status,
+        {
+          evidenceId,
+          kind: response.action === "challenge" ? "challenge" : "retrieval",
+          hintsUsed: hintLevel,
+          retries: understandingRetries,
+          independent: response.action === "challenge" && hintLevel === 0,
+        },
       );
+      setMasteryReason(mastery.lastChangeReason);
       if (historyId)
         saveHistoryEvaluation(historyId, {
           score: payload.evaluation.score,
@@ -670,40 +758,34 @@ export function TutorShell() {
           masteryLevel: mastery.masteryLevel,
           evaluatedAt: new Date().toISOString(),
         });
+      if (!mastery.lastEvidenceApplied) return;
 
       // ── LD2.0 data wiring ──
       // Record outcome in Learning DNA evidence model
       try {
         const dna = loadLearningDNA2();
-        const { getPrimaryLearningStyle } = await import("@/lib/learning-dna");
-        const approach: import("@/lib/learning-dna").LearningDimension =
-          teachingMode !== "adaptive"
-            ? (teachingMode as import("@/lib/learning-dna").LearningDimension)
-            : getPrimaryLearningStyle(profile.scores);
+        const approach = teachingModeToDimension(
+          teachingMode,
+          dna.currentRecommendation,
+        );
         const updatedDna = recordCheckOutcome(dna, approach, {
           score: payload.evaluation.score,
-          confidenceBefore: 50,
-          confidenceAfter: payload.evaluation.confidenceInsight
-            ? 75
-            : 50,
-          hintCount: 0,
-          retryCount: 0,
-          switchedAway: false,
+          confidenceBefore: confidence,
+          confidenceAfter: confidence,
+          hintCount: hintLevel,
+          retryCount: understandingRetries,
+          switchedAway: didSwitchMode,
+          evidenceId,
         });
         saveLearningDNA2(updatedDna);
+        saveCalibrationRecord({
+          selfReported: confidence,
+          actualScore: payload.evaluation.score,
+          timestamp: new Date().toISOString(),
+          skillId: normalizeTopicId(topic.trim()),
+          approach,
+        });
       } catch { /* non-critical, silently skip */ }
-
-      // Update Thompson sampling state
-      try {
-        const { getPrimaryLearningStyle } = await import("@/lib/learning-dna");
-        const approach: import("@/lib/learning-dna").LearningDimension =
-          teachingMode !== "adaptive"
-            ? (teachingMode as import("@/lib/learning-dna").LearningDimension)
-            : getPrimaryLearningStyle(profile.scores);
-        const state = defaultApproachState();
-        const success = payload.evaluation.score >= 60;
-        updateApproachState(state, approach, success);
-      } catch { /* non-critical */ }
 
       // Create or update SM-2 review card
       try {
@@ -729,34 +811,58 @@ export function TutorShell() {
 
       // ── Explanation history ──
       try {
-        const approach: import("@/lib/explanation-history").ExplanationRecord["approach"] =
-          teachingMode !== "adaptive"
-            ? (teachingMode as import("@/lib/learning-dna").LearningDimension)
-            : "adaptive";
+        const dna = loadLearningDNA2();
+        const approach = teachingModeToDimension(
+          teachingMode,
+          dna.currentRecommendation,
+        );
         addExplanationRecord({
-          conceptId: topic.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+          conceptId: normalizeTopicId(topic.trim()),
           conceptLabel: topic.trim(),
           timestamp: new Date().toISOString(),
           approach,
           lessonId: historyId ?? "unknown",
-          reasonSelected: teachingMode === "adaptive" ? "Thompson sampling" : "Learner choice",
-          learnerConfidence: confidenceBefore ?? 50,
+          reasonSelected: teachingMode === "adaptive"
+            ? dna.recommendationReason
+            : "Learner selected this approach.",
+          learnerConfidence: confidence,
           checkType: "understanding",
           evaluationStatus: payload.evaluation.status,
           evaluationScore: payload.evaluation.score,
           hintsUsed: hintLevel,
-          retries: 0,
-          masteryBefore: 0,
-          masteryAfter: mastery.masteryLevel === "mastered" ? 100 : mastery.masteryLevel === "proficient" ? 75 : mastery.masteryLevel === "developing" ? 50 : 25,
-          switchedAway: false,
+          retries: understandingRetries,
+          masteryBefore,
+          masteryAfter: mastery.masteryPercent,
+          switchedAway: didSwitchMode,
           learnerFeedback: null,
           recommendationOutcome: payload.evaluation.status,
+          attemptMade: response.action === "challenge" && hasAttempted,
+          timeBeforeFirstAttemptSeconds:
+            response.action === "challenge"
+              ? timeBeforeFirstAttempt ?? undefined
+              : undefined,
+          highestHintLevel: hintLevel,
+          eventualIndependentSuccess:
+            response.action === "challenge"
+              ? payload.evaluation.status === "correct" && hintLevel === 0
+              : undefined,
         });
       } catch { /* non-critical */ }
 
+      setDidSwitchMode(false);
+      if (payload.evaluation.status !== "correct") {
+        setUnderstandingRetries((current) => current + 1);
+      }
+
       // ── Schedule quick recall ──
       try {
-        const qr = scheduleQuickRecall(topic.trim(), topic.trim(), subject);
+        const qr = scheduleQuickRecall(
+          topic.trim(),
+          topic.trim(),
+          subject,
+          false,
+          `Without looking back, explain the central mechanism of ${topic.trim()} and give one consequence or application.`,
+        );
         setQuickRecallRecord(qr);
         setQuickRecallStatus(getQuickRecallStatus(topic.trim()));
       } catch { /* non-critical */ }
@@ -783,17 +889,37 @@ export function TutorShell() {
     setEvaluation(null);
     setExplainBackFeedback(null);
     setExplainBackState("prompt");
+    setExplainBackConfidence(null);
+    setExplainBackRetries(0);
     setHints(null);
     setHintLevel(0);
+    setHintError(null);
     setHasAttempted(false);
+    setChallengeStartedAt(null);
+    setTimeBeforeFirstAttempt(null);
     setConfidenceBefore(null);
+    setMasteryReason(null);
+    setUnderstandingRetries(0);
+    setDidSwitchMode(false);
     setQuickRecallRecord(null);
     setQuickRecallStatus("not-due");
+    setQuickRecallConfidence(null);
+    setQuickRecallResult(null);
+    setQuickRecallError(null);
+    setIsQuickRecallLoading(false);
     clearConversation();
     localStorage.removeItem(lessonStorageKey);
   }
 
-  async function requestExplainBack(learnerResponse: string) {
+  function handleTeachingModeChange(mode: TeachingMode) {
+    if (response && mode !== teachingMode) setDidSwitchMode(true);
+    setTeachingMode(mode);
+  }
+
+  async function requestExplainBack(
+    learnerResponse: string,
+    confidence: number,
+  ) {
     if (!profile || !response || !topic.trim()) return;
     setIsExplainBackLoading(true);
     setExplainBackError(null);
@@ -806,19 +932,102 @@ export function TutorShell() {
           action: "explain-back",
           teachingMode,
           learnerResponse,
+          learnerConfidence: confidence,
           lessonContext: response.lesson.explanation.slice(0, 500),
       });
       if (!isExplainBackApiResponse(payload))
         throw new Error("Ada could not evaluate this explanation.");
       const evalResult = payload.evaluation;
+      const evaluationStatus: UnderstandingEvaluation["status"] =
+        evalResult.isComplete && evalResult.score >= 70
+          ? "correct"
+          : evalResult.misconception
+            ? "misconception"
+            : evalResult.score >= 40
+              ? "partial"
+              : "uncertain";
+      const existingMastery = getTopicMastery().find(
+        (entry) => entry.topicId === normalizeTopicId(topic.trim()),
+      );
+      const masteryBefore = existingMastery?.masteryPercent ?? 10;
+      const evidenceId = createMasteryEvidenceId(
+        topic.trim(),
+        `${historyId ?? response.requestId ?? response.lesson.title}:explain-back`,
+        learnerResponse,
+      );
+      const mastery = updateTopicMastery(
+        topic.trim(),
+        subject,
+        evalResult.score,
+        evaluationStatus,
+        {
+          evidenceId,
+          kind: "explain-back",
+          retries: explainBackRetries,
+        },
+      );
       setExplainBackFeedback({
         understood: evalResult.understood,
         missing: evalResult.missing,
         misconception: evalResult.misconception,
         followUpQuestion: evalResult.followUpQuestion,
         isComplete: evalResult.isComplete,
+        masteryReason: mastery.lastChangeReason,
       });
       setExplainBackState("feedback");
+
+      if (mastery.lastEvidenceApplied) {
+        try {
+          const dna = loadLearningDNA2();
+          const approach = teachingModeToDimension(
+            teachingMode,
+            dna.currentRecommendation,
+          );
+          saveLearningDNA2(recordCheckOutcome(dna, approach, {
+            score: evalResult.score,
+            confidenceBefore: confidence,
+            confidenceAfter: confidence,
+            hintCount: 0,
+            retryCount: explainBackRetries,
+            switchedAway: didSwitchMode,
+            evidenceId,
+          }));
+          saveCalibrationRecord({
+            selfReported: confidence,
+            actualScore: evalResult.score,
+            timestamp: new Date().toISOString(),
+            skillId: normalizeTopicId(topic.trim()),
+            approach,
+          });
+          addExplanationRecord({
+            conceptId: normalizeTopicId(topic.trim()),
+            conceptLabel: topic.trim(),
+            timestamp: new Date().toISOString(),
+            approach,
+            lessonId: `${historyId ?? "lesson"}:explain-back:${explainBackRetries}`,
+            reasonSelected: teachingMode === "adaptive"
+              ? dna.recommendationReason
+              : "Learner selected this approach.",
+            learnerConfidence: confidence,
+            checkType: "explain-back",
+            evaluationStatus,
+            evaluationScore: evalResult.score,
+            hintsUsed: 0,
+            retries: explainBackRetries,
+            masteryBefore,
+            masteryAfter: mastery.masteryPercent,
+            switchedAway: didSwitchMode,
+            learnerFeedback: null,
+            recommendationOutcome: evalResult.isComplete
+              ? "Continue with application practice."
+              : "Revise the explanation using the targeted feedback.",
+          });
+        } catch { /* Local evidence storage is non-critical. */ }
+        setDidSwitchMode(false);
+        if (!evalResult.isComplete) {
+          setExplainBackRetries((current) => current + 1);
+        }
+      }
     } catch (requestError) {
       setExplainBackError(
         requestError instanceof Error
@@ -833,16 +1042,27 @@ export function TutorShell() {
   function handleExplainBackRetry() {
     setExplainBackState("prompt");
     setExplainBackFeedback(null);
+    setExplainBackConfidence(null);
   }
 
   function handleExplainBackNext() {
     setExplainBackState("prompt");
     setExplainBackFeedback(null);
+    setExplainBackConfidence(null);
   }
 
   async function requestHints(level?: number) {
     if (!profile || !response || !topic.trim()) return;
+    const requestedLevel = Math.max(
+      1,
+      Math.min(level ?? hintLevel + 1, 4),
+    ) as 1 | 2 | 3 | 4;
+    if (hints) {
+      setHintLevel(requestedLevel);
+      return;
+    }
     setIsHintLoading(true);
+    setHintError(null);
     try {
       const payload = await postTutorRequest({
           topic: topic.trim(),
@@ -851,27 +1071,154 @@ export function TutorShell() {
           scores: profile.scores,
           action: "hint",
           teachingMode,
-          currentHintLevel: level ?? hintLevel,
+          currentHintLevel: requestedLevel - 1,
           lessonContext: response.lesson.explanation.slice(0, 500),
           challengeContext: response.lesson.challenge,
       });
       if (payload && typeof payload === "object" && Array.isArray((payload as Record<string, unknown>).hints)) {
         setHints((payload as { hints: [string, string, string, string] }).hints);
-        setHintLevel((prev) => Math.min(prev + 1, 3) as 0 | 1 | 2 | 3 | 4);
+        setHintLevel(requestedLevel);
       }
-    } catch {
-      // Silently fail for hints — not critical
+    } catch (requestError) {
+      setHintError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Ada could not load a hint. Please try again.",
+      );
     } finally {
       setIsHintLoading(false);
     }
   }
 
-  // ── Peer Agent handlers ──
+  async function evaluateQuickRecall(
+    answer: string,
+    confidence: number,
+  ) {
+    if (
+      !profile
+      || !response
+      || !quickRecallRecord
+      || quickRecallStatus !== "due"
+    ) {
+      return;
+    }
+    setIsQuickRecallLoading(true);
+    setQuickRecallError(null);
+    try {
+      const payload = await postTutorRequest({
+        topic: quickRecallRecord.topic,
+        subject: quickRecallRecord.subject ?? subject,
+        level,
+        scores: profile.scores,
+        action: "evaluate",
+        teachingMode,
+        learnerAnswer: answer,
+        learnerConfidence: confidence,
+        checkQuestion: quickRecallRecord.question,
+        lessonCoreIdea: response.lesson.coreIdea,
+        lessonContext: response.lesson.explanation.slice(0, 500),
+      });
+      if (!isEvaluationApiResponse(payload)) {
+        throw new Error("Ada returned an incomplete recall check.");
+      }
+
+      const result = payload.evaluation;
+      const completed = completeQuickRecall(
+        quickRecallRecord.skillId,
+        result.score,
+      );
+      setQuickRecallRecord(completed.updated);
+      setQuickRecallStatus(getQuickRecallStatus(quickRecallRecord.skillId));
+      setQuickRecallResult({
+        score: result.score,
+        status: result.status === "correct"
+          ? "correct"
+          : result.status === "partial"
+            ? "partial"
+            : "incorrect",
+        feedback: result.feedback,
+      });
+
+      const evidenceId = createMasteryEvidenceId(
+        quickRecallRecord.topic,
+        `quick-recall:${quickRecallRecord.createdAt}`,
+        answer,
+      );
+      const masteryBefore = getTopicMastery().find(
+        (entry) => entry.topicId === quickRecallRecord.skillId,
+      )?.masteryPercent ?? 10;
+      const mastery = updateTopicMastery(
+        quickRecallRecord.topic,
+        quickRecallRecord.subject ?? subject,
+        result.score,
+        result.status,
+        {
+          evidenceId,
+          kind: "quick-recall",
+          delayed: !quickRecallRecord.simulated
+            && Date.parse(quickRecallRecord.dueAt) <= Date.now(),
+        },
+      );
+      if (mastery.lastEvidenceApplied) {
+        const dna = loadLearningDNA2();
+        const approach = teachingModeToDimension(
+          teachingMode,
+          dna.currentRecommendation,
+        );
+        saveLearningDNA2(recordCheckOutcome(dna, approach, {
+          score: result.score,
+          confidenceBefore: confidence,
+          confidenceAfter: confidence,
+          hintCount: 0,
+          retryCount: quickRecallRecord.retries,
+          switchedAway: false,
+          evidenceId,
+        }));
+        saveCalibrationRecord({
+          selfReported: confidence,
+          actualScore: result.score,
+          timestamp: new Date().toISOString(),
+          skillId: quickRecallRecord.skillId,
+          approach,
+        });
+        addExplanationRecord({
+          conceptId: quickRecallRecord.skillId,
+          conceptLabel: quickRecallRecord.topic,
+          timestamp: new Date().toISOString(),
+          approach,
+          lessonId: `quick-recall:${quickRecallRecord.createdAt}`,
+          reasonSelected: dna.recommendationReason,
+          learnerConfidence: confidence,
+          checkType: "quick-recall",
+          evaluationStatus: result.status,
+          evaluationScore: result.score,
+          hintsUsed: 0,
+          retries: quickRecallRecord.retries,
+          masteryBefore,
+          masteryAfter: mastery.masteryPercent,
+          switchedAway: false,
+          learnerFeedback: null,
+          recommendationOutcome: completed.updated.fullReviewRecommended
+            ? "Complete a full review."
+            : "Continue with the scheduled review interval.",
+        });
+      }
+    } catch (requestError) {
+      setQuickRecallError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Ada could not check this recall.",
+      );
+    } finally {
+      setIsQuickRecallLoading(false);
+    }
+  }
+
+  // ── Practice-learner role-play handlers ──
   function startPeerSession() {
     setPeerAgentState("active");
     setPeerAgentMessages([]);
     setPeerError(null);
-    // Initial peer prompt
     const initialPrompt = `I heard something about "${topic.trim()}" but I am not sure I understand. Can you explain the main idea to me?`;
     setPeerAgentMessages([{ role: "peer", content: initialPrompt }]);
   }
@@ -890,7 +1237,7 @@ export function TutorShell() {
           scores: profile?.scores ?? balancedScores,
           action: "followup",
           teachingMode,
-          question: `The student just explained "${topic.trim()}" to you as a confused classmate. You are playing the role of a classmate who just heard their explanation. Respond naturally as a confused peer who is trying to understand, asking a follow-up question or expressing confusion about one specific part. Keep it brief (2-3 sentences). Do NOT break character. Do NOT reveal you are an AI.`,
+          question: `Ada is facilitating a transparent practice-learner exercise about "${topic.trim()}". Respond as Ada role-playing a learner who has just heard the student's explanation. Ask one brief follow-up question or identify one specific point that remains unclear. Do not claim to be human and do not conceal that this is an exercise. Keep the response to 2-3 sentences.`,
           currentLesson: {
             title: response.lesson.title,
             coreIdea: response.lesson.coreIdea,
@@ -920,14 +1267,12 @@ export function TutorShell() {
     // Record explanation history
     try {
       addExplanationRecord({
-        conceptId: topic.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        conceptId: normalizeTopicId(topic),
         conceptLabel: topic.trim(),
         timestamp: new Date().toISOString(),
-        approach: teachingMode !== "adaptive"
-          ? (teachingMode as import("@/lib/learning-dna").LearningDimension)
-          : "adaptive",
+        approach: teachingModeToDimension(teachingMode) ?? "adaptive",
         lessonId: historyId ?? "unknown",
-        reasonSelected: "Peer agent session",
+        reasonSelected: "Ada practice-learner role-play",
         learnerConfidence: confidenceBefore ?? 50,
         checkType: "peer-agent",
         evaluationStatus: "correct",
@@ -983,7 +1328,7 @@ export function TutorShell() {
             onTopicChange={setTopic}
             onSubjectChange={setSubject}
             onLevelChange={setLevel}
-            onTeachingModeChange={setTeachingMode}
+            onTeachingModeChange={handleTeachingModeChange}
             onSubmit={() => requestLesson("initial")}
           />
 
@@ -1016,7 +1361,7 @@ export function TutorShell() {
           {response && (
             <WhyThisMode
               activeMode={teachingMode}
-              onModeChange={setTeachingMode}
+              onModeChange={handleTeachingModeChange}
               availableModes={["adaptive", "visual", "example", "analogy", "story", "challenge"]}
             />
           )}
@@ -1030,7 +1375,10 @@ export function TutorShell() {
           <PreferenceOverridesUI />
 
           {/* Explanation history */}
-          <ExplanationHistoryView currentConcept={topic.trim()} />
+          <ExplanationHistoryView
+            key={topic.trim()}
+            currentConcept={topic.trim()}
+          />
         </div>
 
         {/* Right: Lesson content */}
@@ -1073,18 +1421,35 @@ export function TutorShell() {
               />
 
               {/* Hint Ladder for challenges */}
-              {response.lesson.challenge && hints && (
+              {response.lesson.challenge && (
                 <HintLadder
+                  key={historyId ?? response.lesson.title}
                   hints={hints}
                   currentLevel={hintLevel as 0 | 1 | 2 | 3 | 4}
                   isLoading={isHintLoading}
                   onRequestHint={requestHints}
+                  onRequestFullSolution={() => void requestHints(4)}
+                  fullSolutionRevealed={hintLevel === 4}
                   gateType="attempt"
                   hasAttempted={hasAttempted}
                   onAttempt={() => {
                     setHasAttempted(true);
+                    if (timeBeforeFirstAttempt === null) {
+                      const elapsed = challengeStartedAt
+                        ? Math.max(
+                            0,
+                            Math.round((Date.now() - challengeStartedAt) / 1000),
+                          )
+                        : 0;
+                      setTimeBeforeFirstAttempt(elapsed);
+                    }
                   }}
+                  attemptPrompt={response.lesson.challenge}
+                  timeBeforeFirstHint={
+                    timeBeforeFirstAttempt ?? undefined
+                  }
                   isChallenge={true}
+                  error={hintError}
                 />
               )}
 
@@ -1093,6 +1458,8 @@ export function TutorShell() {
                 question={response.lesson.checkQuestion}
                 isLoading={isEvaluating}
                 error={evaluationError}
+                confidence={confidenceBefore}
+                onConfidenceChange={setConfidenceBefore}
                 onSubmit={evaluateUnderstanding}
               />
 
@@ -1101,6 +1468,7 @@ export function TutorShell() {
                 <UnderstandingFeedback
                   evaluation={evaluation}
                   source={evaluationSource}
+                  masteryReason={masteryReason}
                   onAction={(nextStep) => {
                     if (nextStep === "simplify")
                       void requestLesson("simpler");
@@ -1129,17 +1497,24 @@ export function TutorShell() {
                 <QuickRecall
                   topic={quickRecallRecord.topic}
                   recallStatus={quickRecallStatus}
-                  isSimulated={true}
-                  onSubmit={(answer) => {
-                    // Score the answer (simple heuristic for demo)
-                    const score = Math.min(100, Math.max(0, answer.length * 2));
-                    completeQuickRecall(quickRecallRecord.skillId, score);
-                    setQuickRecallStatus(getQuickRecallStatus(quickRecallRecord.skillId));
-                  }}
-                  onRetry={() => {
-                    const simulated = simulateQuickRecallDue(quickRecallRecord.skillId);
+                  isSimulated={quickRecallRecord.simulated}
+                  question={quickRecallRecord.question}
+                  result={quickRecallResult ?? undefined}
+                  isLoading={isQuickRecallLoading}
+                  error={quickRecallError}
+                  confidence={quickRecallConfidence}
+                  onConfidenceChange={setQuickRecallConfidence}
+                  onSubmit={(answer, confidence) =>
+                    void evaluateQuickRecall(answer, confidence)
+                  }
+                  onAccelerate={() => {
+                    const simulated = simulateQuickRecallDue(
+                      quickRecallRecord.skillId,
+                    );
                     setQuickRecallRecord(simulated);
                     setQuickRecallStatus("due");
+                    setQuickRecallResult(null);
+                    setQuickRecallError(null);
                   }}
                   onFullReview={() => void requestLesson("different")}
                 />
@@ -1153,6 +1528,8 @@ export function TutorShell() {
                   isLoading={isExplainBackLoading}
                   error={explainBackError}
                   feedback={explainBackFeedback}
+                  confidence={explainBackConfidence}
+                  onConfidenceChange={setExplainBackConfidence}
                   onSubmit={requestExplainBack}
                   onRetry={handleExplainBackRetry}
                   onNext={handleExplainBackNext}

@@ -10,6 +10,7 @@ import {
   type LearningDNA2,
 } from "@/lib/learning-dna-v2";
 import type { TeachingMode } from "@/lib/ai/types";
+import { teachingModeToDimension } from "@/lib/mode-effectiveness";
 
 const MODE_LABELS: Record<string, string> = {
   visual: "Visual",
@@ -18,6 +19,10 @@ const MODE_LABELS: Record<string, string> = {
   stories: "Stories",
   challenges: "Challenges",
   adaptive: "Adaptive (auto-select)",
+  example: "Examples",
+  analogy: "Analogies",
+  story: "Stories",
+  challenge: "Challenges",
 };
 
 const MODE_DESCRIPTIONS: Record<string, string> = {
@@ -27,6 +32,10 @@ const MODE_DESCRIPTIONS: Record<string, string> = {
   stories: "Narrative-driven explanations.",
   challenges: "Problem-first, learn by solving.",
   adaptive: "Let Ada select based on your Learning DNA.",
+  example: "Concrete worked examples and real cases.",
+  analogy: "Familiar comparisons to other domains.",
+  story: "Narrative-driven explanations.",
+  challenge: "Problem-first, learn by solving.",
 };
 
 export function WhyThisMode({
@@ -49,10 +58,10 @@ export function WhyThisMode({
 
   const recommendation = dna ? generateRecommendation(dna) : null;
 
-  const activeDimension =
-    activeMode === "adaptive" && recommendation
-      ? recommendation.recommendation
-      : activeMode;
+  const activeDimension = teachingModeToDimension(
+    activeMode,
+    recommendation?.recommendation ?? "visual",
+  );
 
   const evidence = dna?.observedEffectiveness[activeDimension as LearningDimension];
 
@@ -157,7 +166,9 @@ export function WhyThisMode({
                   Why Ada recommended this
                 </p>
                 <p className="text-xs leading-5 text-[var(--am-text-secondary)]">
-                  {recommendation.reason}
+                  {activeMode === "adaptive"
+                    ? recommendation.reason
+                    : "You selected this approach. Ada will still record the outcome so future recommendations can improve."}
                 </p>
               </div>
             )}

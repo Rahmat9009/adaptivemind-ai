@@ -25,10 +25,12 @@ const actionLabels = {
 export function UnderstandingFeedback({
   evaluation,
   source,
+  masteryReason,
   onAction,
 }: {
   evaluation: UnderstandingEvaluation;
   source: TutorResponseSource;
+  masteryReason?: string | null;
   onAction: (action: UnderstandingEvaluation["nextStep"]) => void;
 }) {
   return (
@@ -60,6 +62,15 @@ export function UnderstandingFeedback({
       >
         {evaluation.feedback}
       </motion.p>
+
+      {masteryReason && (
+        <motion.p
+          variants={slideUp}
+          className="mt-3 rounded-[var(--am-radius-md)] bg-[var(--am-bg-reading)] px-3 py-2 text-xs leading-5 text-[var(--am-text-secondary)]"
+        >
+          {masteryReason}
+        </motion.p>
+      )}
 
       {evaluation.whatWasUnderstood.length > 0 && (
         <motion.div variants={slideUp} className="mt-3">

@@ -47,6 +47,14 @@ export interface ExplanationRecord {
   learnerFeedback: "helped" | "somewhat" | "not-helpful" | null;
   /** What Ada recommended after this check */
   recommendationOutcome: string;
+  /** Whether a challenge attempt was made before hints */
+  attemptMade?: boolean;
+  /** Seconds elapsed before the first challenge attempt */
+  timeBeforeFirstAttemptSeconds?: number;
+  /** Highest hint level revealed (0-4) */
+  highestHintLevel?: number;
+  /** Whether success occurred without hints */
+  eventualIndependentSuccess?: boolean;
 }
 
 export interface ExplanationHistory {
@@ -54,6 +62,26 @@ export interface ExplanationHistory {
   concepts: Record<string, ExplanationRecord[]>;
   /** Order concepts were first encountered */
   conceptOrder: string[];
+}
+
+function isExplanationRecord(value: unknown): value is ExplanationRecord {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.conceptId === "string"
+    && typeof record.conceptLabel === "string"
+    && typeof record.timestamp === "string"
+    && typeof record.approach === "string"
+    && typeof record.lessonId === "string"
+    && typeof record.reasonSelected === "string"
+    && typeof record.learnerConfidence === "number"
+    && typeof record.checkType === "string"
+    && typeof record.evaluationStatus === "string"
+    && typeof record.evaluationScore === "number"
+    && typeof record.hintsUsed === "number"
+    && typeof record.retries === "number"
+    && typeof record.masteryBefore === "number"
+    && typeof record.masteryAfter === "number"
+    && typeof record.switchedAway === "boolean";
 }
 
 // ──────────────────────────────────────
@@ -67,11 +95,26 @@ export function loadExplanationHistory(): ExplanationHistory {
     );
     if (!value || typeof value !== "object") return { concepts: {}, conceptOrder: [] };
     const raw = value as Record<string, unknown>;
-    const concepts = raw.concepts as Record<string, ExplanationRecord[]> | undefined;
+    const rawConcepts = raw.concepts;
     const conceptOrder = raw.conceptOrder as string[] | undefined;
-    if (!concepts || !Array.isArray(conceptOrder)) return { concepts: {}, conceptOrder: [] };
-    // Validate concept order matches keys
-    const validOrder = conceptOrder.filter((id) => id in concepts);
+    if (
+      !rawConcepts
+      || typeof rawConcepts !== "object"
+      || !Array.isArray(conceptOrder)
+    ) {
+      return { concepts: {}, conceptOrder: [] };
+    }
+    const concepts: Record<string, ExplanationRecord[]> = {};
+    for (const [conceptId, records] of Object.entries(rawConcepts)) {
+      if (!Array.isArray(records)) continue;
+      const validRecords = records
+        .filter(isExplanationRecord)
+        .slice(0, MAX_ENTRIES_PER_CONCEPT);
+      if (validRecords.length > 0) concepts[conceptId] = validRecords;
+    }
+    const validOrder = conceptOrder
+      .filter((id): id is string => typeof id === "string" && id in concepts)
+      .slice(-MAX_CONCEPTS);
     return { concepts, conceptOrder: validOrder };
   } catch {
     return { concepts: {}, conceptOrder: [] };
@@ -79,7 +122,11 @@ export function loadExplanationHistory(): ExplanationHistory {
 }
 
 export function saveExplanationHistory(history: ExplanationHistory): void {
-  localStorage.setItem(EXPLANATION_HISTORY_KEY, JSON.stringify(history));
+  try {
+    localStorage.setItem(EXPLANATION_HISTORY_KEY, JSON.stringify(history));
+  } catch {
+    // Keep the current learning flow usable when storage is unavailable.
+  }
 }
 
 // ──────────────────────────────────────
