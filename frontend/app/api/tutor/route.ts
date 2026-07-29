@@ -1,130 +1,105 @@
 import { NextResponse } from "next/server";
-import { createDemoEvaluation, createDemoFollowUp, createDemoLesson } from "@/lib/ai/demo";
-import { createProviderEvaluation, createProviderFollowUp, createProviderLesson } from "@/lib/ai/provider";
-import type { TeachingMode, TutorAction, TutorConversationMessage, TutorLessonSummary, TutorRequest } from "@/lib/ai/types";
-import { learningDimensions, type LearningDimension, type LearningScores } from "@/lib/learning-dna";
+import { deduplicateRequest } from "@/lib/server/ada/dedupe";
+import { orchestrateAda } from "@/lib/server/ada/orchestrator";
+import { parseTutorRequest } from "@/lib/server/ada/schemas";
+import {
+  AdaError,
+  getSafeAdaError,
+  MAX_TUTOR_REQUEST_BYTES,
+} from "@/lib/server/ada/safety";
+import { sourceAttribution } from "@/lib/sources";
 
-const actions: TutorAction[] = ["initial", "simpler", "different", "example", "challenge", "followup", "evaluate"];
-const teachingModes: TeachingMode[] = ["adaptive", "visual", "example", "analogy", "story", "challenge"];
+export const runtime = "nodejs";
 
-function isLearningScores(value: unknown): value is LearningScores {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return learningDimensions.every((dimension) => typeof record[dimension] === "number" && record[dimension] >= 0 && record[dimension] <= 100);
+function responseHeaders(requestId: string): HeadersInit {
+  return {
+    "Cache-Control": "no-store",
+    "X-Request-ID": requestId,
+  };
 }
 
-function isLearningDimensionArray(value: unknown): value is LearningDimension[] {
-  return Array.isArray(value)
-    && value.length <= learningDimensions.length
-    && value.every((dimension) => typeof dimension === "string" && learningDimensions.includes(dimension as LearningDimension));
-}
-
-function isLessonSummary(value: unknown): value is TutorLessonSummary {
-  if (typeof value !== "object" || value === null) return false;
-  const record = value as Record<string, unknown>;
-  return typeof record.title === "string" && record.title.length <= 160
-    && typeof record.coreIdea === "string" && record.coreIdea.length <= 500
-    && typeof record.explanation === "string" && record.explanation.length <= 360
-    && isLearningDimensionArray(record.stylesUsed);
-}
-
-function isConversation(value: unknown): value is TutorConversationMessage[] {
-  if (!Array.isArray(value) || value.length > 8) return false;
-  let totalLength = 0;
-  return value.every((message) => {
-    if (typeof message !== "object" || message === null) return false;
-    const record = message as Record<string, unknown>;
-    const content = typeof record.content === "string" ? record.content.trim() : "";
-    totalLength += content.length;
-    return typeof record.id === "string" && record.id.length > 0 && record.id.length <= 80
-      && (record.role === "student" || record.role === "tutor")
-      && content.length > 0 && content.length <= 500
-      && typeof record.createdAt === "string" && record.createdAt.length > 0 && record.createdAt.length <= 40
-      && totalLength <= 2400;
-  });
-}
-
-function parseRequest(value: unknown): TutorRequest | null {
-  if (typeof value !== "object" || value === null) return null;
-  const record = value as Record<string, unknown>;
-  const topic = typeof record.topic === "string" ? record.topic.trim() : "";
-  const subject = typeof record.subject === "string" ? record.subject.trim() : "General learning";
-  const level = typeof record.level === "string" ? record.level.trim() : "General";
-  const action = record.action;
-  const teachingMode = record.teachingMode;
-  const previousStyles = record.previousStyles;
-  const previousTeachingMode = record.previousTeachingMode;
-  const previousTitle = record.previousTitle;
-  const previousExplanation = record.previousExplanation;
-  const question = typeof record.question === "string" ? record.question.trim() : "";
-  const currentLesson = record.currentLesson;
-  const conversation = record.conversation;
-  const learnerAnswer = typeof record.learnerAnswer === "string" ? record.learnerAnswer.trim() : "";
-  const checkQuestion = typeof record.checkQuestion === "string" ? record.checkQuestion.trim() : "";
-  const lessonCoreIdea = typeof record.lessonCoreIdea === "string" ? record.lessonCoreIdea.trim() : "";
-  const lessonContext = typeof record.lessonContext === "string" ? record.lessonContext.trim() : "";
-  if (!topic || topic.length > 160 || subject.length > 50 || level.length > 50 || !isLearningScores(record.scores) || typeof action !== "string" || !actions.includes(action as TutorAction) || typeof teachingMode !== "string" || !teachingModes.includes(teachingMode as TeachingMode) || (previousStyles !== undefined && !isLearningDimensionArray(previousStyles)) || (previousTeachingMode !== undefined && (typeof previousTeachingMode !== "string" || !teachingModes.includes(previousTeachingMode as TeachingMode))) || (previousTitle !== undefined && (typeof previousTitle !== "string" || previousTitle.length > 160)) || (previousExplanation !== undefined && (typeof previousExplanation !== "string" || previousExplanation.length > 360))) return null;
-  if (action === "followup" && (!question || question.length > 500 || !isLessonSummary(currentLesson) || (conversation !== undefined && !isConversation(conversation)))) return null;
-  if (action === "evaluate" && (!learnerAnswer || learnerAnswer.length > 1000 || !checkQuestion || checkQuestion.length > 500 || !lessonCoreIdea || lessonCoreIdea.length > 500 || lessonContext.length > 500)) return null;
-  return { topic, subject: subject || "General learning", level: level || "General", scores: record.scores, action: action as TutorAction, teachingMode: teachingMode as TeachingMode, previousStyles, previousTeachingMode: previousTeachingMode as TeachingMode | undefined, previousTitle, previousExplanation, question: question || undefined, currentLesson: currentLesson as TutorLessonSummary | undefined, conversation: conversation as TutorConversationMessage[] | undefined, learnerAnswer: learnerAnswer || undefined, checkQuestion: checkQuestion || undefined, lessonCoreIdea: lessonCoreIdea || undefined, lessonContext: lessonContext || undefined };
-}
-
-function lessonMatchesAction(action: Exclude<TutorAction, "followup" | "evaluate">, lesson: { challenge?: string; practicePrompt?: string }): boolean {
-  if (action === "challenge") return Boolean(lesson.challenge);
-  if (action === "example") return Boolean(lesson.practicePrompt);
-  return true;
+function errorResponse(error: AdaError, requestId: string): NextResponse {
+  return NextResponse.json(
+    {
+      error: error.message,
+      code: error.code,
+      retryable: error.retryable,
+      retryAfterMs: error.retryAfterMs,
+      requestId,
+    },
+    {
+      status: error.status,
+      headers: responseHeaders(requestId),
+    },
+  );
 }
 
 export async function POST(request: Request) {
+  const contentLength = Number(request.headers.get("content-length") ?? 0);
+  const initialRequestId = crypto.randomUUID();
+  if (contentLength > MAX_TUTOR_REQUEST_BYTES) {
+    return errorResponse(new AdaError({
+      code: "REQUEST_TOO_LARGE",
+      message: "This Ada request is too large. Remove some context and try again.",
+      status: 413,
+    }), initialRequestId);
+  }
+
   let body: unknown;
   try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Send a valid JSON request." }, { status: 400 });
-  }
-
-  const tutorRequest = parseRequest(body);
-  if (!tutorRequest) {
-    return NextResponse.json({ error: "Enter a topic and choose valid lesson settings." }, { status: 400 });
-  }
-
-  if (tutorRequest.action === "followup") {
-    try {
-      const providerFollowUp = await createProviderFollowUp(tutorRequest);
-      if (providerFollowUp) return NextResponse.json({ followUp: providerFollowUp, source: "provider", teachingMode: tutorRequest.teachingMode, action: "followup" });
-
-      if (process.env.NODE_ENV === "development") {
-        const demoFollowUp = createDemoFollowUp(tutorRequest);
-        if (demoFollowUp) return NextResponse.json({ followUp: demoFollowUp, source: "demo", teachingMode: tutorRequest.teachingMode, action: "followup" });
-      }
-      return NextResponse.json({ error: "The tutor is not configured yet. Add an AI provider or try a supported demo topic in development." }, { status: 503 });
-    } catch (error) {
-      if (process.env.NODE_ENV === "development") {
-        const demoFollowUp = createDemoFollowUp(tutorRequest);
-        if (demoFollowUp) return NextResponse.json({ followUp: demoFollowUp, source: "demo", teachingMode: tutorRequest.teachingMode, action: "followup" });
-      }
-      const message = error instanceof Error ? error.message : "The tutor could not answer this follow-up.";
-      return NextResponse.json({ error: message }, { status: 502 });
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_TUTOR_REQUEST_BYTES) {
+      return errorResponse(new AdaError({
+        code: "REQUEST_TOO_LARGE",
+        message: "This Ada request is too large. Remove some context and try again.",
+        status: 413,
+      }), initialRequestId);
     }
+    body = JSON.parse(rawBody);
+  } catch {
+    return errorResponse(new AdaError({
+      code: "INVALID_REQUEST",
+      message: "Send a valid JSON request.",
+      status: 400,
+    }), initialRequestId);
   }
-  if (tutorRequest.action === "evaluate") { try { const evaluation = await createProviderEvaluation(tutorRequest); if (evaluation) return NextResponse.json({ evaluation, source: "provider", teachingMode: tutorRequest.teachingMode, action: "evaluate" }); if (process.env.NODE_ENV === "development") { const demo = createDemoEvaluation(tutorRequest); if (demo) return NextResponse.json({ evaluation: demo, source: "demo", teachingMode: tutorRequest.teachingMode, action: "evaluate" }); } return NextResponse.json({ error: "The tutor is not configured yet. Add an AI provider or try a supported demo topic in development." }, { status: 503 }); } catch (error) { if (process.env.NODE_ENV === "development") { const demo = createDemoEvaluation(tutorRequest); if (demo) return NextResponse.json({ evaluation: demo, source: "demo", teachingMode: tutorRequest.teachingMode, action: "evaluate" }); } return NextResponse.json({ error: error instanceof Error ? error.message : "The tutor could not evaluate this answer." }, { status: 502 }); } }
+
+  const parsed = parseTutorRequest(body);
+  const requestId = parsed.success
+    ? parsed.data.requestId ?? initialRequestId
+    : initialRequestId;
+  if (!parsed.success) {
+    return errorResponse(new AdaError({
+      code: "INVALID_REQUEST",
+      message: parsed.message,
+      status: 400,
+    }), requestId);
+  }
 
   try {
-    const providerLesson = await createProviderLesson(tutorRequest);
-    if (providerLesson && lessonMatchesAction(tutorRequest.action, providerLesson)) return NextResponse.json({ lesson: providerLesson, source: "provider", teachingMode: tutorRequest.teachingMode, action: tutorRequest.action });
-
-    if (process.env.NODE_ENV === "development") {
-      const demoLesson = createDemoLesson(tutorRequest);
-      if (demoLesson) return NextResponse.json({ lesson: demoLesson, source: "demo", teachingMode: tutorRequest.teachingMode, action: tutorRequest.action });
-    }
-
-    return NextResponse.json({ error: "The tutor is not configured yet. Add an AI provider or try a supported demo topic in development." }, { status: 503 });
+    const result = await deduplicateRequest(
+      requestId,
+      () => orchestrateAda(parsed.data, request.signal),
+    );
+    return NextResponse.json(
+      {
+        ...result,
+        requestId,
+        sources: parsed.data.sources?.map(sourceAttribution),
+        sourceMode: parsed.data.sources?.length
+          ? parsed.data.sourceMode
+          : undefined,
+      },
+      { headers: responseHeaders(requestId) },
+    );
   } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      const demoLesson = createDemoLesson(tutorRequest);
-      if (demoLesson) return NextResponse.json({ lesson: demoLesson, source: "demo", teachingMode: tutorRequest.teachingMode, action: tutorRequest.action });
+    const safeError = getSafeAdaError(error);
+    if (safeError.code !== "REQUEST_CANCELLED") {
+      const upstream = safeError.upstreamStatus
+        ? ` upstream=${safeError.upstreamStatus}`
+        : "";
+      console.error(`[Ada request ${requestId}] ${safeError.code}${upstream}`);
     }
-    const message = error instanceof Error ? error.message : "The tutor could not create a lesson.";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return errorResponse(safeError, requestId);
   }
 }

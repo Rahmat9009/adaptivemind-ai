@@ -1,0 +1,11 @@
+# Local secrets and framework output anywhere in this repository.
+**/.env
+**/.env.*
+!**/.env.example
+**/.next/
+**/node_modules/
+**/.vercel/
+
+# Local build and test output.
+**/coverage/
+**/*.tsbuildinfo

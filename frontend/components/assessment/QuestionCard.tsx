@@ -1,3 +1,6 @@
+"use client";
+
+import { motion } from "motion/react";
 import { assessmentQuestions } from "@/lib/learning-dna";
 import { AnswerOption } from "./AnswerOption";
 
@@ -7,16 +10,25 @@ interface QuestionCardProps {
   onSelect: (answerIndex: number) => void;
 }
 
-export function QuestionCard({ questionIndex, selectedAnswer, onSelect }: QuestionCardProps) {
+export function QuestionCard({
+  questionIndex,
+  selectedAnswer,
+  onSelect,
+}: QuestionCardProps) {
   const question = assessmentQuestions[questionIndex];
   const questionId = `question-${questionIndex + 1}`;
 
   return (
-    <fieldset>
-      <legend className="max-w-2xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+    <motion.fieldset
+      key={questionIndex}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <legend className="max-w-2xl text-xl font-semibold tracking-normal text-[var(--am-text-primary)] sm:text-2xl">
         {question.prompt}
       </legend>
-      <div className="mt-8 grid gap-3">
+      <div className="mt-6 grid gap-3">
         {question.answers.map((answer, answerIndex) => (
           <AnswerOption
             key={answer.label}
@@ -28,6 +40,6 @@ export function QuestionCard({ questionIndex, selectedAnswer, onSelect }: Questi
           />
         ))}
       </div>
-    </fieldset>
+    </motion.fieldset>
   );
 }

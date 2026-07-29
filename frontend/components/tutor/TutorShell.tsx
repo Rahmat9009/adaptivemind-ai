@@ -1,13 +1,58 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { TeachingMode, TutorAction, TutorApiResponse, TutorConversationMessage, TutorConversationTurn, TutorFollowUpApiResponse, TutorFollowUpResponse, TutorLesson, UnderstandingEvaluation, UnderstandingEvaluationApiResponse } from "@/lib/ai/types";
-import { learningDimensions, type LearningDimension, type LearningScores } from "@/lib/learning-dna";
+import { Button } from "@/components/base/buttons/button";
+import type {
+  TeachingMode,
+  TutorApiResponse,
+  TutorConversationMessage,
+  TutorConversationTurn,
+  TutorFollowUpApiResponse,
+  TutorFollowUpResponse,
+  TutorLesson,
+  TutorLessonAction,
+  TutorResponseSource,
+  UnderstandingEvaluation,
+  UnderstandingEvaluationApiResponse,
+  ExplainBackApiResponse,
+  GeneratedQuiz,
+  TutorAction,
+} from "@/lib/ai/types";
+import {
+  learningDimensions,
+  type LearningDimension,
+  type LearningScores,
+} from "@/lib/learning-dna";
 import { isTutorHandoff, tutorHandoffStorageKey } from "@/lib/tutor-handoff";
-import { addLessonToHistory, historyRestoreStorageKey, readLearningHistory, saveHistoryConversation, saveHistoryEvaluation, startNewTopicStorageKey } from "@/lib/dashboard-storage";
-import { updateTopicMastery } from "@/lib/mastery";
-import { AppNavigation } from "@/components/layout/AppNavigation";
-import { LearningDNACompact } from "./LearningDNACompact";
+import {
+  addLessonToHistory,
+  historyRestoreStorageKey,
+  readLearningHistory,
+  saveHistoryConversation,
+  saveHistoryEvaluation,
+  startNewTopicStorageKey,
+  type LessonHistoryEntry,
+} from "@/lib/dashboard-storage";
+import {
+  createMasteryEvidenceId,
+  getTopicMastery,
+  normalizeTopicId,
+  updateTopicMastery,
+} from "@/lib/mastery";
+import {
+  loadLearningDNA2,
+  saveLearningDNA2,
+  recordCheckOutcome,
+} from "@/lib/learning-dna-v2";
+import {
+  teachingModeToDimension,
+} from "@/lib/mode-effectiveness";
+import {
+  getReviewCard,
+  upsertReviewCard,
+  updateReviewCard,
+} from "@/lib/spaced-review";
+import { PageShell } from "@/components/am/PageShell";
 import { LessonActions } from "./LessonActions";
 import { LessonCard } from "./LessonCard";
 import { LessonFollowUp } from "./LessonFollowUp";
@@ -17,77 +62,260 @@ import { TutorErrorState } from "./TutorErrorState";
 import { TutorLoadingState } from "./TutorLoadingState";
 import { UnderstandingCheck } from "./UnderstandingCheck";
 import { UnderstandingFeedback } from "./UnderstandingFeedback";
+import { ExplainBack, type ExplainBackFeedback, type ExplainBackState } from "./ExplainBack";
+import { HintLadder } from "./HintLadder";
+import {
+  defaultReadingSettings,
+  loadReadingSettings,
+  type ReadingSettings,
+} from "@/lib/reading-preferences";
+import { ReadingPreferencesInline } from "./ReadingPreferencesInline";
+import { WhyThisMode } from "./WhyThisMode";
+import {
+  scheduleQuickRecall,
+} from "@/lib/quick-recall";
+import { LearnerTransparency } from "./LearnerTransparency";
+import { PreferenceOverridesUI } from "./PreferenceOverridesUI";
+import { ExplanationHistoryView } from "./ExplanationHistoryView";
+import { QuizExperience } from "./QuizExperience";
+import { VisualLessonEngine } from "@/components/visuals/VisualLessonEngine";
+import {
+  addExplanationRecord,
+} from "@/lib/explanation-history";
+import { loadPreferenceOverrides } from "@/lib/preference-overrides";
+import { saveCalibrationRecord } from "@/lib/confidence-calibration";
+import { saveLearningActivity } from "@/lib/idb";
+import type {
+  SourceGroundingMode,
+  TutorSource,
+} from "@/lib/sources";
 
 const profileStorageKey = "adaptivemind-learning-dna";
 const lessonStorageKey = "adaptivemind-current-lesson";
+const tutorDraftStorageKey = "adaptivemind-tutor-draft";
 const conversationStorageKey = "adaptivemind-lesson-conversation";
-const balancedScores: LearningScores = { visual: 50, examples: 50, analogies: 50, stories: 50, challenges: 50 };
+const balancedScores: LearningScores = {
+  visual: 50,
+  examples: 50,
+  analogies: 50,
+  stories: 50,
+  challenges: 50,
+};
 
-interface TutorProfile { scores: LearningScores; isBalanced: boolean; }
-interface StoredLessonSession { response: TutorApiResponse; topic: string; subject: string; level: string; teachingMode: TeachingMode; }
-interface StoredConversation { lessonTitle: string; turns: TutorConversationTurn[]; }
+interface TutorProfile {
+  scores: LearningScores;
+  isBalanced: boolean;
+}
+interface StoredLessonSession {
+  response: TutorApiResponse;
+  topic: string;
+  subject: string;
+  level: string;
+  teachingMode: TeachingMode;
+  historyId?: string;
+}
+interface StoredConversation {
+  lessonTitle: string;
+  turns: TutorConversationTurn[];
+}
 
 function isLearningScores(value: unknown): value is LearningScores {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return learningDimensions.every((dimension) => typeof record[dimension] === "number" && record[dimension] >= 0 && record[dimension] <= 100);
+  return learningDimensions.every(
+    (dimension) =>
+      typeof record[dimension] === "number" &&
+      record[dimension] >= 0 &&
+      record[dimension] <= 100,
+  );
 }
 
 function isStyles(value: unknown): value is LearningDimension[] {
-  return Array.isArray(value) && value.every((style) => typeof style === "string" && learningDimensions.includes(style as LearningDimension));
+  return (
+    Array.isArray(value) &&
+    value.every(
+      (style) =>
+        typeof style === "string" &&
+        learningDimensions.includes(style as LearningDimension),
+    )
+  );
 }
 
 function isTutorLesson(value: unknown): value is TutorLesson {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return typeof record.title === "string" && typeof record.coreIdea === "string" && typeof record.explanation === "string" && Array.isArray(record.keyPoints) && record.keyPoints.every((point) => typeof point === "string") && typeof record.checkQuestion === "string" && isStyles(record.stylesUsed);
+  return (
+    typeof record.title === "string" &&
+    typeof record.coreIdea === "string" &&
+    typeof record.explanation === "string" &&
+    Array.isArray(record.keyPoints) &&
+    record.keyPoints.every((point: unknown) => typeof point === "string") &&
+    typeof record.checkQuestion === "string" &&
+    isStyles(record.stylesUsed)
+  );
 }
 
 function isTeachingMode(value: unknown): value is TeachingMode {
-  return value === "adaptive" || value === "visual" || value === "example" || value === "analogy" || value === "story" || value === "challenge";
+  return (
+    value === "adaptive" ||
+    value === "visual" ||
+    value === "example" ||
+    value === "analogy" ||
+    value === "story" ||
+    value === "challenge"
+  );
 }
 
-function isLessonAction(value: unknown): value is Exclude<TutorAction, "followup" | "evaluate"> {
-  return value === "initial" || value === "simpler" || value === "different" || value === "example" || value === "challenge";
+function isTutorResponseSource(value: unknown): value is TutorResponseSource {
+  return (
+    value === "live-primary" ||
+    value === "live-fallback" ||
+    value === "local-fallback" ||
+    value === "provider" ||
+    value === "demo"
+  );
+}
+
+function isLessonAction(value: unknown): value is TutorLessonAction {
+  return (
+    value === "initial" ||
+    value === "simpler" ||
+    value === "different" ||
+    value === "example" ||
+    value === "challenge" ||
+    value === "visualize"
+  );
 }
 
 function isTutorResponse(value: unknown): value is TutorApiResponse {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return isTutorLesson(record.lesson) && (record.source === "provider" || record.source === "demo") && isTeachingMode(record.teachingMode) && isLessonAction(record.action);
+  return (
+    isTutorLesson(record.lesson) &&
+    isTutorResponseSource(record.source) &&
+    isTeachingMode(record.teachingMode) &&
+    isLessonAction(record.action)
+  );
 }
 
-function isFollowUpResponse(value: unknown): value is TutorFollowUpResponse {
+function isFollowUpResponse(
+  value: unknown,
+): value is TutorFollowUpResponse {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return typeof record.answer === "string" && record.answer.length > 0 && isStyles(record.stylesUsed);
+  return (
+    typeof record.answer === "string" &&
+    record.answer.length > 0 &&
+    isStyles(record.stylesUsed)
+  );
 }
 
-function isFollowUpApiResponse(value: unknown): value is TutorFollowUpApiResponse {
+function isFollowUpApiResponse(
+  value: unknown,
+): value is TutorFollowUpApiResponse {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return isFollowUpResponse(record.followUp) && (record.source === "provider" || record.source === "demo") && isTeachingMode(record.teachingMode) && record.action === "followup";
+  return (
+    isFollowUpResponse(record.followUp) &&
+    isTutorResponseSource(record.source) &&
+    isTeachingMode(record.teachingMode) &&
+    record.action === "followup"
+  );
 }
-function isEvaluationApiResponse(value: unknown): value is UnderstandingEvaluationApiResponse { if (typeof value !== "object" || value === null) return false; const record = value as Record<string, unknown>; const evaluation = record.evaluation as Record<string, unknown> | undefined; return record.action === "evaluate" && (record.source === "provider" || record.source === "demo") && typeof evaluation === "object" && evaluation !== null && (evaluation.status === "correct" || evaluation.status === "partial" || evaluation.status === "misconception" || evaluation.status === "uncertain") && typeof evaluation.score === "number" && typeof evaluation.feedback === "string" && Array.isArray(evaluation.stylesUsed); }
+
+function isEvaluationApiResponse(
+  value: unknown,
+): value is UnderstandingEvaluationApiResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  const evaluation = record.evaluation as Record<string, unknown> | undefined;
+  return (
+    record.action === "evaluate" &&
+    isTutorResponseSource(record.source) &&
+    typeof evaluation === "object" &&
+    evaluation !== null &&
+    (evaluation.status === "correct" ||
+      evaluation.status === "partial" ||
+      evaluation.status === "misconception" ||
+      evaluation.status === "uncertain") &&
+    typeof evaluation.score === "number" &&
+    typeof evaluation.feedback === "string" &&
+    Array.isArray(evaluation.stylesUsed)
+  );
+}
+
+function isExplainBackApiResponse(
+  value: unknown,
+): value is ExplainBackApiResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  const evaluation = record.evaluation as Record<string, unknown> | undefined;
+  return (
+    record.action === "explain-back" &&
+    isTutorResponseSource(record.source) &&
+    typeof evaluation === "object" &&
+    evaluation !== null &&
+    typeof evaluation.isComplete === "boolean" &&
+    typeof evaluation.score === "number" &&
+    Array.isArray(evaluation.understood) &&
+    Array.isArray(evaluation.missing) &&
+    Array.isArray(evaluation.stylesUsed)
+  );
+}
 
 function isMessage(value: unknown): value is TutorConversationMessage {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return typeof record.id === "string" && (record.role === "student" || record.role === "tutor") && typeof record.content === "string" && typeof record.createdAt === "string";
+  return (
+    typeof record.id === "string" &&
+    (record.role === "student" || record.role === "tutor") &&
+    typeof record.content === "string" &&
+    typeof record.createdAt === "string"
+  );
 }
 
 function isTurn(value: unknown): value is TutorConversationTurn {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
-  return isMessage(record.student) && isMessage(record.tutor) && isFollowUpResponse(record.response);
+  return (
+    isMessage(record.student) &&
+    isMessage(record.tutor) &&
+    isFollowUpResponse(record.response)
+  );
 }
 
-function normalizeStoredLesson(value: unknown): StoredLessonSession | null {
-  if (isTutorResponse(value)) return { response: value, topic: "", subject: "Science", level: "High school", teachingMode: value.teachingMode };
+function normalizeStoredLesson(
+  value: unknown,
+): StoredLessonSession | null {
+  if (isTutorResponse(value))
+    return {
+      response: value,
+      topic: "",
+      subject: "Science",
+      level: "High school",
+      teachingMode: value.teachingMode,
+    };
   if (typeof value !== "object" || value === null) return null;
   const record = value as Record<string, unknown>;
-  if (!isTutorResponse(record.response) || typeof record.topic !== "string" || typeof record.subject !== "string" || typeof record.level !== "string" || !isTeachingMode(record.teachingMode)) return null;
-  return { response: record.response, topic: record.topic, subject: record.subject, level: record.level, teachingMode: record.teachingMode };
+  if (
+    !isTutorResponse(record.response) ||
+    typeof record.topic !== "string" ||
+    typeof record.subject !== "string" ||
+    typeof record.level !== "string" ||
+    !isTeachingMode(record.teachingMode)
+  )
+    return null;
+  return {
+    response: record.response,
+    topic: record.topic,
+    subject: record.subject,
+    level: record.level,
+    teachingMode: record.teachingMode,
+    historyId:
+      typeof record.historyId === "string"
+        ? record.historyId.slice(0, 120)
+        : undefined,
+  };
 }
 
 function getErrorMessage(value: unknown): string {
@@ -98,15 +326,29 @@ function getErrorMessage(value: unknown): string {
 
 function getSavedProfile(): TutorProfile | null {
   try {
-    const value: unknown = JSON.parse(localStorage.getItem(profileStorageKey) ?? "null");
+    const value: unknown = JSON.parse(
+      localStorage.getItem(profileStorageKey) ?? "null",
+    );
     if (typeof value !== "object" || value === null) return null;
     const record = value as Record<string, unknown>;
-    return isLearningScores(record.scores) ? { scores: record.scores, isBalanced: false } : null;
-  } catch { return null; }
+    return isLearningScores(record.scores)
+      ? { scores: record.scores, isBalanced: false }
+      : null;
+  } catch {
+    return null;
+  }
 }
 
-function createMessage(role: TutorConversationMessage["role"], content: string): TutorConversationMessage {
-  return { id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, role, content, createdAt: new Date().toISOString() };
+function createMessage(
+  role: TutorConversationMessage["role"],
+  content: string,
+): TutorConversationMessage {
+  return {
+    id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    role,
+    content,
+    createdAt: new Date().toISOString(),
+  };
 }
 
 export function TutorShell() {
@@ -117,18 +359,124 @@ export function TutorShell() {
   const [level, setLevel] = useState("High school");
   const [teachingMode, setTeachingMode] = useState<TeachingMode>("adaptive");
   const [response, setResponse] = useState<TutorApiResponse | null>(null);
-  const [conversation, setConversation] = useState<TutorConversationTurn[]>([]);
+  const [conversation, setConversation] = useState<TutorConversationTurn[]>(
+    [],
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isFollowUpLoading, setIsFollowUpLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
   const [handoffMessage, setHandoffMessage] = useState<string | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
-  const [evaluation, setEvaluation] = useState<UnderstandingEvaluation | null>(null);
-  const [evaluationSource, setEvaluationSource] = useState<"provider" | "demo">("provider");
+  const [evaluation, setEvaluation] = useState<UnderstandingEvaluation | null>(
+    null,
+  );
+  const [evaluationSource, setEvaluationSource] =
+    useState<TutorResponseSource>("live-primary");
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluationError, setEvaluationError] = useState<string | null>(null);
+  const [explainBackFeedback, setExplainBackFeedback] = useState<ExplainBackFeedback | null>(null);
+  const [explainBackState, setExplainBackState] = useState<ExplainBackState>("prompt");
+  const [isExplainBackLoading, setIsExplainBackLoading] = useState(false);
+  const [explainBackError, setExplainBackError] = useState<string | null>(null);
+  const [explainBackConfidence, setExplainBackConfidence] = useState<number | null>(null);
+  const [explainBackRetries, setExplainBackRetries] = useState(0);
+  const [hintLevel, setHintLevel] = useState<0 | 1 | 2 | 3 | 4>(0);
+  const [hints, setHints] = useState<[string, string, string, string] | null>(null);
+  const [isHintLoading, setIsHintLoading] = useState(false);
+  const [hintError, setHintError] = useState<string | null>(null);
+  const [timeBeforeFirstAttempt, setTimeBeforeFirstAttempt] = useState<number | null>(null);
+  const [readingSettings, setReadingSettings] = useState<ReadingSettings>(() => {
+    try {
+      return loadReadingSettings();
+    } catch {
+      return { ...defaultReadingSettings };
+    }
+  });
+  const [showReadingPrefs, setShowReadingPrefs] = useState(false);
+  const [hasAttempted, setHasAttempted] = useState(false);
+  const [confidenceBefore, setConfidenceBefore] = useState<number | null>(null);
+  const [masteryReason, setMasteryReason] = useState<string | null>(null);
+  const [understandingRetries, setUnderstandingRetries] = useState(0);
+  const [didSwitchMode, setDidSwitchMode] = useState(false);
+  const [activeSources, setActiveSources] = useState<TutorSource[]>([]);
+  const [activeSourceMode, setActiveSourceMode] =
+    useState<SourceGroundingMode | undefined>(undefined);
+  const [composerSessionId, setComposerSessionId] = useState(0);
+
+  // --- New layout state ---
+  const [focusMode, setFocusMode] = useState(false);
+  const [activeTab, setActiveTab] = useState("learn");
+
+  const [generatedQuiz, setGeneratedQuiz] = useState<GeneratedQuiz | null>(null);
+  const [isQuizLoading, setIsQuizLoading] = useState(false);
+  const [quizError, setQuizError] = useState<string | null>(null);
   const latestTurnRef = useRef<HTMLDivElement>(null);
+  const activeRequestsRef = useRef(new Set<AbortController>());
+  const lessonRequestPendingRef = useRef(false);
+
+  async function postTutorRequest(
+    body: Omit<Record<string, unknown>, "requestId">,
+  ): Promise<unknown> {
+    const controller = new AbortController();
+    const requestId = crypto.randomUUID();
+    activeRequestsRef.current.add(controller);
+    const timeoutId = window.setTimeout(() => controller.abort(), 35_000);
+
+    try {
+      const apiResponse = await fetch("/api/tutor", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...body,
+          ...getLearnerRequestContext(),
+          requestId,
+        }),
+        cache: "no-store",
+        signal: controller.signal,
+      });
+      const payload: unknown = await apiResponse.json().catch(() => null);
+      if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
+      return payload;
+    } catch (requestError) {
+      if (requestError instanceof DOMException && requestError.name === "AbortError") {
+        throw new Error("Ada took too long to respond. Your previous lesson is still available.");
+      }
+      throw requestError;
+    } finally {
+      window.clearTimeout(timeoutId);
+      activeRequestsRef.current.delete(controller);
+    }
+  }
+
+  function getLearnerRequestContext() {
+    try {
+      const dna = loadLearningDNA2();
+      const preferences = loadPreferenceOverrides();
+      const evidenceCount = Object.values(dna.observedEffectiveness).reduce(
+        (sum, evidence) => sum + evidence.evidenceCount,
+        0,
+      );
+      return {
+        adaptationContext: {
+          recommendedApproach: dna.currentRecommendation,
+          recommendationReason: dna.recommendationReason,
+          evidenceCount,
+          confidence: dna.recommendationConfidence,
+        },
+        learnerPreferences: {
+          detailPreference: preferences.detailPreference,
+          conciseStories: preferences.conciseStories,
+          startChallengesEasy: preferences.startChallengesEasy,
+          likedDomains: preferences.likedDomains,
+          bannedDomains: preferences.bannedDomains,
+          dislikedPatterns: preferences.dislikedPatterns,
+        },
+      };
+    } catch {
+      return {};
+    }
+  }
 
   function clearConversation() {
     setConversation([]);
@@ -140,111 +488,1013 @@ export function TutorShell() {
     const timer = window.setTimeout(() => {
       setProfile(getSavedProfile());
       try {
-        const startNewTopic = sessionStorage.getItem(startNewTopicStorageKey) === "true";
+        const startNewTopic =
+          sessionStorage.getItem(startNewTopicStorageKey) === "true";
         sessionStorage.removeItem(startNewTopicStorageKey);
-        const restoreId = startNewTopic ? null : sessionStorage.getItem(historyRestoreStorageKey);
-        const restoredLesson = restoreId ? readLearningHistory().find((entry) => entry.id === restoreId) : null;
+        const restoreId = startNewTopic
+          ? null
+          : sessionStorage.getItem(historyRestoreStorageKey);
+        const restoredLesson = restoreId
+          ? readLearningHistory().find((entry) => entry.id === restoreId)
+          : null;
         sessionStorage.removeItem(historyRestoreStorageKey);
-        const session = restoredLesson ? { response: restoredLesson.response, topic: restoredLesson.topic, subject: restoredLesson.subject, level: restoredLesson.level, teachingMode: restoredLesson.teachingMode } : startNewTopic ? null : normalizeStoredLesson(JSON.parse(localStorage.getItem(lessonStorageKey) ?? "null"));
+        const params = new URLSearchParams(window.location.search);
+        const suggestedTopic = params.get("topic");
+        const suggestedSubject = params.get("subject");
+        const suggestedLevel = params.get("level");
+        const session = restoredLesson
+          ? {
+              response: restoredLesson.response,
+              topic: restoredLesson.topic,
+              subject: restoredLesson.subject,
+              level: restoredLesson.level,
+              teachingMode: restoredLesson.teachingMode,
+              historyId: restoredLesson.id,
+            }
+          : startNewTopic
+            ? null
+            : suggestedTopic
+              ? null
+            : normalizeStoredLesson(
+                JSON.parse(
+                  localStorage.getItem(lessonStorageKey) ?? "null",
+                ),
+              );
         if (session) {
           setResponse(session.response);
           setTopic(session.topic);
           setSubject(session.subject);
           setLevel(session.level);
           setTeachingMode(session.teachingMode);
+          if (session.historyId) setHistoryId(session.historyId);
           if (restoredLesson) {
-            setHistoryId(restoredLesson.id);
-            if (restoredLesson.conversation) setConversation(restoredLesson.conversation.slice(-4));
+            if (restoredLesson.conversation)
+              setConversation(restoredLesson.conversation.slice(-4));
           }
-          const storedConversation: unknown = restoredLesson ? null : JSON.parse(localStorage.getItem(conversationStorageKey) ?? "null");
-          if (typeof storedConversation === "object" && storedConversation !== null) {
+          const storedConversation: unknown = restoredLesson
+            ? null
+            : JSON.parse(
+                localStorage.getItem(conversationStorageKey) ?? "null",
+              );
+          if (
+            typeof storedConversation === "object" &&
+            storedConversation !== null
+          ) {
             const record = storedConversation as Record<string, unknown>;
-            if (record.lessonTitle === session.response.lesson.title && Array.isArray(record.turns) && record.turns.length <= 4 && record.turns.every(isTurn)) setConversation(record.turns);
+            if (
+              record.lessonTitle === session.response.lesson.title &&
+              Array.isArray(record.turns) &&
+              record.turns.length <= 4 &&
+              record.turns.every(isTurn)
+            )
+              setConversation(record.turns);
           }
         } else {
-          const params = new URLSearchParams(window.location.search);
-          const suggestedTopic = params.get("topic");
-          const suggestedSubject = params.get("subject");
-          const suggestedLevel = params.get("level");
-          if (suggestedTopic) setTopic(suggestedTopic.slice(0, 160));
+          if (suggestedTopic) setTopic(suggestedTopic.slice(0, 500));
           if (suggestedSubject) setSubject(suggestedSubject.slice(0, 50));
           if (suggestedLevel) setLevel(suggestedLevel.slice(0, 50));
         }
-      } catch { localStorage.removeItem(lessonStorageKey); localStorage.removeItem(conversationStorageKey); }
+        const savedDraft = localStorage.getItem(tutorDraftStorageKey);
+        if (!startNewTopic && !suggestedTopic && savedDraft?.trim()) {
+          setTopic(savedDraft.slice(0, 500));
+        }
+      } catch {
+        localStorage.removeItem(lessonStorageKey);
+        localStorage.removeItem(conversationStorageKey);
+      }
       try {
-        const handoff: unknown = JSON.parse(sessionStorage.getItem(tutorHandoffStorageKey) ?? "null");
+        const handoff: unknown = JSON.parse(
+          sessionStorage.getItem(tutorHandoffStorageKey) ?? "null",
+        );
         if (isTutorHandoff(handoff)) setHandoffMessage(handoff.message);
         sessionStorage.removeItem(tutorHandoffStorageKey);
-      } catch { sessionStorage.removeItem(tutorHandoffStorageKey); }
+      } catch {
+        sessionStorage.removeItem(tutorHandoffStorageKey);
+      }
       setIsReady(true);
     }, 0);
     return () => window.clearTimeout(timer);
   }, []);
 
-  useEffect(() => { if (conversation.length) latestTurnRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [conversation.length]);
+  useEffect(() => {
+    if (!isReady) return;
+    try {
+      if (topic.trim()) {
+        localStorage.setItem(tutorDraftStorageKey, topic.slice(0, 500));
+      } else {
+        localStorage.removeItem(tutorDraftStorageKey);
+      }
+    } catch {
+      // The active Tutor session still works when draft storage is unavailable.
+    }
+  }, [isReady, topic]);
 
-  async function requestLesson(action: Exclude<TutorAction, "followup" | "evaluate">) {
-    if (!profile || !topic.trim()) return;
+  useEffect(() => () => {
+    for (const controller of activeRequestsRef.current) controller.abort();
+    activeRequestsRef.current.clear();
+  }, []);
+
+  useEffect(() => {
+    if (conversation.length)
+      latestTurnRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "nearest",
+      });
+  }, [conversation.length]);
+
+  async function requestLesson(
+    action: TutorLessonAction,
+    submittedSources: TutorSource[] = activeSources,
+    submittedSourceMode: SourceGroundingMode | undefined = activeSourceMode,
+  ) {
+    if (!profile || !topic.trim() || lessonRequestPendingRef.current) return;
+    lessonRequestPendingRef.current = true;
     setIsLoading(true);
     setError(null);
     try {
       const previousLesson = response?.lesson;
-      const evaluationContext = evaluation ? ` Latest understanding check: ${evaluation.status}; focus: ${evaluation.needsReview.join(", ")}.` : "";
-      const apiResponse = await fetch("/api/tutor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: topic.trim(), subject, level, scores: profile.scores, action, teachingMode, previousStyles: previousLesson?.stylesUsed, previousTeachingMode: response?.teachingMode, previousTitle: previousLesson?.title, previousExplanation: `${previousLesson?.explanation.slice(0, 250) ?? ""}${evaluationContext}`.slice(0, 360) }) });
-      const payload: unknown = await apiResponse.json();
-      if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
-      if (!isTutorResponse(payload)) throw new Error("The tutor returned an incomplete lesson. Please try again.");
+      const evaluationContext = evaluation
+        ? ` Latest understanding check: ${evaluation.status}; focus: ${evaluation.needsReview.join(", ")}.`
+        : "";
+      const payload = await postTutorRequest({
+          topic: topic.trim(),
+          subject,
+          level,
+          scores: profile.scores,
+          action,
+          teachingMode,
+          previousStyles: previousLesson?.stylesUsed,
+          previousTeachingMode: response?.teachingMode,
+          previousTitle: previousLesson?.title,
+          previousExplanation: `${previousLesson?.explanation?.slice(0, 250) ?? ""}${evaluationContext}`.slice(
+            0,
+            360,
+          ),
+          sources: submittedSources.length ? submittedSources : undefined,
+          sourceMode: submittedSources.length
+            ? submittedSourceMode
+            : undefined,
+      });
+      if (!isTutorResponse(payload))
+        throw new Error(
+          "The tutor returned an incomplete lesson. Please try again.",
+        );
       setResponse(payload);
+      localStorage.removeItem(tutorDraftStorageKey);
+      setEvaluation(null);
+      setConfidenceBefore(null);
+      setMasteryReason(null);
+      setUnderstandingRetries(0);
+      setExplainBackFeedback(null);
+      setExplainBackState("prompt");
+      setExplainBackConfidence(null);
+      setExplainBackRetries(0);
+      setHints(null);
+      setHintLevel(0);
+      setHintError(null);
+      setHasAttempted(false);
+      setTimeBeforeFirstAttempt(null);
+      setActiveSources(submittedSources);
+      setActiveSourceMode(
+        submittedSources.length ? submittedSourceMode : undefined,
+      );
       clearConversation();
-      const historyEntry = addLessonToHistory({ topic: topic.trim(), subject, level, teachingMode, stylesUsed: payload.lesson.stylesUsed, response: payload });
+      let recommendationReason =
+        "This lesson used the selected teaching approach.";
+      try {
+        recommendationReason =
+          teachingMode === "adaptive"
+            ? loadLearningDNA2().recommendationReason
+            : `You selected ${teachingMode} mode. Ada will use the outcome to improve later recommendations.`;
+      } catch {
+        // The lesson remains usable without Learning DNA metadata.
+      }
+      const historyEntry = addLessonToHistory({
+        topic: topic.trim(),
+        subject,
+        level,
+        teachingMode,
+        stylesUsed: payload.lesson.stylesUsed,
+        response: payload,
+        recommendationReason,
+      });
       setHistoryId(historyEntry.id);
-      localStorage.setItem(lessonStorageKey, JSON.stringify({ response: payload, topic: topic.trim(), subject, level, teachingMode } satisfies StoredLessonSession));
-    } catch (requestError) { setError(requestError instanceof Error ? requestError.message : "Please check your connection and try again."); } finally { setIsLoading(false); }
+      void import("@/lib/offline-lessons")
+        .then(({ autoCacheOfflineLesson }) =>
+          autoCacheOfflineLesson(historyEntry),
+        )
+        .catch(() => {
+          // Automatic caching is optional and never blocks the live lesson.
+        });
+      localStorage.setItem(
+        lessonStorageKey,
+        JSON.stringify({
+          response: payload,
+          topic: topic.trim(),
+          subject,
+          level,
+          teachingMode,
+          historyId: historyEntry.id,
+        } satisfies StoredLessonSession),
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Please check your connection and try again.",
+      );
+    } finally {
+      lessonRequestPendingRef.current = false;
+      setIsLoading(false);
+    }
   }
 
-  async function requestFollowUp(question: string): Promise<boolean> {
+  async function requestFollowUp(
+    question: string,
+    followUpSources: TutorSource[],
+    followUpSourceMode: SourceGroundingMode | undefined
+  ): Promise<boolean> {
     if (!profile || !response || !topic.trim()) return false;
     setIsFollowUpLoading(true);
     setFollowUpError(null);
     const student = createMessage("student", question);
-    const recentConversation = conversation.slice(-3).flatMap((turn) => [turn.student, turn.tutor]);
+    const recentConversation = conversation
+      .slice(-3)
+      .flatMap((turn) => [turn.student, turn.tutor]);
     try {
-      const apiResponse = await fetch("/api/tutor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: topic.trim(), subject, level, scores: profile.scores, action: "followup", teachingMode, question, currentLesson: { title: response.lesson.title, coreIdea: response.lesson.coreIdea, explanation: response.lesson.explanation.slice(0, 360), stylesUsed: response.lesson.stylesUsed }, conversation: recentConversation }) });
-      const payload: unknown = await apiResponse.json();
-      if (!apiResponse.ok) throw new Error(getErrorMessage(payload));
-      if (!isFollowUpApiResponse(payload)) throw new Error("Ada returned an incomplete follow-up. Please try again.");
+      const payload = await postTutorRequest({
+          topic: topic.trim(),
+          subject,
+          level,
+          scores: profile.scores,
+          action: "followup",
+          teachingMode,
+          question,
+          currentLesson: {
+            title: response.lesson.title,
+            coreIdea: response.lesson.coreIdea,
+            explanation: response.lesson.explanation.slice(0, 360),
+            stylesUsed: response.lesson.stylesUsed,
+          },
+          conversation: recentConversation,
+          sources: followUpSources.length ? followUpSources : undefined,
+          sourceMode: followUpSources.length ? followUpSourceMode : undefined,
+      });
+      if (!isFollowUpApiResponse(payload))
+        throw new Error(
+          "Ada returned an incomplete follow-up. Please try again.",
+        );
       const tutor = createMessage("tutor", payload.followUp.answer);
-      const nextConversation = [...conversation, { student, tutor, response: payload.followUp }].slice(-4);
+      const nextConversation = [
+        ...conversation,
+        { student, tutor, response: payload.followUp },
+      ].slice(-4);
       setConversation(nextConversation);
-      localStorage.setItem(conversationStorageKey, JSON.stringify({ lessonTitle: response.lesson.title, turns: nextConversation } satisfies StoredConversation));
+      localStorage.setItem(
+        conversationStorageKey,
+        JSON.stringify({
+          lessonTitle: response.lesson.title,
+          turns: nextConversation,
+        } satisfies StoredConversation),
+      );
       if (historyId) saveHistoryConversation(historyId, nextConversation);
       return true;
     } catch (requestError) {
-      setFollowUpError(requestError instanceof Error ? requestError.message : "Please check your connection and try again.");
+      setFollowUpError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Please check your connection and try again.",
+      );
       return false;
-    } finally { setIsFollowUpLoading(false); }
+    } finally {
+      setIsFollowUpLoading(false);
+    }
   }
 
-  async function evaluateUnderstanding(answer: string) { if (!profile || !response || !topic.trim()) return; setIsEvaluating(true); setEvaluationError(null); try { const apiResponse = await fetch("/api/tutor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic: topic.trim(), subject, level, scores: profile.scores, action: "evaluate", teachingMode, learnerAnswer: answer, checkQuestion: response.lesson.checkQuestion, lessonCoreIdea: response.lesson.coreIdea, lessonContext: response.lesson.explanation.slice(0, 500) }) }); const payload: unknown = await apiResponse.json(); if (!apiResponse.ok) throw new Error(getErrorMessage(payload)); if (!isEvaluationApiResponse(payload)) throw new Error("Ada returned an incomplete understanding check."); setEvaluation(payload.evaluation); setEvaluationSource(payload.source); const mastery = updateTopicMastery(topic.trim(), subject, payload.evaluation.score, payload.evaluation.status); if (historyId) saveHistoryEvaluation(historyId, { score: payload.evaluation.score, status: payload.evaluation.status, masteryLevel: mastery.masteryLevel, evaluatedAt: new Date().toISOString() }); } catch (requestError) { setEvaluationError(requestError instanceof Error ? requestError.message : "Please try again."); } finally { setIsEvaluating(false); } }
+  async function evaluateUnderstanding(answer: string, confidence: number) {
+    if (!profile || !response || !topic.trim()) return;
+    setConfidenceBefore(confidence);
+    setIsEvaluating(true);
+    setEvaluationError(null);
+    try {
+      const payload = await postTutorRequest({
+          topic: topic.trim(),
+          subject,
+          level,
+          scores: profile.scores,
+          action: "evaluate",
+          teachingMode,
+          learnerAnswer: answer,
+          learnerConfidence: confidence,
+          checkQuestion: response.lesson.checkQuestion,
+          lessonCoreIdea: response.lesson.coreIdea,
+          lessonContext: response.lesson.explanation.slice(0, 500),
+      });
+      if (!isEvaluationApiResponse(payload))
+        throw new Error("Ada returned an incomplete understanding check.");
+      setEvaluation(payload.evaluation);
+      setEvaluationSource(payload.source);
+      const existingMastery = getTopicMastery().find(
+        (entry) => entry.topicId === normalizeTopicId(topic.trim()),
+      );
+      const masteryBefore = existingMastery?.masteryPercent ?? 10;
+      const evidenceId = createMasteryEvidenceId(
+        topic.trim(),
+        `${historyId ?? response.requestId ?? response.lesson.title}:understanding`,
+        answer,
+      );
+      const mastery = updateTopicMastery(
+        topic.trim(),
+        subject,
+        payload.evaluation.score,
+        payload.evaluation.status,
+        {
+          evidenceId,
+          kind: response.action === "challenge" ? "challenge" : "retrieval",
+          hintsUsed: hintLevel,
+          retries: understandingRetries,
+          independent: response.action === "challenge" && hintLevel === 0,
+        },
+      );
+      setMasteryReason(mastery.lastChangeReason);
+      if (historyId)
+        saveHistoryEvaluation(historyId, {
+          score: payload.evaluation.score,
+          status: payload.evaluation.status,
+          masteryLevel: mastery.masteryLevel,
+          evaluatedAt: new Date().toISOString(),
+          needsReview: payload.evaluation.needsReview,
+          misconception: payload.evaluation.misconception,
+        });
+      if (historyId) {
+        const updatedHistoryEntry = readLearningHistory().find(
+          (entry) => entry.id === historyId,
+        );
+        if (updatedHistoryEntry) {
+          void import("@/lib/offline-lessons")
+            .then(({ refreshOfflineLessonIfSaved }) =>
+              refreshOfflineLessonIfSaved(updatedHistoryEntry),
+            )
+            .catch(() => {
+              // Evaluation remains recorded even if an offline copy cannot update.
+            });
+        }
+      }
+      if (!mastery.lastEvidenceApplied) return;
+      void saveLearningActivity({
+        id: `activity:${evidenceId}`,
+        type: "understanding-check",
+        occurredAt: new Date().toISOString(),
+        topic: topic.trim(),
+        score: payload.evaluation.score,
+      }).catch(() => {
+        // The learning flow remains usable when IndexedDB is unavailable.
+      });
+
+      // ── LD2.0 data wiring ──
+      // Record outcome in Learning DNA evidence model
+      try {
+        const dna = loadLearningDNA2();
+        const approach = teachingModeToDimension(
+          teachingMode,
+          dna.currentRecommendation,
+        );
+        const updatedDna = recordCheckOutcome(dna, approach, {
+          score: payload.evaluation.score,
+          confidenceBefore: confidence,
+          confidenceAfter: confidence,
+          hintCount: hintLevel,
+          retryCount: understandingRetries,
+          switchedAway: didSwitchMode,
+          evidenceId,
+        });
+        saveLearningDNA2(updatedDna);
+        saveCalibrationRecord({
+          selfReported: confidence,
+          actualScore: payload.evaluation.score,
+          timestamp: new Date().toISOString(),
+          skillId: normalizeTopicId(topic.trim()),
+          approach,
+        });
+      } catch { /* non-critical, silently skip */ }
+
+      // Create or update SM-2 review card
+      try {
+        const quality = payload.evaluation.status === "correct" ? 5
+          : payload.evaluation.status === "partial" ? 3
+          : 1;
+        const existing = getReviewCard(topic.trim());
+        if (existing) {
+          upsertReviewCard(updateReviewCard(existing, quality, topic.trim(), topic.trim(), subject));
+        } else {
+          const newCard = {
+            skillId: topic.trim(),
+            topic: topic.trim(),
+            subject,
+            repetition: 0,
+            easeFactor: 2.5,
+            interval: 0,
+            qualityHistory: [] as number[],
+          };
+          upsertReviewCard(updateReviewCard(newCard, quality, topic.trim(), topic.trim(), subject));
+        }
+      } catch { /* non-critical */ }
+
+      // ── Explanation history ──
+      try {
+        const dna = loadLearningDNA2();
+        const approach = teachingModeToDimension(
+          teachingMode,
+          dna.currentRecommendation,
+        );
+        addExplanationRecord({
+          conceptId: normalizeTopicId(topic.trim()),
+          conceptLabel: topic.trim(),
+          timestamp: new Date().toISOString(),
+          approach,
+          lessonId: historyId ?? "unknown",
+          reasonSelected: teachingMode === "adaptive"
+            ? dna.recommendationReason
+            : "Learner selected this approach.",
+          learnerConfidence: confidence,
+          checkType: "understanding",
+          evaluationStatus: payload.evaluation.status,
+          evaluationScore: payload.evaluation.score,
+          hintsUsed: hintLevel,
+          retries: understandingRetries,
+          masteryBefore,
+          masteryAfter: mastery.masteryPercent,
+          switchedAway: didSwitchMode,
+          learnerFeedback: null,
+          recommendationOutcome: payload.evaluation.status,
+          attemptMade: response.action === "challenge" && hasAttempted,
+          timeBeforeFirstAttemptSeconds:
+            response.action === "challenge"
+              ? timeBeforeFirstAttempt ?? undefined
+              : undefined,
+          highestHintLevel: hintLevel,
+          eventualIndependentSuccess:
+            response.action === "challenge"
+              ? payload.evaluation.status === "correct" && hintLevel === 0
+              : undefined,
+        });
+      } catch { /* non-critical */ }
+
+      setDidSwitchMode(false);
+      if (payload.evaluation.status !== "correct") {
+        setUnderstandingRetries((current) => current + 1);
+      }
+
+      // ── Schedule quick recall ──
+      try {
+        scheduleQuickRecall(
+          topic.trim(),
+          topic.trim(),
+          subject,
+          false,
+          `Without looking back, explain the central mechanism of ${topic.trim()} and give one consequence or application.`,
+        );
+      } catch { /* non-critical */ }
+    } catch (requestError) {
+      setEvaluationError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Please try again.",
+      );
+    } finally {
+      setIsEvaluating(false);
+    }
+  }
 
   function startNewLesson() {
+    for (const controller of activeRequestsRef.current) controller.abort();
+    activeRequestsRef.current.clear();
+    lessonRequestPendingRef.current = false;
+    setIsLoading(false);
     setResponse(null);
     setError(null);
     setTopic("");
     setHistoryId(null);
     setEvaluation(null);
+    setExplainBackFeedback(null);
+    setExplainBackState("prompt");
+    setExplainBackConfidence(null);
+    setExplainBackRetries(0);
+    setHints(null);
+    setHintLevel(0);
+    setHintError(null);
+    setHasAttempted(false);
+    setTimeBeforeFirstAttempt(null);
+    setConfidenceBefore(null);
+    setMasteryReason(null);
+    setUnderstandingRetries(0);
+    setDidSwitchMode(false);
+    setActiveSources([]);
+    setActiveSourceMode(undefined);
+    setComposerSessionId((current) => current + 1);
     clearConversation();
     localStorage.removeItem(lessonStorageKey);
+    localStorage.removeItem(tutorDraftStorageKey);
   }
 
-  if (!isReady) return <main className="min-h-screen bg-[#f7f9fc]" aria-busy="true" />;
-  if (!profile) return <main className="relative grid min-h-screen place-items-center overflow-hidden bg-[#f7f9fc] px-5 py-10"><div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_15%,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_85%_85%,rgba(99,102,241,0.14),transparent_32%)]" /><TutorEmptyState onUseBalancedProfile={() => setProfile({ scores: balancedScores, isBalanced: true })} /></main>;
+  function handleTeachingModeChange(mode: TeachingMode) {
+    if (response && mode !== teachingMode) setDidSwitchMode(true);
+    setTeachingMode(mode);
+  }
 
-  return <><AppNavigation /><main className="relative min-h-[calc(100vh-65px)] overflow-hidden bg-[#f7f9fc] px-5 py-8 sm:px-6 sm:py-12 lg:px-8">
-    <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_15%,rgba(56,189,248,0.18),transparent_28%),radial-gradient(circle_at_85%_85%,rgba(99,102,241,0.14),transparent_32%)]" />
-    <div className="mx-auto max-w-6xl">
-      <header className="max-w-3xl"><p className="text-sm font-semibold uppercase tracking-wider text-teal-700">Adaptive AI tutor</p><h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">A lesson shaped around your current preferences.</h1><p className="mt-4 text-lg leading-8 text-slate-600">Ask Ada about a topic, then choose how you would like to be taught.</p>{handoffMessage ? <p className="mt-5 rounded-2xl border border-teal-100 bg-teal-50/80 px-4 py-3 text-sm font-medium leading-6 text-teal-900" role="status">{handoffMessage}</p> : null}</header>
-      <div className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.35fr)] lg:items-start"><div className="space-y-5"><LearningDNACompact scores={profile.scores} isBalanced={profile.isBalanced} /><TopicForm topic={topic} subject={subject} level={level} scores={profile.scores} teachingMode={teachingMode} isLoading={isLoading} onTopicChange={setTopic} onSubjectChange={setSubject} onLevelChange={setLevel} onTeachingModeChange={setTeachingMode} onSubmit={() => requestLesson("initial")} /></div><div>{error ? <TutorErrorState message={error} /> : null}{isLoading ? <TutorLoadingState /> : null}{!isLoading && response ? <><LessonCard response={response} /><LessonActions isLoading={isLoading} onAction={requestLesson} onNewLesson={startNewLesson} /><UnderstandingCheck question={response.lesson.checkQuestion} isLoading={isEvaluating} error={evaluationError} onSubmit={evaluateUnderstanding} />{evaluation ? <UnderstandingFeedback evaluation={evaluation} source={evaluationSource} onAction={(nextStep) => { if (nextStep === "simplify") void requestLesson("simpler"); else if (nextStep === "example") void requestLesson("example"); else if (nextStep === "clarify") void requestLesson("different"); }} /> : null}{topic.trim() ? <LessonFollowUp lesson={response.lesson} conversation={conversation} isLoading={isFollowUpLoading} error={followUpError} onAsk={requestFollowUp} latestTurnRef={latestTurnRef} /> : null}</> : null}{!isLoading && !response && !error ? <section className="rounded-3xl border border-dashed border-slate-300 bg-white/50 p-10 text-center text-slate-500"><p className="font-medium text-slate-700">Ada will build your focused lesson here.</p><p className="mt-2 text-sm leading-6">Choose a suggested topic or enter one of your own to begin.</p></section> : null}</div></div>
-    </div>
-  </main></>;
+  async function requestExplainBack(
+    learnerResponse: string,
+    confidence: number,
+  ) {
+    if (!profile || !response || !topic.trim()) return;
+    setIsExplainBackLoading(true);
+    setExplainBackError(null);
+    try {
+      const payload = await postTutorRequest({
+          topic: topic.trim(),
+          subject,
+          level,
+          scores: profile.scores,
+          action: "explain-back",
+          teachingMode,
+          learnerResponse,
+          learnerConfidence: confidence,
+          lessonContext: response.lesson.explanation.slice(0, 500),
+      });
+      if (!isExplainBackApiResponse(payload))
+        throw new Error("Ada could not evaluate this explanation.");
+      const evalResult = payload.evaluation;
+      const evaluationStatus: UnderstandingEvaluation["status"] =
+        evalResult.isComplete && evalResult.score >= 70
+          ? "correct"
+          : evalResult.misconception
+            ? "misconception"
+            : evalResult.score >= 40
+              ? "partial"
+              : "uncertain";
+      const existingMastery = getTopicMastery().find(
+        (entry) => entry.topicId === normalizeTopicId(topic.trim()),
+      );
+      const masteryBefore = existingMastery?.masteryPercent ?? 10;
+      const evidenceId = createMasteryEvidenceId(
+        topic.trim(),
+        `${historyId ?? response.requestId ?? response.lesson.title}:explain-back`,
+        learnerResponse,
+      );
+      const mastery = updateTopicMastery(
+        topic.trim(),
+        subject,
+        evalResult.score,
+        evaluationStatus,
+        {
+          evidenceId,
+          kind: "explain-back",
+          retries: explainBackRetries,
+        },
+      );
+      setExplainBackFeedback({
+        understood: evalResult.understood,
+        missing: evalResult.missing,
+        misconception: evalResult.misconception,
+        followUpQuestion: evalResult.followUpQuestion,
+        isComplete: evalResult.isComplete,
+        masteryReason: mastery.lastChangeReason,
+      });
+      setExplainBackState("feedback");
+
+      if (mastery.lastEvidenceApplied) {
+        void saveLearningActivity({
+          id: `activity:${evidenceId}`,
+          type: "explain-back",
+          occurredAt: new Date().toISOString(),
+          topic: topic.trim(),
+          score: evalResult.score,
+        }).catch(() => {
+          // The learning flow remains usable when IndexedDB is unavailable.
+        });
+        try {
+          const dna = loadLearningDNA2();
+          const approach = teachingModeToDimension(
+            teachingMode,
+            dna.currentRecommendation,
+          );
+          saveLearningDNA2(recordCheckOutcome(dna, approach, {
+            score: evalResult.score,
+            confidenceBefore: confidence,
+            confidenceAfter: confidence,
+            hintCount: 0,
+            retryCount: explainBackRetries,
+            switchedAway: didSwitchMode,
+            evidenceId,
+          }));
+          saveCalibrationRecord({
+            selfReported: confidence,
+            actualScore: evalResult.score,
+            timestamp: new Date().toISOString(),
+            skillId: normalizeTopicId(topic.trim()),
+            approach,
+          });
+          addExplanationRecord({
+            conceptId: normalizeTopicId(topic.trim()),
+            conceptLabel: topic.trim(),
+            timestamp: new Date().toISOString(),
+            approach,
+            lessonId: `${historyId ?? "lesson"}:explain-back:${explainBackRetries}`,
+            reasonSelected: teachingMode === "adaptive"
+              ? dna.recommendationReason
+              : "Learner selected this approach.",
+            learnerConfidence: confidence,
+            checkType: "explain-back",
+            evaluationStatus,
+            evaluationScore: evalResult.score,
+            hintsUsed: 0,
+            retries: explainBackRetries,
+            masteryBefore,
+            masteryAfter: mastery.masteryPercent,
+            switchedAway: didSwitchMode,
+            learnerFeedback: null,
+            recommendationOutcome: evalResult.isComplete
+              ? "Continue with application practice."
+              : "Revise the explanation using the targeted feedback.",
+          });
+        } catch { /* Local evidence storage is non-critical. */ }
+        setDidSwitchMode(false);
+        if (!evalResult.isComplete) {
+          setExplainBackRetries((current) => current + 1);
+        }
+      }
+    } catch (requestError) {
+      setExplainBackError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Please try again.",
+      );
+    } finally {
+      setIsExplainBackLoading(false);
+    }
+  }
+
+  function handleExplainBackRetry() {
+    setExplainBackState("prompt");
+    setExplainBackFeedback(null);
+    setExplainBackConfidence(null);
+  }
+
+  function handleExplainBackNext() {
+    setExplainBackState("prompt");
+    setExplainBackFeedback(null);
+    setExplainBackConfidence(null);
+  }
+
+  async function requestHints(level?: number) {
+    if (!profile || !response || !topic.trim()) return;
+    const requestedLevel = Math.max(
+      1,
+      Math.min(level ?? hintLevel + 1, 4),
+    ) as 1 | 2 | 3 | 4;
+    if (hints) {
+      setHintLevel(requestedLevel);
+      return;
+    }
+    setIsHintLoading(true);
+    setHintError(null);
+    try {
+      const payload = await postTutorRequest({
+          topic: topic.trim(),
+          subject,
+          level,
+          scores: profile.scores,
+          action: "hint",
+          teachingMode,
+          currentHintLevel: requestedLevel - 1,
+          lessonContext: response.lesson.explanation.slice(0, 500),
+          challengeContext: response.lesson.challenge,
+      });
+      if (payload && typeof payload === "object" && Array.isArray((payload as Record<string, unknown>).hints)) {
+        setHints((payload as { hints: [string, string, string, string] }).hints);
+        setHintLevel(requestedLevel);
+      }
+    } catch (requestError) {
+      setHintError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Ada could not load a hint. Please try again.",
+      );
+    } finally {
+      setIsHintLoading(false);
+    }
+  }
+
+  if (!isReady)
+    return (
+      <div
+        className="min-h-screen bg-[var(--am-bg)]"
+        aria-busy="true"
+      />
+    );
+
+  if (!profile)
+    return (
+      <PageShell heading="Ada" subheading="Your adaptive tutor">
+        <div className="flex h-full min-h-[60vh] items-center justify-center">
+          <TutorEmptyState
+            onUseBalancedProfile={() =>
+              setProfile({ scores: balancedScores, isBalanced: true })
+            }
+          />
+        </div>
+      </PageShell>
+    );
+
+  const currentHistoryEntry: LessonHistoryEntry | undefined = historyId
+    ? readLearningHistory().find((entry) => entry.id === historyId)
+    : undefined;
+
+  async function handleGenerateQuiz(count: number) {
+    if (!profile || !response || !topic.trim()) return;
+    setIsQuizLoading(true);
+    setQuizError(null);
+    try {
+      const payload = (await postTutorRequest({
+        topic: topic.trim(),
+        subject,
+        level,
+        scores: profile.scores,
+        action: "generate-quiz" as TutorAction,
+        teachingMode,
+        question: count.toString(),
+        currentLesson: {
+          title: response.lesson.title,
+          coreIdea: response.lesson.coreIdea,
+          explanation: response.lesson.explanation.slice(0, 360),
+          stylesUsed: response.lesson.stylesUsed,
+        },
+      })) as { quiz: GeneratedQuiz };
+      if (!payload.quiz) throw new Error("Failed to generate quiz.");
+      setGeneratedQuiz(payload.quiz);
+    } catch (e) {
+      setQuizError(e instanceof Error ? e.message : "Failed to generate quiz.");
+    } finally {
+      setIsQuizLoading(false);
+    }
+  }
+
+  const hasLesson = Boolean(response);
+
+  if (!hasLesson) {
+    return (
+      <PageShell heading="Ada" subheading="Your adaptive tutor">
+        <div className="flex flex-col min-h-[70vh] justify-center items-center px-4">
+          <TopicForm
+            key={composerSessionId}
+            topic={topic}
+            subject={subject}
+            level={level}
+            scores={profile.scores}
+            teachingMode={teachingMode}
+            isLoading={isLoading}
+            onTopicChange={setTopic}
+            onSubjectChange={setSubject}
+            onLevelChange={setLevel}
+            onTeachingModeChange={handleTeachingModeChange}
+            onSubmit={(sources, sourceMode) =>
+              requestLesson("initial", sources, sourceMode)
+            }
+          />
+          {isLoading && <div className="mt-8"><TutorLoadingState /></div>}
+          {error && <div className="mt-8 max-w-2xl w-full"><TutorErrorState message={error} /></div>}
+        </div>
+      </PageShell>
+    );
+  }
+
+  return (
+    <PageShell heading="Ada" subheading="Your adaptive tutor">
+      <div className={`transition-all duration-300 ${focusMode ? "max-w-4xl mx-auto" : "grid gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start"}`}>
+        
+        {/* Context Panel (Hidden in Focus Mode) */}
+        {!focusMode && (
+          <div className="space-y-6 flex flex-col">
+            <div className="am-card p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-[var(--am-text-primary)]">Current topic</h3>
+                <Button size="xs" color="tertiary" onClick={() => startNewLesson()}>New topic</Button>
+              </div>
+              <p className="text-sm font-medium text-[var(--am-text-secondary)]">{topic}</p>
+              
+              <div className="pt-4 border-t border-[var(--am-border-light)]">
+                <p className="text-xs text-[var(--am-text-muted)] mb-2">Subject & Level</p>
+                <p className="text-sm text-[var(--am-text-secondary)]">{subject} · {level}</p>
+              </div>
+
+              <div className="pt-4 border-t border-[var(--am-border-light)]">
+                <p className="text-xs text-[var(--am-text-muted)] mb-2">Learning approach</p>
+                <p className="text-sm text-[var(--am-text-secondary)] capitalize">{teachingMode === "adaptive" ? "Adaptive" : teachingMode}</p>
+              </div>
+            </div>
+
+            {/* Reading Preferences toggle */}
+            <Button
+              type="button"
+              color="tertiary"
+              size="sm"
+              onClick={() => setShowReadingPrefs(!showReadingPrefs)}
+              className="w-full"
+            >
+              <span className="flex items-center justify-between w-full">
+                <span>Reading preferences</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                </svg>
+              </span>
+            </Button>
+            {showReadingPrefs && (
+              <div className="rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-surface)] p-4">
+                <ReadingPreferencesInline
+                  settings={readingSettings}
+                  onChange={setReadingSettings}
+                />
+              </div>
+            )}
+
+            <WhyThisMode
+              activeMode={teachingMode}
+              onModeChange={handleTeachingModeChange}
+              availableModes={["adaptive", "visual", "example", "analogy", "story", "challenge"]}
+            />
+
+            {topic.trim() && (
+              <LearnerTransparency topic={topic.trim()} />
+            )}
+
+            <PreferenceOverridesUI />
+
+            <ExplanationHistoryView
+              key={topic.trim()}
+              currentConcept={topic.trim()}
+            />
+          </div>
+        )}
+
+        {/* Main Lesson Area */}
+        <div className="flex flex-col min-w-0">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex space-x-1 bg-[var(--am-surface)] border border-[var(--am-border-light)] p-1 rounded-[var(--am-radius-lg)] overflow-x-auto">
+              {["learn", "visual", "quiz", "practice", "sources"].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-[var(--am-radius-md)] capitalize whitespace-nowrap transition-colors ${
+                    activeTab === tab
+                      ? "bg-[var(--am-primary-light)] text-[var(--am-primary)]"
+                      : "text-[var(--am-text-secondary)] hover:text-[var(--am-text-primary)] hover:bg-[var(--am-warm-bg)]"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setFocusMode(!focusMode)}
+              className="am-btn am-btn-ghost text-xs"
+            >
+              {focusMode ? "Exit Focus" : "Focus Mode"}
+            </button>
+          </div>
+
+          {handoffMessage && (
+            <p className="mb-6 rounded-[var(--am-radius-lg)] border border-[var(--am-primary)]/20 bg-[var(--am-primary-light)] px-4 py-3 text-sm font-medium text-[var(--am-primary)]">
+              {handoffMessage}
+            </p>
+          )}
+
+          {error && <TutorErrorState message={error} />}
+          
+          {isLoading && !response && <TutorLoadingState />}
+          
+          {isLoading && response && (
+            <p className="mb-3 text-sm text-[var(--am-text-muted)]">
+              Ada is preparing the updated explanation. Your current lesson remains available.
+            </p>
+          )}
+
+          {response && activeTab === "learn" && (
+            <>
+              <LessonCard response={response} historyEntry={currentHistoryEntry} />
+              <LessonActions isLoading={isLoading} onAction={requestLesson} onNewLesson={startNewLesson} />
+              {topic.trim() && (
+                <LessonFollowUp
+                  lesson={response.lesson}
+                  conversation={conversation}
+                  sources={activeSources}
+                  isLoading={isFollowUpLoading}
+                  error={followUpError}
+                  onAsk={requestFollowUp}
+                  latestTurnRef={latestTurnRef}
+                />
+              )}
+            </>
+          )}
+
+          {response && activeTab === "visual" && (
+            <div className="am-card min-h-[300px]">
+              {response.lesson.visual ? (
+                <VisualLessonEngine visual={response.lesson.visual} />
+              ) : (
+                <div className="p-6 flex items-center justify-center text-[var(--am-text-secondary)]">
+                  Ada did not generate a visual for this lesson.
+                </div>
+              )}
+            </div>
+          )}
+
+          {response && activeTab === "quiz" && (
+            <QuizExperience
+              topic={topic.trim()}
+              isLoading={isQuizLoading}
+              error={quizError}
+              quiz={generatedQuiz}
+              onGenerate={handleGenerateQuiz}
+            />
+          )}
+
+          {response && activeTab === "practice" && (
+            <div className="space-y-6">
+              {response.lesson.challenge && (
+                <HintLadder
+                  key={historyId ?? response.lesson.title}
+                  hints={hints}
+                  currentLevel={hintLevel as 0 | 1 | 2 | 3 | 4}
+                  isLoading={isHintLoading}
+                  onRequestHint={requestHints}
+                  onRequestFullSolution={() => void requestHints(4)}
+                  fullSolutionRevealed={hintLevel === 4}
+                  gateType="attempt"
+                  hasAttempted={hasAttempted}
+                  onAttempt={() => setHasAttempted(true)}
+                  attemptPrompt={response.lesson.challenge}
+                  timeBeforeFirstHint={timeBeforeFirstAttempt ?? undefined}
+                  isChallenge={true}
+                  error={hintError}
+                />
+              )}
+
+              <UnderstandingCheck
+                question={response.lesson.checkQuestion}
+                isLoading={isEvaluating}
+                error={evaluationError}
+                confidence={confidenceBefore}
+                onConfidenceChange={setConfidenceBefore}
+                onSubmit={evaluateUnderstanding}
+              />
+
+              {evaluation && (
+                <UnderstandingFeedback
+                  evaluation={evaluation}
+                  source={evaluationSource}
+                  masteryReason={masteryReason}
+                  onAction={(nextStep) => {
+                    if (nextStep === "simplify") void requestLesson("simpler");
+                    else if (nextStep === "example") void requestLesson("example");
+                    else if (nextStep === "clarify") void requestLesson("different");
+                  }}
+                />
+              )}
+
+              {response.lesson.checkQuestion && (
+                <ExplainBack
+                  topic={topic.trim()}
+                  state={explainBackState}
+                  isLoading={isExplainBackLoading}
+                  error={explainBackError}
+                  feedback={explainBackFeedback}
+                  confidence={explainBackConfidence}
+                  onConfidenceChange={setExplainBackConfidence}
+                  onSubmit={requestExplainBack}
+                  onRetry={handleExplainBackRetry}
+                  onNext={handleExplainBackNext}
+                />
+              )}
+            </div>
+          )}
+
+          {response && activeTab === "sources" && (
+            <div className="am-card p-6 min-h-[300px]">
+              <h3 className="text-lg font-semibold text-[var(--am-text-primary)] mb-4">Lesson Sources</h3>
+              {response.sources && response.sources.length > 0 ? (
+                <ul className="space-y-3">
+                  {response.sources.map(s => (
+                    <li key={s.id} className="text-sm text-[var(--am-text-secondary)] border-b border-[var(--am-border-light)] pb-2">{s.title} ({s.type})</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-[var(--am-text-muted)]">No sources were used to generate this lesson.</p>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </PageShell>
+  );
 }

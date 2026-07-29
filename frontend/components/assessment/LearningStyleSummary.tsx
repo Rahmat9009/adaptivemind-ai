@@ -1,4 +1,12 @@
-import { learningDimensionLabels, type LearningDimension, type LearningScores } from "@/lib/learning-dna";
+"use client";
+
+import { motion } from "motion/react";
+import { fadeIn, slideUp, staggerContainer, staggerItem } from "@/lib/motion";
+import {
+  learningDimensionLabels,
+  type LearningDimension,
+  type LearningScores,
+} from "@/lib/learning-dna";
 
 interface LearningStyleSummaryProps {
   primaryStyle: LearningDimension;
@@ -21,18 +29,105 @@ const approach: Record<LearningDimension, string> = {
   challenges: "Ada will begin with a question that invites you to reason through the idea.",
 };
 
-export function LearningStyleSummary({ primaryStyle, scores }: LearningStyleSummaryProps) {
-  const supportingStyle = (Object.keys(scores) as LearningDimension[])
-    .filter((dimension) => dimension !== primaryStyle)
-    .sort((first, second) => scores[second] - scores[first])[0];
+const dnaVisuals: Record<LearningDimension, { color: string }> = {
+  visual: { color: "#0891B2" },
+  examples: { color: "#B45309" },
+  analogies: { color: "#7C3AED" },
+  stories: { color: "#BE185D" },
+  challenges: { color: "#DC2626" },
+};
+
+export function LearningStyleSummary({
+  primaryStyle,
+  scores,
+}: LearningStyleSummaryProps) {
+  const sorted = (Object.keys(scores) as LearningDimension[]).sort(
+    (a, b) => scores[b] - scores[a],
+  );
+  const supportingStyle = sorted[1];
+  const secondaryStyle = sorted[2];
 
   return (
-    <section className="rounded-3xl border border-teal-100 bg-[linear-gradient(145deg,#ecfdf5,#eff6ff)] p-6 shadow-lg shadow-teal-950/5 sm:p-8">
-      <p className="text-sm font-semibold uppercase tracking-wider text-teal-700">Primary learning preference</p>
-      <div className="mt-3 flex items-end gap-3"><h2 className="text-3xl font-semibold tracking-tight text-slate-950">{learningDimensionLabels[primaryStyle]}</h2><span className="pb-1 text-lg font-semibold text-teal-800">{scores[primaryStyle]}%</span></div>
-      <p className="mt-4 leading-7 text-slate-700">Based on your current assessment preferences, you currently respond best to {guidance[primaryStyle]}.</p>
-      <div className="mt-6 border-t border-teal-200/80 pt-5"><p className="text-xs font-semibold uppercase tracking-wider text-teal-700">Recommended approach</p><p className="mt-2 text-sm leading-6 text-slate-700">{approach[primaryStyle]}</p></div>
-      {supportingStyle ? <p className="mt-5 text-sm leading-6 text-slate-600"><span className="font-semibold text-slate-800">Strongest supporting preference:</span> {learningDimensionLabels[supportingStyle]} ({scores[supportingStyle]}%).</p> : null}
-    </section>
+    <motion.section
+      variants={fadeIn}
+      initial="hidden"
+      animate="visible"
+      className="am-card p-6 sm:p-8"
+    >
+      <motion.div variants={slideUp} className="flex items-start justify-between gap-4">
+        <div>
+          <p className="am-label text-[var(--am-text-muted)]">
+            Current starting point
+          </p>
+          <h2
+            className="am-heading-serif mt-2 text-3xl sm:text-4xl"
+            style={{ color: dnaVisuals[primaryStyle].color }}
+          >
+            {learningDimensionLabels[primaryStyle]}
+          </h2>
+        </div>
+        <span
+          className="text-2xl font-bold tabular-nums"
+          style={{ color: dnaVisuals[primaryStyle].color }}
+        >
+          {scores[primaryStyle]}%
+        </span>
+      </motion.div>
+
+      <motion.p variants={slideUp} className="mt-4 leading-7 text-[var(--am-text-secondary)]">
+        Based on your assessment, Ada will start with{" "}
+        <strong className="text-[var(--am-text-primary)]">{guidance[primaryStyle]}</strong>.
+      </motion.p>
+
+      <motion.div
+        variants={slideUp}
+        className="mt-6 rounded-[var(--am-radius-lg)] border border-[var(--am-border-light)] bg-[var(--am-warm-bg)] p-4"
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--am-primary)]/70">
+          Ada will teach you with
+        </p>
+        <p className="mt-2 text-sm leading-6 text-[var(--am-text-secondary)]">
+          {approach[primaryStyle]}
+        </p>
+      </motion.div>
+
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="visible"
+        className="mt-6 space-y-3"
+      >
+        {supportingStyle && (
+          <motion.div
+            key={supportingStyle}
+            variants={staggerItem}
+            className="flex items-center justify-between gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] px-4 py-3"
+          >
+            <span className="flex items-center gap-2 text-sm font-medium text-[var(--am-text-primary)]">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: dnaVisuals[supportingStyle].color }} />
+              {learningDimensionLabels[supportingStyle]}
+            </span>
+            <span className="text-sm font-semibold tabular-nums" style={{ color: dnaVisuals[supportingStyle].color }}>
+              {scores[supportingStyle]}%
+            </span>
+          </motion.div>
+        )}
+        {secondaryStyle && (
+          <motion.div
+            key={secondaryStyle}
+            variants={staggerItem}
+            className="flex items-center justify-between gap-3 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] px-4 py-3"
+          >
+            <span className="flex items-center gap-2 text-sm font-medium text-[var(--am-text-primary)]">
+              <span className="h-2 w-2 rounded-full" style={{ backgroundColor: dnaVisuals[secondaryStyle].color }} />
+              {learningDimensionLabels[secondaryStyle]}
+            </span>
+            <span className="text-sm font-semibold tabular-nums" style={{ color: dnaVisuals[secondaryStyle].color }}>
+              {scores[secondaryStyle]}%
+            </span>
+          </motion.div>
+        )}
+      </motion.div>
+    </motion.section>
   );
 }
