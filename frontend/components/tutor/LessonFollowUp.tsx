@@ -8,8 +8,7 @@ import type {
   TutorConversationTurn,
   TutorLesson,
 } from "@/lib/ai/types";
-import type { TutorSourceAttribution, TutorSource } from "@/lib/sources";
-import type { SourceGroundingMode } from "@/lib/ai/types";
+import type { TutorSource, SourceGroundingMode } from "@/lib/sources";
 import { AdaComposer } from "./AdaComposer";
 
 interface LessonFollowUpProps {

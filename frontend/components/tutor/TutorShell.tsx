@@ -15,6 +15,8 @@ import type {
   UnderstandingEvaluation,
   UnderstandingEvaluationApiResponse,
   ExplainBackApiResponse,
+  GeneratedQuiz,
+  TutorAction,
 } from "@/lib/ai/types";
 import {
   learningDimensions,
@@ -51,7 +53,6 @@ import {
   updateReviewCard,
 } from "@/lib/spaced-review";
 import { PageShell } from "@/components/am/PageShell";
-import { LearningDNACompact } from "./LearningDNACompact";
 import { LessonActions } from "./LessonActions";
 import { LessonCard } from "./LessonCard";
 import { LessonFollowUp } from "./LessonFollowUp";
@@ -69,25 +70,17 @@ import {
   type ReadingSettings,
 } from "@/lib/reading-preferences";
 import { ReadingPreferencesInline } from "./ReadingPreferencesInline";
-import { ConfidenceCoaching } from "./ConfidenceCoaching";
 import { WhyThisMode } from "./WhyThisMode";
-import { QuickRecall } from "./QuickRecall";
 import {
   scheduleQuickRecall,
-  simulateQuickRecallDue,
-  getQuickRecallStatus,
-  completeQuickRecall,
-  type QuickRecallRecord,
 } from "@/lib/quick-recall";
 import { LearnerTransparency } from "./LearnerTransparency";
 import { PreferenceOverridesUI } from "./PreferenceOverridesUI";
 import { ExplanationHistoryView } from "./ExplanationHistoryView";
-import { PeerAgent, type PeerAgentState, type PeerAgentMessage } from "./PeerAgent";
 import { QuizExperience } from "./QuizExperience";
 import { VisualLessonEngine } from "@/components/visuals/VisualLessonEngine";
 import {
   addExplanationRecord,
-  getExplanationHistoryForConcept,
 } from "@/lib/explanation-history";
 import { loadPreferenceOverrides } from "@/lib/preference-overrides";
 import { saveCalibrationRecord } from "@/lib/confidence-calibration";
@@ -392,7 +385,6 @@ export function TutorShell() {
   const [hints, setHints] = useState<[string, string, string, string] | null>(null);
   const [isHintLoading, setIsHintLoading] = useState(false);
   const [hintError, setHintError] = useState<string | null>(null);
-  const [challengeStartedAt, setChallengeStartedAt] = useState<number | null>(null);
   const [timeBeforeFirstAttempt, setTimeBeforeFirstAttempt] = useState<number | null>(null);
   const [readingSettings, setReadingSettings] = useState<ReadingSettings>(() => {
     try {
@@ -407,24 +399,18 @@ export function TutorShell() {
   const [masteryReason, setMasteryReason] = useState<string | null>(null);
   const [understandingRetries, setUnderstandingRetries] = useState(0);
   const [didSwitchMode, setDidSwitchMode] = useState(false);
-  const [quickRecallRecord, setQuickRecallRecord] = useState<QuickRecallRecord | null>(null);
-  const [quickRecallStatus, setQuickRecallStatus] = useState<"due" | "completed" | "full-review-recommended" | "not-due">("not-due");
-  const [quickRecallConfidence, setQuickRecallConfidence] = useState<number | null>(null);
-  const [isQuickRecallLoading, setIsQuickRecallLoading] = useState(false);
-  const [quickRecallError, setQuickRecallError] = useState<string | null>(null);
-  const [quickRecallResult, setQuickRecallResult] = useState<{
-    score: number;
-    status: "correct" | "partial" | "incorrect";
-    feedback: string;
-  } | null>(null);
-  const [peerAgentState, setPeerAgentState] = useState<PeerAgentState>("prompt");
-  const [peerAgentMessages, setPeerAgentMessages] = useState<PeerAgentMessage[]>([]);
-  const [isPeerLoading, setIsPeerLoading] = useState(false);
-  const [peerError, setPeerError] = useState<string | null>(null);
   const [activeSources, setActiveSources] = useState<TutorSource[]>([]);
   const [activeSourceMode, setActiveSourceMode] =
     useState<SourceGroundingMode | undefined>(undefined);
   const [composerSessionId, setComposerSessionId] = useState(0);
+
+  // --- New layout state ---
+  const [focusMode, setFocusMode] = useState(false);
+  const [activeTab, setActiveTab] = useState("learn");
+
+  const [generatedQuiz, setGeneratedQuiz] = useState<GeneratedQuiz | null>(null);
+  const [isQuizLoading, setIsQuizLoading] = useState(false);
+  const [quizError, setQuizError] = useState<string | null>(null);
   const latestTurnRef = useRef<HTMLDivElement>(null);
   const activeRequestsRef = useRef(new Set<AbortController>());
   const lessonRequestPendingRef = useRef(false);
@@ -667,7 +653,6 @@ export function TutorShell() {
       setHintLevel(0);
       setHintError(null);
       setHasAttempted(false);
-      setChallengeStartedAt(payload.lesson.challenge ? Date.now() : null);
       setTimeBeforeFirstAttempt(null);
       setActiveSources(submittedSources);
       setActiveSourceMode(
@@ -962,15 +947,13 @@ export function TutorShell() {
 
       // ── Schedule quick recall ──
       try {
-        const qr = scheduleQuickRecall(
+        scheduleQuickRecall(
           topic.trim(),
           topic.trim(),
           subject,
           false,
           `Without looking back, explain the central mechanism of ${topic.trim()} and give one consequence or application.`,
         );
-        setQuickRecallRecord(qr);
-        setQuickRecallStatus(getQuickRecallStatus(topic.trim()));
       } catch { /* non-critical */ }
     } catch (requestError) {
       setEvaluationError(
@@ -1001,18 +984,11 @@ export function TutorShell() {
     setHintLevel(0);
     setHintError(null);
     setHasAttempted(false);
-    setChallengeStartedAt(null);
     setTimeBeforeFirstAttempt(null);
     setConfidenceBefore(null);
     setMasteryReason(null);
     setUnderstandingRetries(0);
     setDidSwitchMode(false);
-    setQuickRecallRecord(null);
-    setQuickRecallStatus("not-due");
-    setQuickRecallConfidence(null);
-    setQuickRecallResult(null);
-    setQuickRecallError(null);
-    setIsQuickRecallLoading(false);
     setActiveSources([]);
     setActiveSourceMode(undefined);
     setComposerSessionId((current) => current + 1);
@@ -1209,213 +1185,6 @@ export function TutorShell() {
     }
   }
 
-  async function evaluateQuickRecall(
-    answer: string,
-    confidence: number,
-  ) {
-    if (
-      !profile
-      || !response
-      || !quickRecallRecord
-      || quickRecallStatus !== "due"
-    ) {
-      return;
-    }
-    setIsQuickRecallLoading(true);
-    setQuickRecallError(null);
-    try {
-      const payload = await postTutorRequest({
-        topic: quickRecallRecord.topic,
-        subject: quickRecallRecord.subject ?? subject,
-        level,
-        scores: profile.scores,
-        action: "evaluate",
-        teachingMode,
-        learnerAnswer: answer,
-        learnerConfidence: confidence,
-        checkQuestion: quickRecallRecord.question,
-        lessonCoreIdea: response.lesson.coreIdea,
-        lessonContext: response.lesson.explanation.slice(0, 500),
-      });
-      if (!isEvaluationApiResponse(payload)) {
-        throw new Error("Ada returned an incomplete recall check.");
-      }
-
-      const result = payload.evaluation;
-      const completed = completeQuickRecall(
-        quickRecallRecord.skillId,
-        result.score,
-      );
-      setQuickRecallRecord(completed.updated);
-      setQuickRecallStatus(getQuickRecallStatus(quickRecallRecord.skillId));
-      setQuickRecallResult({
-        score: result.score,
-        status: result.status === "correct"
-          ? "correct"
-          : result.status === "partial"
-            ? "partial"
-            : "incorrect",
-        feedback: result.feedback,
-      });
-
-      const evidenceId = createMasteryEvidenceId(
-        quickRecallRecord.topic,
-        `quick-recall:${quickRecallRecord.createdAt}`,
-        answer,
-      );
-      const masteryBefore = getTopicMastery().find(
-        (entry) => entry.topicId === quickRecallRecord.skillId,
-      )?.masteryPercent ?? 10;
-      const mastery = updateTopicMastery(
-        quickRecallRecord.topic,
-        quickRecallRecord.subject ?? subject,
-        result.score,
-        result.status,
-        {
-          evidenceId,
-          kind: "quick-recall",
-          delayed: !quickRecallRecord.simulated
-            && Date.parse(quickRecallRecord.dueAt) <= Date.now(),
-        },
-      );
-      if (mastery.lastEvidenceApplied) {
-        void saveLearningActivity({
-          id: `activity:${evidenceId}`,
-          type: "quick-recall",
-          occurredAt: new Date().toISOString(),
-          topic: quickRecallRecord.topic,
-          score: result.score,
-        }).catch(() => {
-          // The learning flow remains usable when IndexedDB is unavailable.
-        });
-        const dna = loadLearningDNA2();
-        const approach = teachingModeToDimension(
-          teachingMode,
-          dna.currentRecommendation,
-        );
-        saveLearningDNA2(recordCheckOutcome(dna, approach, {
-          score: result.score,
-          confidenceBefore: confidence,
-          confidenceAfter: confidence,
-          hintCount: 0,
-          retryCount: quickRecallRecord.retries,
-          switchedAway: false,
-          evidenceId,
-        }));
-        saveCalibrationRecord({
-          selfReported: confidence,
-          actualScore: result.score,
-          timestamp: new Date().toISOString(),
-          skillId: quickRecallRecord.skillId,
-          approach,
-        });
-        addExplanationRecord({
-          conceptId: quickRecallRecord.skillId,
-          conceptLabel: quickRecallRecord.topic,
-          timestamp: new Date().toISOString(),
-          approach,
-          lessonId: `quick-recall:${quickRecallRecord.createdAt}`,
-          reasonSelected: dna.recommendationReason,
-          learnerConfidence: confidence,
-          checkType: "quick-recall",
-          evaluationStatus: result.status,
-          evaluationScore: result.score,
-          hintsUsed: 0,
-          retries: quickRecallRecord.retries,
-          masteryBefore,
-          masteryAfter: mastery.masteryPercent,
-          switchedAway: false,
-          learnerFeedback: null,
-          recommendationOutcome: completed.updated.fullReviewRecommended
-            ? "Complete a full review."
-            : "Continue with the scheduled review interval.",
-        });
-      }
-    } catch (requestError) {
-      setQuickRecallError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Ada could not check this recall.",
-      );
-    } finally {
-      setIsQuickRecallLoading(false);
-    }
-  }
-
-  // ── Practice-learner role-play handlers ──
-  function startPeerSession() {
-    setPeerAgentState("active");
-    setPeerAgentMessages([]);
-    setPeerError(null);
-    const initialPrompt = `I heard something about "${topic.trim()}" but I am not sure I understand. Can you explain the main idea to me?`;
-    setPeerAgentMessages([{ role: "peer", content: initialPrompt }]);
-  }
-
-  async function handlePeerSubmit(explanation: string) {
-    if (!response) return;
-    setIsPeerLoading(true);
-    setPeerError(null);
-    const userMsg: PeerAgentMessage = { role: "learner", content: explanation };
-    setPeerAgentMessages((prev) => [...prev, userMsg]);
-    try {
-      const payload = await postTutorRequest({
-          topic: topic.trim(),
-          subject,
-          level,
-          scores: profile?.scores ?? balancedScores,
-          action: "followup",
-          teachingMode,
-          question: `Ada is facilitating a transparent practice-learner exercise about "${topic.trim()}". Respond as Ada role-playing a learner who has just heard the student's explanation. Ask one brief follow-up question or identify one specific point that remains unclear. Do not claim to be human and do not conceal that this is an exercise. Keep the response to 2-3 sentences.`,
-          currentLesson: {
-            title: response.lesson.title,
-            coreIdea: response.lesson.coreIdea,
-            explanation: response.lesson.explanation.slice(0, 360),
-            stylesUsed: response.lesson.stylesUsed,
-          },
-          conversation: [],
-      });
-      const answer = payload && typeof payload === "object" && "followUp" in payload
-        ? (payload as { followUp: { answer: string } }).followUp?.answer
-        : null;
-      if (answer) {
-        setPeerAgentMessages((prev) => [
-          ...prev,
-          { role: "peer", content: answer },
-        ]);
-      }
-    } catch {
-      setPeerError("Could not get a response. Try again.");
-    } finally {
-      setIsPeerLoading(false);
-    }
-  }
-
-  function handlePeerComplete() {
-    setPeerAgentState("complete");
-    // Record explanation history
-    try {
-      addExplanationRecord({
-        conceptId: normalizeTopicId(topic),
-        conceptLabel: topic.trim(),
-        timestamp: new Date().toISOString(),
-        approach: teachingModeToDimension(teachingMode) ?? "adaptive",
-        lessonId: historyId ?? "unknown",
-        reasonSelected: "Ada practice-learner role-play",
-        learnerConfidence: confidenceBefore ?? 50,
-        checkType: "peer-agent",
-        evaluationStatus: "correct",
-        evaluationScore: 0,
-        hintsUsed: 0,
-        retries: 0,
-        masteryBefore: 0,
-        masteryAfter: 0,
-        switchedAway: false,
-        learnerFeedback: null,
-        recommendationOutcome: "peer-session",
-      });
-    } catch { /* non-critical */ }
-  }
-
   if (!isReady)
     return (
       <div
@@ -1423,60 +1192,6 @@ export function TutorShell() {
         aria-busy="true"
       />
     );
-
-  if (!profile)
-    return (
-      <PageShell>
-        <div className="py-12">
-          <TutorEmptyState
-            onUseBalancedProfile={() =>
-              setProfile({ scores: balancedScores, isBalanced: true })
-            }
-          />
-        </div>
-      </PageShell>
-    );
-
-  const currentHistoryEntry: LessonHistoryEntry | undefined = historyId
-    ? readLearningHistory().find((entry) => entry.id === historyId)
-    : undefined;
-
-  // --- New layout state ---
-  const [focusMode, setFocusMode] = useState(false);
-  const [activeTab, setActiveTab] = useState("learn");
-
-  const [generatedQuiz, setGeneratedQuiz] = useState<GeneratedQuiz | null>(null);
-  const [isQuizLoading, setIsQuizLoading] = useState(false);
-  const [quizError, setQuizError] = useState<string | null>(null);
-
-  async function handleGenerateQuiz(count: number) {
-    if (!profile || !response || !topic.trim()) return;
-    setIsQuizLoading(true);
-    setQuizError(null);
-    try {
-      const payload = await postTutorRequest({
-        topic: topic.trim(),
-        subject,
-        level,
-        scores: profile.scores,
-        action: "generate-quiz" as any,
-        teachingMode,
-        question: count.toString(),
-        currentLesson: {
-          title: response.lesson.title,
-          coreIdea: response.lesson.coreIdea,
-          explanation: response.lesson.explanation.slice(0, 360),
-          stylesUsed: response.lesson.stylesUsed,
-        },
-      });
-      if (!payload.quiz) throw new Error("Failed to generate quiz.");
-      setGeneratedQuiz(payload.quiz);
-    } catch (e) {
-      setQuizError(e instanceof Error ? e.message : "Failed to generate quiz.");
-    } finally {
-      setIsQuizLoading(false);
-    }
-  }
 
   if (!profile)
     return (
@@ -1494,6 +1209,35 @@ export function TutorShell() {
   const currentHistoryEntry: LessonHistoryEntry | undefined = historyId
     ? readLearningHistory().find((entry) => entry.id === historyId)
     : undefined;
+
+  async function handleGenerateQuiz(count: number) {
+    if (!profile || !response || !topic.trim()) return;
+    setIsQuizLoading(true);
+    setQuizError(null);
+    try {
+      const payload = (await postTutorRequest({
+        topic: topic.trim(),
+        subject,
+        level,
+        scores: profile.scores,
+        action: "generate-quiz" as TutorAction,
+        teachingMode,
+        question: count.toString(),
+        currentLesson: {
+          title: response.lesson.title,
+          coreIdea: response.lesson.coreIdea,
+          explanation: response.lesson.explanation.slice(0, 360),
+          stylesUsed: response.lesson.stylesUsed,
+        },
+      })) as { quiz: GeneratedQuiz };
+      if (!payload.quiz) throw new Error("Failed to generate quiz.");
+      setGeneratedQuiz(payload.quiz);
+    } catch (e) {
+      setQuizError(e instanceof Error ? e.message : "Failed to generate quiz.");
+    } finally {
+      setIsQuizLoading(false);
+    }
+  }
 
   const hasLesson = Boolean(response);
 
@@ -1534,7 +1278,7 @@ export function TutorShell() {
             <div className="am-card p-4 space-y-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-[var(--am-text-primary)]">Current topic</h3>
-                <Button size="xs" color="ghost" onClick={() => startNewLesson()}>New topic</Button>
+                <Button size="xs" color="tertiary" onClick={() => startNewLesson()}>New topic</Button>
               </div>
               <p className="text-sm font-medium text-[var(--am-text-secondary)]">{topic}</p>
               
@@ -1643,7 +1387,7 @@ export function TutorShell() {
                 <LessonFollowUp
                   lesson={response.lesson}
                   conversation={conversation}
-                  sources={response.sources}
+                  sources={activeSources}
                   isLoading={isFollowUpLoading}
                   error={followUpError}
                   onAsk={requestFollowUp}

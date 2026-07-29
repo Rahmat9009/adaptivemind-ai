@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/base/buttons/button";
-import type { GeneratedQuiz, QuizQuestion } from "@/lib/ai/types";
+import type { GeneratedQuiz } from "@/lib/ai/types";
 import { LoaderCircle, ChevronDown, ChevronUp } from "lucide-react";
 
 interface QuizExperienceProps {
@@ -99,8 +99,11 @@ export function QuizExperience({
         <h3 className="am-heading-serif text-2xl text-[var(--am-text-primary)] mb-2">
           Quiz Completed
         </h3>
-        <p className="text-lg font-medium text-[var(--am-text-secondary)] mb-6">
+        <p className="text-lg font-medium text-[var(--am-text-secondary)] mb-2">
           You finished the quiz on {topic}.
+        </p>
+        <p className="text-3xl font-serif text-[var(--am-primary)] font-bold mb-6">
+          {correctCount} / {quiz.questions.length} correct
         </p>
         <p className="text-sm text-[var(--am-text-muted)] mb-6">
           Ada found strong areas and concepts to review.
@@ -188,14 +191,18 @@ export function QuizExperience({
         <div className="space-y-6">
           <div className="p-4 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-warm-bg)]">
             <p className="text-sm font-medium text-[var(--am-text-primary)] mb-2">
-              Feedback
+              {q.type === "multiple-choice" ? "Feedback" : "Model Answer & Guide"}
             </p>
             <p className="text-sm leading-relaxed text-[var(--am-text-secondary)]">
               {q.explanation}
             </p>
-            {q.type === "multiple-choice" && (
+            {q.type === "multiple-choice" ? (
               <p className="mt-3 text-sm text-[var(--am-success)] font-medium">
                 Correct answer: {q.correctAnswer}
+              </p>
+            ) : (
+              <p className="mt-3 text-xs text-[var(--am-text-muted)] italic">
+                Self-assess your answer against the model explanation above.
               </p>
             )}
           </div>

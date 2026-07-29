@@ -1,8 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "motion/react";
-import { Button } from "@/components/base/buttons/button";
-import { fadeIn, slideUp, staggerContainer, staggerItem } from "@/lib/motion";
+import { fadeIn, slideUp } from "@/lib/motion";
 import { buildTeachingProfile } from "@/lib/adaptive-prompt";
 import type { TeachingMode } from "@/lib/ai/types";
 import type {
@@ -68,7 +68,6 @@ export function TopicForm({
   const [showSettings, setShowSettings] = useState(false);
   const profile = buildTeachingProfile(scores);
   const [primary] = profile.dominantDimensions;
-  const selectedMode = teachingModes.find((mode) => mode.value === teachingMode);
 
   return (
     <motion.div

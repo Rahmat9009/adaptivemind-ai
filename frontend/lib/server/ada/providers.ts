@@ -515,4 +515,4 @@ export async function generateProviderHint(
     signal,
   );
 }
-export async function generateProviderQuiz(provider: ConfiguredProvider, request: TutorRequest, signal?: AbortSignal): Promise<GeneratedQuiz> { return generateStructured<GeneratedQuiz>(provider, buildQuizPrompt(request), quizSchema, 0.7, signal); }
+export async function generateProviderQuiz(provider: ProviderConfig, request: TutorRequest, signal?: AbortSignal): Promise<GeneratedQuiz> { return generateStructured<GeneratedQuiz>(provider, buildQuizPrompt(request), quizSchema, 0.7, signal); }

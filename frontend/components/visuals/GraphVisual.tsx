@@ -180,10 +180,7 @@ export function GraphVisual({
                   strokeWidth="2"
                 >
                   <title>
-                    {point.label
-                      ? `${point.label}: `
-                      : ""}
-                    x {formatValue(point.x)}, y {formatValue(point.y)}
+                    {`${point.label ? `${point.label}: ` : ""}x ${formatValue(point.x)}, y ${formatValue(point.y)}`}
                   </title>
                 </circle>
               ))}

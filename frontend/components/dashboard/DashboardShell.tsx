@@ -24,7 +24,6 @@ import {
 import { offlineQueueChangedEvent } from "@/lib/offline-sync";
 import {
   deriveActivitiesFromExplanationHistory,
-  getLearningMomentum,
   type LearningActivity,
 } from "@/lib/learning-activity";
 import {
@@ -38,19 +37,14 @@ import {
 } from "@/lib/confidence-calibration";
 import { useOfflineLessons } from "@/hooks/useOfflineLessons";
 import { useOnlineStatus } from "@/hooks/useOnlineStatus";
-import { DashboardHeader } from "./DashboardHeader";
 import { EmptyDashboard } from "./EmptyDashboard";
 import { LearningDNACard } from "./LearningDNACard";
-import { PersonalizationCard } from "./PersonalizationCard";
-import { ProgressCard } from "./ProgressCard";
-import { QuickActions } from "./QuickActions";
 import { RecentLessons } from "./RecentLessons";
 import { MasteryOverview } from "./MasteryOverview";
 import { StudyPlanCard } from "./StudyPlanCard";
 import { readStudyPlan, type StudyPlan } from "@/lib/study-planner";
 import { LearningDNAEvidence } from "./LearningDNAEvidence";
 import { SpacedReviewCard } from "./SpacedReviewCard";
-import { PrivacySummary } from "./PrivacySummary";
 import { ActivityHeatmap } from "./ActivityHeatmap";
 import { ConfidenceInsightCard } from "./ConfidenceInsightCard";
 import { ExplanationHistorySummary } from "./ExplanationHistorySummary";
@@ -147,6 +141,8 @@ export function DashboardShell() {
     classifyCalibration([]),
   );
   const [isReady, setIsReady] = useState(false);
+  const [showInsights, setShowInsights] = useState(false);
+  const [showOffline, setShowOffline] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -269,7 +265,6 @@ export function DashboardShell() {
     );
 
   const profile = buildTeachingProfile(scores);
-  const momentum = getLearningMomentum(activities);
   const topicsWithEvidence = new Set(
     activities
       .map((activity) => activity.topic?.trim().toLowerCase())
@@ -286,16 +281,6 @@ export function DashboardShell() {
     : 0;
   const approachReason = dna2?.recommendationReason
     ?? `This starts from your initial ${profile.primaryDimension} preference. Outcome evidence is still limited.`;
-  const lastActivityDate = momentum.latestActivityAt
-    ? new Date(momentum.latestActivityAt).toLocaleDateString(undefined, {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      })
-    : null;
-
-  const [showInsights, setShowInsights] = useState(false);
-  const [showOffline, setShowOffline] = useState(false);
 
   return (
     <PageShell heading="" subheading="">
