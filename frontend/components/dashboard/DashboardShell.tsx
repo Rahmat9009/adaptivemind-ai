@@ -294,26 +294,18 @@ export function DashboardShell() {
       })
     : null;
 
+  const [showInsights, setShowInsights] = useState(false);
+  const [showOffline, setShowOffline] = useState(false);
+
   return (
     <PageShell heading="" subheading="">
       <motion.div
         variants={staggerContainer}
         initial="hidden"
         animate="visible"
-        className="space-y-8"
+        className="space-y-8 max-w-5xl mx-auto"
       >
-        {/* Header */}
-        <motion.div variants={staggerItem}>
-          <DashboardHeader
-            activeDays={momentum.activeDaysLast14}
-            meaningfulActions={activities.length}
-            primaryLabel={
-              recommendedApproach[0].toUpperCase()
-              + recommendedApproach.slice(1)
-            }
-          />
-        </motion.div>
-
+        {/* Top: Continue learning */}
         <motion.div variants={staggerItem}>
           <NextLearningAction
             action={nextAction}
@@ -323,77 +315,33 @@ export function DashboardShell() {
           />
         </motion.div>
 
-        {/* Quick actions */}
-        <motion.div variants={staggerItem}>
-          <QuickActions hasHistory={history.length > 0} />
-        </motion.div>
-
-        {/* Learning DNA + personalization side column */}
-        <motion.div variants={staggerItem} className="grid gap-8 lg:grid-cols-[1.2fr_1fr]">
-          <LearningDNACard scores={scores} />
-          <div className="space-y-6">
-            <PersonalizationCard scores={scores} />
-            <ProgressCard
-              meaningfulActions={activities.length}
-              topicsWithEvidence={topicsWithEvidence}
-              activeDays={momentum.activeDaysLast14}
-              lastActivityDate={lastActivityDate}
-            />
+        {/* Summary Row */}
+        <motion.div variants={staggerItem} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="am-card p-4 text-center">
+            <p className="text-2xl font-serif text-[var(--am-text-primary)]">{topicsWithEvidence}</p>
+            <p className="text-xs font-medium text-[var(--am-text-secondary)] mt-1">Topics</p>
+          </div>
+          <div className="am-card p-4 text-center">
+            <p className="text-2xl font-serif text-[var(--am-text-primary)]">{activities.length}</p>
+            <p className="text-xs font-medium text-[var(--am-text-secondary)] mt-1">Actions</p>
+          </div>
+          <div className="am-card p-4 text-center">
+            <p className="text-2xl font-serif text-[var(--am-text-primary)]">{dueReviews.length}</p>
+            <p className="text-xs font-medium text-[var(--am-text-secondary)] mt-1">Reviews Due</p>
+          </div>
+          <div className="am-card p-4 text-center">
+            <p className="text-2xl font-serif text-[var(--am-text-primary)]">{offlineLessons.lessons.length}</p>
+            <p className="text-xs font-medium text-[var(--am-text-secondary)] mt-1">Downloads</p>
           </div>
         </motion.div>
 
-        <motion.div
-          variants={staggerItem}
-          className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]"
-        >
-          <ActivityHeatmap
-            activities={activities}
-            loading={activitiesLoading}
-          />
-          <SpacedReviewCard
-            dueReviews={dueReviews}
-            upcomingReviews={upcomingReviews}
-          />
+        {/* Main Sections */}
+        <motion.div variants={staggerItem} className="grid gap-8 lg:grid-cols-2">
+          <StudyPlanCard plan={studyPlan} />
+          <SpacedReviewCard dueReviews={dueReviews} upcomingReviews={upcomingReviews} />
         </motion.div>
 
         <motion.div variants={staggerItem}>
-          <MasteryOverview
-            entries={mastery.entries}
-            mastered={mastery.mastered}
-            developing={mastery.developing}
-            needsReview={mastery.needsReview}
-            averageRecentScore={mastery.averageRecentScore}
-          />
-        </motion.div>
-
-        <motion.div
-          variants={staggerItem}
-          className="grid gap-8 lg:grid-cols-2"
-        >
-          <StudyPlanCard plan={studyPlan} />
-          <OfflineLibraryCard
-            lessonCount={offlineLessons.lessons.length}
-            pendingCount={pendingOfflineCount}
-            loading={offlineLessons.loading}
-            isOnline={isOnline}
-          />
-        </motion.div>
-
-        {dna2 && (
-          <motion.div
-            variants={staggerItem}
-            className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]"
-          >
-            <LearningDNAEvidence dna={dna2} />
-            <ConfidenceInsightCard summary={calibration} />
-          </motion.div>
-        )}
-
-        <motion.div
-          variants={staggerItem}
-          className="grid gap-8 lg:grid-cols-2"
-        >
-          <ExplanationHistorySummary history={explanationHistory} />
           {history.length > 0 ? (
             <RecentLessons history={history} />
           ) : (
@@ -401,10 +349,72 @@ export function DashboardShell() {
           )}
         </motion.div>
 
-        {/* Privacy & Data */}
-        <motion.div variants={staggerItem}>
-          <PrivacySummary />
+        {/* Collapsible: Learning insights */}
+        <motion.div variants={staggerItem} className="pt-4 border-t border-[var(--am-border-light)]">
+          <button
+            type="button"
+            onClick={() => setShowInsights(!showInsights)}
+            className="flex items-center gap-2 w-full text-left font-serif text-xl text-[var(--am-text-primary)] hover:text-[var(--am-primary)] transition-colors"
+          >
+            Learning insights
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={showInsights ? "rotate-180" : ""}>
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </button>
+          
+          {showInsights && (
+            <div className="mt-6 space-y-8">
+              <div className="grid gap-8 lg:grid-cols-2">
+                <LearningDNACard scores={scores} />
+                <MasteryOverview
+                  entries={mastery.entries}
+                  mastered={mastery.mastered}
+                  developing={mastery.developing}
+                  needsReview={mastery.needsReview}
+                  averageRecentScore={mastery.averageRecentScore}
+                />
+              </div>
+
+              {dna2 && (
+                <div className="grid gap-8 lg:grid-cols-2">
+                  <LearningDNAEvidence dna={dna2} />
+                  <ConfidenceInsightCard summary={calibration} />
+                </div>
+              )}
+
+              <div className="grid gap-8 lg:grid-cols-2">
+                <ActivityHeatmap activities={activities} loading={activitiesLoading} />
+                <ExplanationHistorySummary history={explanationHistory} />
+              </div>
+            </div>
+          )}
         </motion.div>
+
+        {/* Collapsible: Offline and exports */}
+        <motion.div variants={staggerItem} className="pt-4 border-t border-[var(--am-border-light)]">
+          <button
+            type="button"
+            onClick={() => setShowOffline(!showOffline)}
+            className="flex items-center gap-2 w-full text-left font-serif text-xl text-[var(--am-text-primary)] hover:text-[var(--am-primary)] transition-colors"
+          >
+            Offline and exports
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={showOffline ? "rotate-180" : ""}>
+              <path d="M6 9l6 6 6-6"/>
+            </svg>
+          </button>
+          
+          {showOffline && (
+            <div className="mt-6">
+              <OfflineLibraryCard
+                lessonCount={offlineLessons.lessons.length}
+                pendingCount={pendingOfflineCount}
+                loading={offlineLessons.loading}
+                isOnline={isOnline}
+              />
+            </div>
+          )}
+        </motion.div>
+
       </motion.div>
     </PageShell>
   );

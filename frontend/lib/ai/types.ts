@@ -26,7 +26,8 @@ export type TutorAction =
   | "explain-back"
   | "retrieval-check"
   | "hint"
-  | "review";
+  | "review"
+  | "generate-quiz";
 
 export type TeachingMode =
   | "adaptive"
@@ -52,6 +53,27 @@ export type AIConfidence = "high" | "moderate" | "uncertain" | "verification-rec
 // ──────────────────────────────────────
 // New structured lesson response
 // ──────────────────────────────────────
+
+export interface QuizQuestion {
+  id: string;
+  type: "multiple-choice" | "short-answer";
+  question: string;
+  options?: string[]; // for multiple choice
+  correctAnswer: string;
+  explanation: string;
+}
+
+export interface GeneratedQuiz {
+  title: string;
+  questions: QuizQuestion[];
+}
+
+export interface QuizEvaluation {
+  isCorrect: boolean;
+  feedback: string;
+  strengths: string[];
+  gaps: string[];
+}
 
 export interface LessonObjective {
   what: string;

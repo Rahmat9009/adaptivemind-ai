@@ -153,12 +153,14 @@ describe("Security utilities", () => {
 describe("App navigation routes", () => {
   it("has all required routes", () => {
     const routes = primaryNavigationRoutes.map((route) => route.href);
-    expect(routes).toHaveLength(4);
+    expect(routes).toHaveLength(6);
     expect(routes).toEqual([
       "/",
       "/dashboard",
       "/tutor",
       "/planner",
+      "/downloads",
+      "/privacy",
     ]);
   });
 });

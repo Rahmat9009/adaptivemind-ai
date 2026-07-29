@@ -17,9 +17,11 @@ describe("shared application navigation", () => {
       primaryNavigationRoutes.map(({ label, href }) => ({ label, href })),
     ).toEqual([
       { label: "Home", href: "/" },
-      { label: "Dashboard", href: "/dashboard" },
+      { label: "My Dashboard", href: "/dashboard" },
       { label: "Tutor", href: "/tutor" },
       { label: "Planner", href: "/planner" },
+      { label: "Downloads", href: "/downloads" },
+      { label: "Privacy", href: "/privacy" },
     ]);
   });
 });

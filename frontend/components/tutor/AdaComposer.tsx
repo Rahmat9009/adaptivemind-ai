@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   FileText,
-  Image as ImageIcon,
+  ImageIcon,
   Link2,
   LoaderCircle,
   Mic,
@@ -11,6 +11,7 @@ import {
   Send,
   Trash2,
   X,
+  RotateCcw,
 } from "lucide-react";
 import { prepareImageSource } from "@/lib/client-image-source";
 import { useUnsavedChanges } from "@/hooks/useUnsavedChanges";
@@ -108,18 +109,32 @@ async function processAttachment(
 export function AdaComposer({
   topic,
   isLoading,
+  initialSources = [],
   onTopicChange,
   onSubmit,
 }: {
   topic: string;
   isLoading: boolean;
+  initialSources?: TutorSource[];
   onTopicChange: (value: string) => void;
   onSubmit: (
     sources: TutorSource[],
     sourceMode: SourceGroundingMode | undefined,
   ) => Promise<void> | void;
 }) {
-  const [attachments, setAttachments] = useState<PendingAttachment[]>([]);
+  const [attachments, setAttachments] = useState<PendingAttachment[]>(() => 
+    initialSources.map((source) => ({
+      id: source.id,
+      kind: source.type === "website" ? "url" : "file",
+      title: source.title,
+      sourceType: source.type,
+      size: source.size,
+      url: source.type === "website" ? "existing-url" : undefined,
+      selected: true,
+      status: "ready",
+      source: source,
+    }))
+  );
   const [sourceMode, setSourceMode] =
     useState<SourceGroundingMode>("source-plus-background");
   const [showLinkInput, setShowLinkInput] = useState(false);
@@ -272,6 +287,7 @@ export function AdaComposer({
       } catch (error) {
         failed = true;
         updateAttachment(attachment.id, {
+          selected: false,
           status: "error",
           error: error instanceof Error
             ? error.message
@@ -282,10 +298,14 @@ export function AdaComposer({
 
     setIsPreparing(false);
     if (failed) {
-      setComposerError(
-        "One or more sources could not be prepared. Remove them or correct the error before sending.",
-      );
-      return;
+      if (sourceMode === "source-only") {
+        setComposerError(
+          "A source could not be processed. Fix or remove it before sending a source-only request.",
+        );
+        return;
+      }
+      // If not source-only, we can proceed with text or valid sources, but maybe warn them? Actually prompt says "Do not block an unrelated text-only question merely because one optional attachment failed" so we just let it pass, but maybe we should still warn them? The prompt just says "Do not block".
+      // Wait, if we proceed, do we submit? Yes.
     }
     await onSubmit(sources, sources.length ? sourceMode : undefined);
   }
@@ -431,9 +451,11 @@ export function AdaComposer({
                 onChange={(event) =>
                   updateAttachment(attachment.id, {
                     selected: event.target.checked,
+                    // If they re-select an errored source, we could reset status to pending
+                    ...(attachment.status === "error" && event.target.checked ? { status: "pending", error: undefined } : {})
                   })
                 }
-                disabled={busy || attachment.status === "error"}
+                disabled={busy}
                 aria-label={`Use ${attachment.title} in this request`}
                 className="h-4 w-4 accent-[var(--am-primary)]"
               />
@@ -477,16 +499,30 @@ export function AdaComposer({
               {attachment.status === "processing" ? (
                 <LoaderCircle size={17} className="motion-safe:animate-spin text-[var(--am-text-muted)]" aria-hidden="true" />
               ) : (
-                <button
-                  type="button"
-                  onClick={() => removeAttachment(attachment)}
-                  disabled={busy}
-                  className="am-icon-button"
-                  title={`Remove ${attachment.title}`}
-                  aria-label={`Remove ${attachment.title}`}
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                </button>
+                <div className="flex items-center gap-1">
+                  {attachment.status === "error" && (
+                    <button
+                      type="button"
+                      onClick={() => updateAttachment(attachment.id, { status: "pending", error: undefined, selected: true })}
+                      disabled={busy}
+                      className="am-icon-button"
+                      title={`Retry ${attachment.title}`}
+                      aria-label={`Retry ${attachment.title}`}
+                    >
+                      <RotateCcw size={16} aria-hidden="true" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => removeAttachment(attachment)}
+                    disabled={busy}
+                    className="am-icon-button"
+                    title={`Remove ${attachment.title}`}
+                    aria-label={`Remove ${attachment.title}`}
+                  >
+                    <Trash2 size={16} aria-hidden="true" />
+                  </button>
+                </div>
               )}
             </div>
           ))}

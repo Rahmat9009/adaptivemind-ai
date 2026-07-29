@@ -26,6 +26,7 @@ export const tutorActions = [
   "retrieval-check",
   "hint",
   "review",
+  "generate-quiz",
 ] as const;
 
 export const teachingModes = [
@@ -521,6 +522,18 @@ export const explainBackEvaluationSchema = z.object({
 export const hintResponseSchema = z.object({
   hints: z.tuple([shortString, shortString, shortString, compactString]),
   stylesUsed: z.array(learningDimensionSchema).max(5),
+}).strict();
+
+export const quizSchema = z.object({
+  title: z.string().trim().min(1).max(160),
+  questions: z.array(z.object({
+    id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/),
+    type: z.enum(["multiple-choice", "short-answer"]),
+    question: z.string().trim().min(1).max(500),
+    options: z.array(z.string().trim().min(1).max(200)).optional(),
+    correctAnswer: z.string().trim().min(1).max(500),
+    explanation: z.string().trim().min(1).max(500),
+  })).max(20)
 }).strict();
 
 export function parseTutorRequest(value: unknown):

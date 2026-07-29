@@ -8,16 +8,22 @@ import type {
   TutorConversationTurn,
   TutorLesson,
 } from "@/lib/ai/types";
-import type { TutorSourceAttribution } from "@/lib/sources";
+import type { TutorSourceAttribution, TutorSource } from "@/lib/sources";
+import type { SourceGroundingMode } from "@/lib/ai/types";
+import { AdaComposer } from "./AdaComposer";
 
 interface LessonFollowUpProps {
   lesson: TutorLesson;
   conversation: TutorConversationTurn[];
   isLoading: boolean;
   error: string | null;
-  onAsk: (question: string) => Promise<boolean>;
+  onAsk: (
+    question: string,
+    sources: TutorSource[],
+    sourceMode: SourceGroundingMode | undefined
+  ) => Promise<boolean>;
   latestTurnRef: RefObject<HTMLDivElement | null>;
-  sources?: TutorSourceAttribution[];
+  sources?: TutorSource[];
 }
 
 function getSuggestions(lesson: TutorLesson): string[] {
@@ -43,10 +49,10 @@ export function LessonFollowUp({
   const suggestions = getSuggestions(lesson);
   const sourceById = new Map(sources.map((source) => [source.id, source]));
 
-  async function submitQuestion(value = question) {
+  async function submitQuestion(value: string, currentSources = sources, sourceMode: SourceGroundingMode | undefined = "source-plus-background") {
     const trimmed = value.trim();
     if (!trimmed || isLoading) return;
-    const didSend = await onAsk(trimmed);
+    const didSend = await onAsk(trimmed, currentSources, sourceMode);
     if (didSend) setQuestion("");
   }
 
@@ -170,53 +176,25 @@ export function LessonFollowUp({
       </motion.div>
 
       {/* Input */}
-      <motion.form
+      <motion.div
         variants={slideUp}
         className="mt-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          void submitQuestion();
-        }}
       >
-        <label htmlFor="lesson-follow-up" className="sr-only">
-          Ask Ada a focused question about this lesson
-        </label>
-        <textarea
-          id="lesson-follow-up"
-          value={question}
-          onChange={(event) => setQuestion(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
-              event.preventDefault();
-              void submitQuestion();
-            }
+        <AdaComposer
+          topic={question}
+          isLoading={isLoading}
+          initialSources={sources}
+          onTopicChange={setQuestion}
+          onSubmit={async (sources, sourceMode) => {
+            await submitQuestion(question, sources, sourceMode);
           }}
-          maxLength={500}
-          rows={2}
-          placeholder="Ask a focused question about this lesson..."
-          disabled={isLoading}
-          className="w-full resize-y rounded-[var(--am-radius-lg)] border border-[var(--am-border)] bg-[var(--am-bg-reading)] px-4 py-3 text-sm leading-6 text-[var(--am-text-primary)] outline-none transition placeholder:text-[var(--am-text-muted)] focus:border-[var(--am-primary)] focus:ring-2 focus:ring-[var(--am-primary)]/15 disabled:opacity-50"
         />
-        <div className="mt-3 flex items-center justify-between gap-4">
-          <p className="text-xs text-[var(--am-text-muted)]">
-            Press Enter to ask. Use Shift+Enter for a new line.
-          </p>
-          <Button
-            type="submit"
-            color="primary"
-            size="sm"
-            isDisabled={isLoading || !question.trim()}
-            isLoading={isLoading}
-          >
-            Ask
-          </Button>
-        </div>
         {error && (
           <p className="mt-3 text-sm font-medium text-[var(--am-error)]" role="alert">
             {error}
           </p>
         )}
-      </motion.form>
+      </motion.div>
     </motion.section>
   );
 }

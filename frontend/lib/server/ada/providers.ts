@@ -9,6 +9,7 @@ import type {
   TutorLessonAction,
   TutorRequest,
   UnderstandingEvaluation,
+  GeneratedQuiz,
 } from "@/lib/ai/types";
 import {
   buildEvaluationSystemPrompt,
@@ -16,6 +17,7 @@ import {
   buildFollowUpSystemPrompt,
   buildHintPrompt,
   buildTutorSystemPrompt,
+  buildQuizPrompt,
 } from "./prompts";
 import {
   explainBackEvaluationSchema,
@@ -23,6 +25,7 @@ import {
   tutorFollowUpSchema,
   tutorLessonSchema,
   understandingEvaluationSchema,
+  quizSchema,
 } from "./schemas";
 import {
   AdaError,
@@ -512,3 +515,4 @@ export async function generateProviderHint(
     signal,
   );
 }
+export async function generateProviderQuiz(provider: ConfiguredProvider, request: TutorRequest, signal?: AbortSignal): Promise<GeneratedQuiz> { return generateStructured<GeneratedQuiz>(provider, buildQuizPrompt(request), quizSchema, 0.7, signal); }

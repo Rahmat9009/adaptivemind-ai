@@ -83,6 +83,8 @@ import { LearnerTransparency } from "./LearnerTransparency";
 import { PreferenceOverridesUI } from "./PreferenceOverridesUI";
 import { ExplanationHistoryView } from "./ExplanationHistoryView";
 import { PeerAgent, type PeerAgentState, type PeerAgentMessage } from "./PeerAgent";
+import { QuizExperience } from "./QuizExperience";
+import { VisualLessonEngine } from "@/components/visuals/VisualLessonEngine";
 import {
   addExplanationRecord,
   getExplanationHistoryForConcept,
@@ -722,7 +724,11 @@ export function TutorShell() {
     }
   }
 
-  async function requestFollowUp(question: string): Promise<boolean> {
+  async function requestFollowUp(
+    question: string,
+    followUpSources: TutorSource[],
+    followUpSourceMode: SourceGroundingMode | undefined
+  ): Promise<boolean> {
     if (!profile || !response || !topic.trim()) return false;
     setIsFollowUpLoading(true);
     setFollowUpError(null);
@@ -746,8 +752,8 @@ export function TutorShell() {
             stylesUsed: response.lesson.stylesUsed,
           },
           conversation: recentConversation,
-          sources: activeSources.length ? activeSources : undefined,
-          sourceMode: activeSources.length ? activeSourceMode : undefined,
+          sources: followUpSources.length ? followUpSources : undefined,
+          sourceMode: followUpSources.length ? followUpSourceMode : undefined,
       });
       if (!isFollowUpApiResponse(payload))
         throw new Error(
@@ -1435,15 +1441,66 @@ export function TutorShell() {
     ? readLearningHistory().find((entry) => entry.id === historyId)
     : undefined;
 
-  return (
-    <PageShell heading="Ada" subheading="Your adaptive tutor">
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start">
-        {/* Left: Profile + form */}
-        <div className="space-y-6">
-          <LearningDNACompact
-            scores={profile.scores}
-            isBalanced={profile.isBalanced}
+  // --- New layout state ---
+  const [focusMode, setFocusMode] = useState(false);
+  const [activeTab, setActiveTab] = useState("learn");
+
+  const [generatedQuiz, setGeneratedQuiz] = useState<GeneratedQuiz | null>(null);
+  const [isQuizLoading, setIsQuizLoading] = useState(false);
+  const [quizError, setQuizError] = useState<string | null>(null);
+
+  async function handleGenerateQuiz(count: number) {
+    if (!profile || !response || !topic.trim()) return;
+    setIsQuizLoading(true);
+    setQuizError(null);
+    try {
+      const payload = await postTutorRequest({
+        topic: topic.trim(),
+        subject,
+        level,
+        scores: profile.scores,
+        action: "generate-quiz" as any,
+        teachingMode,
+        question: count.toString(),
+        currentLesson: {
+          title: response.lesson.title,
+          coreIdea: response.lesson.coreIdea,
+          explanation: response.lesson.explanation.slice(0, 360),
+          stylesUsed: response.lesson.stylesUsed,
+        },
+      });
+      if (!payload.quiz) throw new Error("Failed to generate quiz.");
+      setGeneratedQuiz(payload.quiz);
+    } catch (e) {
+      setQuizError(e instanceof Error ? e.message : "Failed to generate quiz.");
+    } finally {
+      setIsQuizLoading(false);
+    }
+  }
+
+  if (!profile)
+    return (
+      <PageShell heading="Ada" subheading="Your adaptive tutor">
+        <div className="flex h-full min-h-[60vh] items-center justify-center">
+          <TutorEmptyState
+            onUseBalancedProfile={() =>
+              setProfile({ scores: balancedScores, isBalanced: true })
+            }
           />
+        </div>
+      </PageShell>
+    );
+
+  const currentHistoryEntry: LessonHistoryEntry | undefined = historyId
+    ? readLearningHistory().find((entry) => entry.id === historyId)
+    : undefined;
+
+  const hasLesson = Boolean(response);
+
+  if (!hasLesson) {
+    return (
+      <PageShell heading="Ada" subheading="Your adaptive tutor">
+        <div className="flex flex-col min-h-[70vh] justify-center items-center px-4">
           <TopicForm
             key={composerSessionId}
             topic={topic}
@@ -1460,237 +1517,128 @@ export function TutorShell() {
               requestLesson("initial", sources, sourceMode)
             }
           />
+          {isLoading && <div className="mt-8"><TutorLoadingState /></div>}
+          {error && <div className="mt-8 max-w-2xl w-full"><TutorErrorState message={error} /></div>}
+        </div>
+      </PageShell>
+    );
+  }
 
-          {/* Reading Preferences toggle */}
-          <Button
-            type="button"
-            color="tertiary"
-            size="sm"
-            onClick={() => setShowReadingPrefs(!showReadingPrefs)}
-            className="w-full"
-          >
-            <span className="flex items-center justify-between w-full">
-              <span>Reading preferences</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-              </svg>
-            </span>
-          </Button>
-          {showReadingPrefs && (
-            <div className="rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-surface)] p-4">
-              <ReadingPreferencesInline
-                settings={readingSettings}
-                onChange={setReadingSettings}
-              />
+  return (
+    <PageShell heading="Ada" subheading="Your adaptive tutor">
+      <div className={`transition-all duration-300 ${focusMode ? "max-w-4xl mx-auto" : "grid gap-8 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] lg:items-start"}`}>
+        
+        {/* Context Panel (Hidden in Focus Mode) */}
+        {!focusMode && (
+          <div className="space-y-6 flex flex-col">
+            <div className="am-card p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-[var(--am-text-primary)]">Current topic</h3>
+                <Button size="xs" color="ghost" onClick={() => startNewLesson()}>New topic</Button>
+              </div>
+              <p className="text-sm font-medium text-[var(--am-text-secondary)]">{topic}</p>
+              
+              <div className="pt-4 border-t border-[var(--am-border-light)]">
+                <p className="text-xs text-[var(--am-text-muted)] mb-2">Subject & Level</p>
+                <p className="text-sm text-[var(--am-text-secondary)]">{subject} · {level}</p>
+              </div>
+
+              <div className="pt-4 border-t border-[var(--am-border-light)]">
+                <p className="text-xs text-[var(--am-text-muted)] mb-2">Learning approach</p>
+                <p className="text-sm text-[var(--am-text-secondary)] capitalize">{teachingMode === "adaptive" ? "Adaptive" : teachingMode}</p>
+              </div>
             </div>
-          )}
 
-          {/* Why this mode? */}
-          {response && (
+            {/* Reading Preferences toggle */}
+            <Button
+              type="button"
+              color="tertiary"
+              size="sm"
+              onClick={() => setShowReadingPrefs(!showReadingPrefs)}
+              className="w-full"
+            >
+              <span className="flex items-center justify-between w-full">
+                <span>Reading preferences</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+                </svg>
+              </span>
+            </Button>
+            {showReadingPrefs && (
+              <div className="rounded-[var(--am-radius-xl)] border border-[var(--am-border-light)] bg-[var(--am-surface)] p-4">
+                <ReadingPreferencesInline
+                  settings={readingSettings}
+                  onChange={setReadingSettings}
+                />
+              </div>
+            )}
+
             <WhyThisMode
               activeMode={teachingMode}
               onModeChange={handleTeachingModeChange}
               availableModes={["adaptive", "visual", "example", "analogy", "story", "challenge"]}
             />
-          )}
 
-          {/* Learner transparency */}
-          {topic.trim() && (
-            <LearnerTransparency topic={topic.trim()} />
-          )}
+            {topic.trim() && (
+              <LearnerTransparency topic={topic.trim()} />
+            )}
 
-          {/* Preference overrides */}
-          <PreferenceOverridesUI />
+            <PreferenceOverridesUI />
 
-          {/* Explanation history */}
-          <ExplanationHistoryView
-            key={topic.trim()}
-            currentConcept={topic.trim()}
-          />
-        </div>
+            <ExplanationHistoryView
+              key={topic.trim()}
+              currentConcept={topic.trim()}
+            />
+          </div>
+        )}
 
-        {/* Right: Lesson content */}
-        <div>
-          {/* Handoff message */}
-          {handoffMessage && (
-            <p
-              className="mb-6 rounded-[var(--am-radius-lg)] border border-[var(--am-primary)]/20 bg-[var(--am-primary-light)] px-4 py-3 text-sm font-medium text-[var(--am-primary)]"
-              role="status"
+        {/* Main Lesson Area */}
+        <div className="flex flex-col min-w-0">
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex space-x-1 bg-[var(--am-surface)] border border-[var(--am-border-light)] p-1 rounded-[var(--am-radius-lg)] overflow-x-auto">
+              {["learn", "visual", "quiz", "practice", "sources"].map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`px-4 py-1.5 text-sm font-medium rounded-[var(--am-radius-md)] capitalize whitespace-nowrap transition-colors ${
+                    activeTab === tab
+                      ? "bg-[var(--am-primary-light)] text-[var(--am-primary)]"
+                      : "text-[var(--am-text-secondary)] hover:text-[var(--am-text-primary)] hover:bg-[var(--am-warm-bg)]"
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setFocusMode(!focusMode)}
+              className="am-btn am-btn-ghost text-xs"
             >
+              {focusMode ? "Exit Focus" : "Focus Mode"}
+            </button>
+          </div>
+
+          {handoffMessage && (
+            <p className="mb-6 rounded-[var(--am-radius-lg)] border border-[var(--am-primary)]/20 bg-[var(--am-primary-light)] px-4 py-3 text-sm font-medium text-[var(--am-primary)]">
               {handoffMessage}
             </p>
           )}
 
-          {/* Error */}
           {error && <TutorErrorState message={error} />}
-
-          {/* Loading */}
+          
           {isLoading && !response && <TutorLoadingState />}
-
+          
           {isLoading && response && (
-            <p
-              className="mb-3 text-sm text-[var(--am-text-muted)]"
-              role="status"
-              aria-live="polite"
-            >
-              Ada is preparing the updated explanation. Your current lesson
-              remains available.
+            <p className="mb-3 text-sm text-[var(--am-text-muted)]">
+              Ada is preparing the updated explanation. Your current lesson remains available.
             </p>
           )}
 
-          {/* Lesson */}
-          {response && (
+          {response && activeTab === "learn" && (
             <>
-              <LessonCard
-                response={response}
-                historyEntry={currentHistoryEntry}
-              />
-              <LessonActions
-                isLoading={isLoading}
-                onAction={requestLesson}
-                onNewLesson={startNewLesson}
-              />
-
-              {/* Hint Ladder for challenges */}
-              {response.lesson.challenge && (
-                <HintLadder
-                  key={historyId ?? response.lesson.title}
-                  hints={hints}
-                  currentLevel={hintLevel as 0 | 1 | 2 | 3 | 4}
-                  isLoading={isHintLoading}
-                  onRequestHint={requestHints}
-                  onRequestFullSolution={() => void requestHints(4)}
-                  fullSolutionRevealed={hintLevel === 4}
-                  gateType="attempt"
-                  hasAttempted={hasAttempted}
-                  onAttempt={() => {
-                    setHasAttempted(true);
-                    void saveLearningActivity({
-                      id: `activity:challenge:${historyId ?? response.requestId ?? response.lesson.title}`,
-                      type: "challenge-attempt",
-                      occurredAt: new Date().toISOString(),
-                      topic: topic.trim(),
-                    }).catch(() => {
-                      // The challenge remains usable when IndexedDB is unavailable.
-                    });
-                    if (timeBeforeFirstAttempt === null) {
-                      const elapsed = challengeStartedAt
-                        ? Math.max(
-                            0,
-                            Math.round((Date.now() - challengeStartedAt) / 1000),
-                          )
-                        : 0;
-                      setTimeBeforeFirstAttempt(elapsed);
-                    }
-                  }}
-                  attemptPrompt={response.lesson.challenge}
-                  timeBeforeFirstHint={
-                    timeBeforeFirstAttempt ?? undefined
-                  }
-                  isChallenge={true}
-                  error={hintError}
-                />
-              )}
-
-              {/* Understanding check */}
-              <UnderstandingCheck
-                question={response.lesson.checkQuestion}
-                isLoading={isEvaluating}
-                error={evaluationError}
-                confidence={confidenceBefore}
-                onConfidenceChange={setConfidenceBefore}
-                onSubmit={evaluateUnderstanding}
-              />
-
-              {/* Evaluation feedback */}
-              {evaluation && (
-                <UnderstandingFeedback
-                  evaluation={evaluation}
-                  source={evaluationSource}
-                  masteryReason={masteryReason}
-                  onAction={(nextStep) => {
-                    if (nextStep === "simplify")
-                      void requestLesson("simpler");
-                    else if (nextStep === "example")
-                      void requestLesson("example");
-                    else if (nextStep === "clarify")
-                      void requestLesson("different");
-                  }}
-                />
-              )}
-
-              {/* Confidence coaching */}
-              {evaluation && (
-                <ConfidenceCoaching
-                  confidence={confidenceBefore}
-                  score={evaluation.score}
-                  calibrationRecords={getExplanationHistoryForConcept(topic.trim()).map(
-                    (r) => ({ selfReported: r.learnerConfidence, actualScore: r.evaluationScore }),
-                  )}
-                  status={evaluation.status}
-                />
-              )}
-
-              {/* Quick recall */}
-              {quickRecallRecord && (
-                <QuickRecall
-                  topic={quickRecallRecord.topic}
-                  recallStatus={quickRecallStatus}
-                  isSimulated={quickRecallRecord.simulated}
-                  question={quickRecallRecord.question}
-                  result={quickRecallResult ?? undefined}
-                  isLoading={isQuickRecallLoading}
-                  error={quickRecallError}
-                  confidence={quickRecallConfidence}
-                  onConfidenceChange={setQuickRecallConfidence}
-                  onSubmit={(answer, confidence) =>
-                    void evaluateQuickRecall(answer, confidence)
-                  }
-                  onAccelerate={() => {
-                    const simulated = simulateQuickRecallDue(
-                      quickRecallRecord.skillId,
-                    );
-                    setQuickRecallRecord(simulated);
-                    setQuickRecallStatus("due");
-                    setQuickRecallResult(null);
-                    setQuickRecallError(null);
-                  }}
-                  onFullReview={() => void requestLesson("different")}
-                />
-              )}
-
-              {/* Explain Back */}
-              {response.lesson.checkQuestion && (
-                <ExplainBack
-                  topic={topic.trim()}
-                  state={explainBackState}
-                  isLoading={isExplainBackLoading}
-                  error={explainBackError}
-                  feedback={explainBackFeedback}
-                  confidence={explainBackConfidence}
-                  onConfidenceChange={setExplainBackConfidence}
-                  onSubmit={requestExplainBack}
-                  onRetry={handleExplainBackRetry}
-                  onNext={handleExplainBackNext}
-                />
-              )}
-
-              {/* Peer Agent */}
-              {response.lesson.checkQuestion && (
-                <PeerAgent
-                  topic={topic.trim()}
-                  state={peerAgentState}
-                  isLoading={isPeerLoading}
-                  error={peerError}
-                  messages={peerAgentMessages}
-                  onStart={startPeerSession}
-                  onSubmit={handlePeerSubmit}
-                  onComplete={handlePeerComplete}
-                />
-              )}
-
-              {/* Follow-up */}
+              <LessonCard response={response} historyEntry={currentHistoryEntry} />
+              <LessonActions isLoading={isLoading} onAction={requestLesson} onNewLesson={startNewLesson} />
               {topic.trim() && (
                 <LessonFollowUp
                   lesson={response.lesson}
@@ -1705,16 +1653,101 @@ export function TutorShell() {
             </>
           )}
 
-          {/* Empty state (no lesson yet) */}
-          {!isLoading && !response && !error && (
-            <section className="am-card p-10 text-center border-dashed">
-              <p className="am-heading-serif text-base text-[var(--am-text-secondary)]">
-                Ada will build your focused lesson here.
-              </p>
-              <p className="mt-2 text-sm leading-6 text-[var(--am-text-muted)]">
-                Choose a suggested topic or enter one of your own to begin.
-              </p>
-            </section>
+          {response && activeTab === "visual" && (
+            <div className="am-card min-h-[300px]">
+              {response.lesson.visual ? (
+                <VisualLessonEngine visual={response.lesson.visual} />
+              ) : (
+                <div className="p-6 flex items-center justify-center text-[var(--am-text-secondary)]">
+                  Ada did not generate a visual for this lesson.
+                </div>
+              )}
+            </div>
+          )}
+
+          {response && activeTab === "quiz" && (
+            <QuizExperience
+              topic={topic.trim()}
+              isLoading={isQuizLoading}
+              error={quizError}
+              quiz={generatedQuiz}
+              onGenerate={handleGenerateQuiz}
+            />
+          )}
+
+          {response && activeTab === "practice" && (
+            <div className="space-y-6">
+              {response.lesson.challenge && (
+                <HintLadder
+                  key={historyId ?? response.lesson.title}
+                  hints={hints}
+                  currentLevel={hintLevel as 0 | 1 | 2 | 3 | 4}
+                  isLoading={isHintLoading}
+                  onRequestHint={requestHints}
+                  onRequestFullSolution={() => void requestHints(4)}
+                  fullSolutionRevealed={hintLevel === 4}
+                  gateType="attempt"
+                  hasAttempted={hasAttempted}
+                  onAttempt={() => setHasAttempted(true)}
+                  attemptPrompt={response.lesson.challenge}
+                  timeBeforeFirstHint={timeBeforeFirstAttempt ?? undefined}
+                  isChallenge={true}
+                  error={hintError}
+                />
+              )}
+
+              <UnderstandingCheck
+                question={response.lesson.checkQuestion}
+                isLoading={isEvaluating}
+                error={evaluationError}
+                confidence={confidenceBefore}
+                onConfidenceChange={setConfidenceBefore}
+                onSubmit={evaluateUnderstanding}
+              />
+
+              {evaluation && (
+                <UnderstandingFeedback
+                  evaluation={evaluation}
+                  source={evaluationSource}
+                  masteryReason={masteryReason}
+                  onAction={(nextStep) => {
+                    if (nextStep === "simplify") void requestLesson("simpler");
+                    else if (nextStep === "example") void requestLesson("example");
+                    else if (nextStep === "clarify") void requestLesson("different");
+                  }}
+                />
+              )}
+
+              {response.lesson.checkQuestion && (
+                <ExplainBack
+                  topic={topic.trim()}
+                  state={explainBackState}
+                  isLoading={isExplainBackLoading}
+                  error={explainBackError}
+                  feedback={explainBackFeedback}
+                  confidence={explainBackConfidence}
+                  onConfidenceChange={setExplainBackConfidence}
+                  onSubmit={requestExplainBack}
+                  onRetry={handleExplainBackRetry}
+                  onNext={handleExplainBackNext}
+                />
+              )}
+            </div>
+          )}
+
+          {response && activeTab === "sources" && (
+            <div className="am-card p-6 min-h-[300px]">
+              <h3 className="text-lg font-semibold text-[var(--am-text-primary)] mb-4">Lesson Sources</h3>
+              {response.sources && response.sources.length > 0 ? (
+                <ul className="space-y-3">
+                  {response.sources.map(s => (
+                    <li key={s.id} className="text-sm text-[var(--am-text-secondary)] border-b border-[var(--am-border-light)] pb-2">{s.title} ({s.type})</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-[var(--am-text-muted)]">No sources were used to generate this lesson.</p>
+              )}
+            </div>
           )}
         </div>
       </div>

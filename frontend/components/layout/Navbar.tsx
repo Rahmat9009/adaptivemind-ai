@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/am/Logo";
-import { primaryNavigationRoutes } from "./navigation";
 
 export function Navbar() {
   const headerRef = useRef<HTMLElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const header = headerRef.current;
@@ -20,6 +20,32 @@ export function Navbar() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && menuOpen) {
+        setMenuOpen(false);
+      }
+    };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuOpen && menuRef.current && !menuRef.current.contains(e.target as Node) && !headerRef.current?.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [menuOpen]);
+
+  const publicLinks = [
+    { label: "Home", href: "/" },
+    { label: "Features", href: "#features" },
+    { label: "How it works", href: "#how-it-works" },
+    { label: "Privacy", href: "/privacy" },
+  ];
 
   return (
     <header
@@ -46,36 +72,32 @@ export function Navbar() {
 
       <nav
         aria-label="Primary"
-        className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5 sm:px-8 lg:px-10"
+        className="mx-auto flex max-w-7xl items-center justify-between px-5 py-3.5 sm:px-8 lg:px-10 relative z-[var(--am-z-nav)]"
       >
         <Link href="/" className="transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[var(--am-primary)]">
           <Logo size={26} colored />
         </Link>
 
-        <div className="hidden items-center gap-5 lg:flex">
-          {primaryNavigationRoutes.map((route) => (
+        {/* Desktop Navigation */}
+        <div className="hidden lg:flex items-center gap-5">
+          {publicLinks.map((route) => (
             <Link
               key={route.href}
               href={route.href}
-              aria-current={route.href === "/" ? "page" : undefined}
-              className={`text-sm font-medium transition-colors ${
-                route.href === "/"
-                  ? "text-[var(--am-primary)]"
-                  : "text-[var(--am-text-secondary)] hover:text-[var(--am-text-primary)]"
-              }`}
+              className="text-sm font-medium text-[var(--am-text-secondary)] transition-colors hover:text-[var(--am-text-primary)]"
             >
               {route.label}
             </Link>
           ))}
-          <a
-            href="#how-it-works"
-            className="text-sm font-medium text-[var(--am-text-secondary)] transition-colors hover:text-[var(--am-text-primary)]"
-          >
-            How it works
-          </a>
         </div>
 
-        <div className="hidden items-center gap-2 lg:flex">
+        <div className="hidden lg:flex items-center gap-3">
+          <Link
+            href="/tutor"
+            className="text-sm font-medium text-[var(--am-text-secondary)] transition-colors hover:text-[var(--am-text-primary)]"
+          >
+            Open Ada
+          </Link>
           <Link
             href="/assessment"
             className="am-glass-btn-primary px-5 py-2 text-sm"
@@ -84,6 +106,7 @@ export function Navbar() {
           </Link>
         </div>
 
+        {/* Mobile Menu Button */}
         <button
           type="button"
           onClick={() => setMenuOpen((current) => !current)}
@@ -101,39 +124,37 @@ export function Navbar() {
         </button>
       </nav>
 
+      {/* Mobile Navigation Panel */}
       {menuOpen && (
         <div
           id="home-mobile-navigation"
-          className="border-b border-[var(--am-border-light)] bg-[var(--am-surface)] px-5 pb-4 pt-2 shadow-[var(--am-shadow-sm)] lg:hidden"
+          ref={menuRef}
+          className="absolute top-full left-0 w-full border-b border-[var(--am-border-light)] bg-[var(--am-surface)] px-5 pb-4 pt-2 shadow-[var(--am-shadow-sm)] lg:hidden"
         >
-          <div className="mx-auto grid max-w-7xl grid-cols-2 gap-2">
-            {primaryNavigationRoutes.map((route) => {
-              const Icon = route.icon;
-              return (
-                <Link
-                  key={route.href}
-                  href={route.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="flex min-h-12 items-center gap-3 border-b border-[var(--am-border-light)] px-2 py-2 text-sm font-semibold text-[var(--am-text-secondary)]"
-                >
-                  <Icon size={18} aria-hidden="true" />
-                  {route.label}
-                </Link>
-              );
-            })}
+          <div className="mx-auto flex flex-col">
+            {publicLinks.map((route) => (
+              <Link
+                key={route.href}
+                href={route.href}
+                onClick={() => setMenuOpen(false)}
+                className="flex min-h-[3rem] items-center border-b border-[var(--am-border-light)] px-2 py-2 text-sm font-semibold text-[var(--am-text-secondary)]"
+              >
+                {route.label}
+              </Link>
+            ))}
           </div>
-          <div className="mx-auto mt-3 flex max-w-7xl flex-wrap items-center gap-3">
-            <a
-              href="#how-it-works"
+          <div className="mx-auto mt-4 flex flex-col sm:flex-row max-w-7xl items-stretch gap-3">
+            <Link
+              href="/tutor"
               onClick={() => setMenuOpen(false)}
-              className="am-btn am-btn-secondary"
+              className="am-btn am-btn-secondary w-full sm:w-auto"
             >
-              How it works
-            </a>
+              Open Ada
+            </Link>
             <Link
               href="/assessment"
               onClick={() => setMenuOpen(false)}
-              className="am-btn am-btn-primary"
+              className="am-btn am-btn-primary text-white w-full sm:w-auto"
             >
               Start assessment
             </Link>

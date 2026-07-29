@@ -57,7 +57,9 @@ async function parsePdf(data: Uint8Array): Promise<TutorSourceSection[]> {
     throw new Error("The file does not contain a valid PDF header.");
   }
 
-  const parser = new PDFParse({ data });
+  // Ensure PDFParse receives a native Buffer, as Next.js turbopack might pass a raw Uint8Array that fails Buffer.isBuffer checks inside pdf-parse
+  const bufferData = Buffer.from(data.buffer, data.byteOffset, data.byteLength);
+  const parser = new PDFParse({ data: bufferData });
   try {
     const result = await parser.getText();
     const sections = boundSourceSections(
@@ -72,7 +74,7 @@ async function parsePdf(data: Uint8Array): Promise<TutorSourceSection[]> {
     );
     if (textLength < 40) {
       throw new Error(
-        "This PDF appears to be scanned or contains too little extractable text. Attach clear page images instead.",
+        "This PDF appears to contain scanned pages without selectable text. Upload the page as an image or use image-based analysis.",
       );
     }
     return sections;

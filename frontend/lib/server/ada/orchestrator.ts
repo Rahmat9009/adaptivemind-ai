@@ -9,6 +9,7 @@ import type {
   TutorLesson,
   TutorRequest,
   UnderstandingEvaluation,
+  GeneratedQuiz,
 } from "@/lib/ai/types";
 import { withBoundedContext } from "./context";
 import { createLocalFallback } from "./local-fallback";
@@ -18,6 +19,7 @@ import {
   generateProviderFollowUp,
   generateProviderHint,
   generateProviderLesson,
+  generateProviderQuiz,
   getConfiguredProviders,
   type ProviderRole,
 } from "./providers";
@@ -45,7 +47,8 @@ export type AdaOrchestrationResult =
       evaluation: ExplainBackEvaluation;
       action: "explain-back";
     })
-  | (AdaResultBase & { hints: HintResponse["hints"]; action: "hint" });
+  | (AdaResultBase & { hints: HintResponse["hints"]; action: "hint" })
+  | (AdaResultBase & { quiz: GeneratedQuiz; action: "generate-quiz" });
 
 function sourceForProvider(role: ProviderRole): AdaResponseSource {
   return role === "primary" ? "live-primary" : "live-fallback";
@@ -102,6 +105,15 @@ async function runProvider(
       source,
       teachingMode: request.teachingMode,
       action: "hint",
+    };
+  }
+
+  if (request.action === "generate-quiz") {
+    return {
+      quiz: await generateProviderQuiz(provider, request, signal),
+      source,
+      teachingMode: request.teachingMode,
+      action: "generate-quiz",
     };
   }
 

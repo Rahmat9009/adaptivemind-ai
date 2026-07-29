@@ -113,23 +113,23 @@ export function ResultsExperience() {
 
           {/* Action row */}
           <div className="mt-10 flex flex-col gap-3 sm:flex-row">
-            <Link href="/dashboard" className="am-btn am-btn-primary">
-              Go to dashboard
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="opacity-60">
-                <path d="M5 12h14M12 5l7 7-7 7" />
-              </svg>
-            </Link>
             <button
               type="button"
               onClick={handleProceedToTutor}
-              className="am-btn am-btn-secondary"
+              className="am-btn am-btn-primary text-white"
             >
-              Start your first lesson
+              Start learning with Ada
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="opacity-80">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
             </button>
+            <Link href="/dashboard" className="am-btn am-btn-secondary text-[var(--am-text-primary)]">
+              Go to my dashboard
+            </Link>
             <button
               type="button"
               onClick={handleRetake}
-              className="am-btn am-btn-ghost"
+              className="am-btn am-btn-ghost text-[var(--am-text-secondary)]"
             >
               Retake assessment
             </button>

@@ -14,7 +14,7 @@ export function Footer() {
               </span>
             </div>
             <p className="max-w-xs text-sm leading-6 text-[var(--am-text-muted)]">
-              Learning adapts to you, not the other way around.
+              AdaptiveMind is a local-first AI learning companion. New Ada responses require an internet connection.
             </p>
           </div>
 
@@ -23,22 +23,16 @@ export function Footer() {
             className="flex flex-wrap gap-x-5 gap-y-3 text-sm text-[var(--am-text-secondary)]"
           >
             <Link
-              href="/dashboard"
+              href="/#features"
               className="min-h-11 content-center transition-colors hover:text-[var(--am-text-primary)]"
             >
-              Dashboard
+              Features
             </Link>
             <Link
-              href="/tutor"
+              href="/#how-it-works"
               className="min-h-11 content-center transition-colors hover:text-[var(--am-text-primary)]"
             >
-              Tutor
-            </Link>
-            <Link
-              href="/planner"
-              className="min-h-11 content-center transition-colors hover:text-[var(--am-text-primary)]"
-            >
-              Planner
+              How it works
             </Link>
             <Link
               href="/privacy"
@@ -46,10 +40,16 @@ export function Footer() {
             >
               Privacy
             </Link>
+            <Link
+              href="/privacy#data-controls"
+              className="min-h-11 content-center transition-colors hover:text-[var(--am-text-primary)]"
+            >
+              Data controls
+            </Link>
           </nav>
         </div>
 
-        <div className="mt-8 border-t border-[var(--am-border-light)] pt-5">
+        <div className="mt-8 border-t border-[var(--am-border-light)] pt-5 flex items-center justify-between">
           <p className="text-xs text-[var(--am-text-muted)]">
             &copy; {new Date().getFullYear()} AdaptiveMind AI.
           </p>
