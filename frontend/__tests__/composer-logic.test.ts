@@ -16,6 +16,10 @@ describe("AdaComposer source submission logic", () => {
     expect(content).toContain('return;'); // Should return inside the block
 
     // Check if it continues otherwise
-    expect(content).toContain('await onSubmit(sources, sources.length ? sourceMode : undefined);');
+    expect(content).toContain('await onSubmit(');
+    expect(content).toContain('sources.length ? sourceMode : undefined,');
+    expect(content).toContain('submitPendingRef.current');
+    expect(content).toContain('preparationControllerRef.current?.abort()');
+    expect(content).toContain('signal,');
   });
 });

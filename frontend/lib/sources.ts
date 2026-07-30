@@ -14,7 +14,8 @@ export type SourceType =
   | "txt"
   | "markdown"
   | "image"
-  | "website";
+  | "website"
+  | "youtube";
 
 export type SourceGroundingMode =
   | "source-only"
@@ -119,6 +120,7 @@ const allowedMimeTypes: Record<SourceType, ReadonlySet<string>> = {
   ]),
   image: new Set(["image/jpeg", "image/png", "image/webp"]),
   website: new Set(),
+  youtube: new Set(),
 };
 
 export function getFilenameExtension(filename: string): string {

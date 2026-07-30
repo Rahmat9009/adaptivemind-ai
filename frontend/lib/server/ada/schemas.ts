@@ -7,6 +7,7 @@ import type {
   TutorRequest,
   UnderstandingEvaluation,
 } from "@/lib/ai/types";
+export { GeneratedQuizSchema } from "@/lib/ai/generated-quiz";
 import {
   MAX_PROMPT_SOURCE_CHARACTERS,
   MAX_SOURCE_COUNT,
@@ -99,6 +100,7 @@ const sourceTypeSchema = z.enum([
   "markdown",
   "image",
   "website",
+  "youtube",
 ]);
 
 const sourceSectionSchema = z.object({
@@ -140,6 +142,13 @@ const tutorSourceSchema = z.object({
       code: "custom",
       path: ["url"],
       message: "A website source needs its original URL and domain.",
+    });
+  }
+  if (source.type === "youtube" && (!source.url || source.domain !== "www.youtube.com")) {
+    context.addIssue({
+      code: "custom",
+      path: ["url"],
+      message: "A YouTube source needs its canonical public video URL.",
     });
   }
 });
@@ -454,6 +463,8 @@ export const tutorLessonSchema = z.object({
   visual: visualLessonSchema.optional(),
 }).strict();
 
+export const tutorTextLessonSchema = tutorLessonSchema.omit({ visual: true });
+
 export const tutorFollowUpSchema = z.object({
   answer: compactString,
   keyPoint: shortString.optional(),
@@ -522,18 +533,6 @@ export const explainBackEvaluationSchema = z.object({
 export const hintResponseSchema = z.object({
   hints: z.tuple([shortString, shortString, shortString, compactString]),
   stylesUsed: z.array(learningDimensionSchema).max(5),
-}).strict();
-
-export const quizSchema = z.object({
-  title: z.string().trim().min(1).max(160),
-  questions: z.array(z.object({
-    id: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/),
-    type: z.enum(["multiple-choice", "short-answer"]),
-    question: z.string().trim().min(1).max(500),
-    options: z.array(z.string().trim().min(1).max(200)).optional(),
-    correctAnswer: z.string().trim().min(1).max(500),
-    explanation: z.string().trim().min(1).max(500),
-  })).max(20)
 }).strict();
 
 export function parseTutorRequest(value: unknown):
