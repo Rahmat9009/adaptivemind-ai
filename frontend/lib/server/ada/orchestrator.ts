@@ -24,6 +24,8 @@ import {
   type ProviderRole,
 } from "./providers";
 import { AdaError, getSafeAdaError } from "./safety";
+import { createDeterministicFallbackQuiz } from "./quiz-generation";
+import type { AdaTelemetry } from "./telemetry";
 
 export type AdaResponseSource =
   | "live-primary"
@@ -48,7 +50,11 @@ export type AdaOrchestrationResult =
       action: "explain-back";
     })
   | (AdaResultBase & { hints: HintResponse["hints"]; action: "hint" })
-  | (AdaResultBase & { quiz: GeneratedQuiz; action: "generate-quiz" });
+  | (AdaResultBase & {
+      quiz: GeneratedQuiz;
+      quizProvenance: "remote" | "deterministic-fallback";
+      action: "generate-quiz";
+    });
 
 function sourceForProvider(role: ProviderRole): AdaResponseSource {
   return role === "primary" ? "live-primary" : "live-fallback";
@@ -68,12 +74,13 @@ async function runProvider(
   request: TutorRequest,
   provider: ReturnType<typeof getConfiguredProviders>[number],
   signal?: AbortSignal,
+  telemetry?: AdaTelemetry,
 ): Promise<AdaOrchestrationResult> {
   const source = sourceForProvider(provider.role);
 
   if (request.action === "followup") {
     return {
-      followUp: await generateProviderFollowUp(provider, request, signal),
+      followUp: await generateProviderFollowUp(provider, request, signal, telemetry),
       source,
       teachingMode: request.teachingMode,
       action: "followup",
@@ -82,7 +89,7 @@ async function runProvider(
 
   if (request.action === "evaluate" || request.action === "retrieval-check") {
     return {
-      evaluation: await generateProviderEvaluation(provider, request, signal),
+      evaluation: await generateProviderEvaluation(provider, request, signal, telemetry),
       source,
       teachingMode: request.teachingMode,
       action: request.action,
@@ -91,7 +98,7 @@ async function runProvider(
 
   if (request.action === "explain-back") {
     return {
-      evaluation: await generateProviderExplainBack(provider, request, signal),
+      evaluation: await generateProviderExplainBack(provider, request, signal, telemetry),
       source,
       teachingMode: request.teachingMode,
       action: "explain-back",
@@ -99,7 +106,7 @@ async function runProvider(
   }
 
   if (request.action === "hint") {
-    const hint = await generateProviderHint(provider, request, signal);
+    const hint = await generateProviderHint(provider, request, signal, telemetry);
     return {
       hints: hint.hints,
       source,
@@ -110,7 +117,8 @@ async function runProvider(
 
   if (request.action === "generate-quiz") {
     return {
-      quiz: await generateProviderQuiz(provider, request, signal),
+      quiz: await generateProviderQuiz(provider, request, signal, telemetry),
+      quizProvenance: "remote",
       source,
       teachingMode: request.teachingMode,
       action: "generate-quiz",
@@ -125,7 +133,7 @@ async function runProvider(
     });
   }
 
-  const lesson = await generateProviderLesson(provider, request, signal);
+  const lesson = await generateProviderLesson(provider, request, signal, telemetry);
   if (!lessonMatchesAction(request.action, lesson)) {
     throw new AdaError({
       code: "PROVIDER_RESPONSE_INVALID",
@@ -145,14 +153,20 @@ async function runProvider(
 export async function orchestrateAda(
   rawRequest: TutorRequest,
   signal?: AbortSignal,
+  telemetry?: AdaTelemetry,
 ): Promise<AdaOrchestrationResult> {
+  const sourceStartedAt = performance.now();
   const request = withBoundedContext(rawRequest);
+  telemetry?.add("source", performance.now() - sourceStartedAt);
   const providers = getConfiguredProviders();
   let lastError: AdaError | null = null;
 
   for (const provider of providers) {
+    const optionalProviderStartedAt = provider.role === "fallback"
+      ? performance.now()
+      : null;
     try {
-      return await runProvider(request, provider, signal);
+      return await runProvider(request, provider, signal, telemetry);
     } catch (error) {
       const safeError = getSafeAdaError(error);
       if (
@@ -161,8 +175,44 @@ export async function orchestrateAda(
       ) {
         throw safeError;
       }
+      if (
+        safeError.code === "QUIZ_SCHEMA_INVALID_AFTER_REPAIR"
+        && request.action === "generate-quiz"
+        && request.currentLesson
+        && !request.sources?.length
+      ) {
+        return {
+          quiz: createDeterministicFallbackQuiz(request),
+          quizProvenance: "deterministic-fallback",
+          source: "local-fallback",
+          teachingMode: request.teachingMode,
+          action: "generate-quiz",
+        };
+      }
       lastError = safeError;
+      if (!safeError.retryable) throw safeError;
+    } finally {
+      if (optionalProviderStartedAt !== null) {
+        telemetry?.add(
+          "optionalProvider",
+          performance.now() - optionalProviderStartedAt,
+        );
+      }
     }
+  }
+
+  if (
+    request.action === "generate-quiz"
+    && request.currentLesson
+    && !request.sources?.length
+  ) {
+    return {
+      quiz: createDeterministicFallbackQuiz(request),
+      quizProvenance: "deterministic-fallback",
+      source: "local-fallback",
+      teachingMode: request.teachingMode,
+      action: "generate-quiz",
+    };
   }
 
   const localFallback = createLocalFallback(request);

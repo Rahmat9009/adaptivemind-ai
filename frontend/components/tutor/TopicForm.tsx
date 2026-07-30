@@ -29,6 +29,7 @@ interface TopicFormProps {
   onSubmit: (
     sources: TutorSource[],
     sourceMode: SourceGroundingMode | undefined,
+    sourcePreparationMs: number,
   ) => Promise<void> | void;
 }
 

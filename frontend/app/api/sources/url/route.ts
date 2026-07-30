@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { ingestWebsiteSource } from "@/lib/server/source-ingestion/url";
+import { ingestUrlSource } from "@/lib/server/source-ingestion/url";
+import { YouTubeIngestionError } from "@/lib/server/source-ingestion/youtube";
 
 export const runtime = "nodejs";
 
@@ -29,9 +30,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    const source = await ingestWebsiteSource(url, request.signal);
+    const source = await ingestUrlSource(url, request.signal);
     return NextResponse.json({ source }, { headers });
   } catch (error) {
+    if (error instanceof YouTubeIngestionError) {
+      return errorResponse(error.message, error.status);
+    }
     const message = error instanceof Error
       ? error.message
       : "The website could not be read.";

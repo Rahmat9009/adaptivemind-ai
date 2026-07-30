@@ -16,8 +16,8 @@ import type {
   UnderstandingEvaluationApiResponse,
   ExplainBackApiResponse,
   GeneratedQuiz,
-  TutorAction,
 } from "@/lib/ai/types";
+import { GeneratedQuizSchema } from "@/lib/ai/generated-quiz";
 import {
   learningDimensions,
   type LearningDimension,
@@ -113,6 +113,15 @@ interface StoredLessonSession {
   level: string;
   teachingMode: TeachingMode;
   historyId?: string;
+}
+
+function measureClientWork<T>(factory: () => T): {
+  value: T;
+  durationMs: number;
+} {
+  const startedAt = performance.now();
+  const value = factory();
+  return { value, durationMs: performance.now() - startedAt };
 }
 interface StoredConversation {
   lessonTitle: string;
@@ -363,6 +372,7 @@ export function TutorShell() {
     [],
   );
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingHasSource, setLoadingHasSource] = useState(false);
   const [isFollowUpLoading, setIsFollowUpLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
@@ -413,23 +423,43 @@ export function TutorShell() {
   const [quizError, setQuizError] = useState<string | null>(null);
   const latestTurnRef = useRef<HTMLDivElement>(null);
   const activeRequestsRef = useRef(new Set<AbortController>());
-  const lessonRequestPendingRef = useRef(false);
+  const lessonRequestRef = useRef<{
+    key: string;
+    controller: AbortController;
+    action: TutorLessonAction;
+    sources: TutorSource[];
+    sourceMode: SourceGroundingMode | undefined;
+    sourcePreparationMs: number;
+  } | null>(null);
 
   async function postTutorRequest(
     body: Omit<Record<string, unknown>, "requestId">,
+    options: {
+      controller?: AbortController;
+      sourcePreparationMs?: number;
+    } = {},
   ): Promise<unknown> {
-    const controller = new AbortController();
+    const controller = options.controller ?? new AbortController();
     const requestId = crypto.randomUUID();
     activeRequestsRef.current.add(controller);
-    const timeoutId = window.setTimeout(() => controller.abort(), 35_000);
+    const learnerContextTiming = measureClientWork(getLearnerRequestContext);
+    const learnerContext = learnerContextTiming.value;
+    const learningDnaDuration = learnerContextTiming.durationMs;
 
     try {
       const apiResponse = await fetch("/api/tutor", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Ada-Learning-DNA-Duration": learningDnaDuration.toFixed(1),
+          "X-Ada-Source-Preparation-Duration": Math.max(
+            0,
+            options.sourcePreparationMs ?? 0,
+          ).toFixed(1),
+        },
         body: JSON.stringify({
           ...body,
-          ...getLearnerRequestContext(),
+          ...learnerContext,
           requestId,
         }),
         cache: "no-store",
@@ -440,11 +470,10 @@ export function TutorShell() {
       return payload;
     } catch (requestError) {
       if (requestError instanceof DOMException && requestError.name === "AbortError") {
-        throw new Error("Ada took too long to respond. Your previous lesson is still available.");
+        throw new Error("This Ada request was cancelled.");
       }
       throw requestError;
     } finally {
-      window.clearTimeout(timeoutId);
       activeRequestsRef.current.delete(controller);
     }
   }
@@ -606,9 +635,29 @@ export function TutorShell() {
     action: TutorLessonAction,
     submittedSources: TutorSource[] = activeSources,
     submittedSourceMode: SourceGroundingMode | undefined = activeSourceMode,
+    sourcePreparationMs = 0,
+    force = false,
   ) {
-    if (!profile || !topic.trim() || lessonRequestPendingRef.current) return;
-    lessonRequestPendingRef.current = true;
+    if (!profile || !topic.trim()) return;
+    const requestKey = JSON.stringify({
+      topic: topic.trim(),
+      action,
+      sourceIds: submittedSources.map((source) => source.id),
+      submittedSourceMode,
+    });
+    const pending = lessonRequestRef.current;
+    if (!force && pending?.key === requestKey) return;
+    pending?.controller.abort();
+    const controller = new AbortController();
+    lessonRequestRef.current = {
+      key: requestKey,
+      controller,
+      action,
+      sources: submittedSources,
+      sourceMode: submittedSourceMode,
+      sourcePreparationMs,
+    };
+    setLoadingHasSource(submittedSources.length > 0);
     setIsLoading(true);
     setError(null);
     try {
@@ -634,11 +683,13 @@ export function TutorShell() {
           sourceMode: submittedSources.length
             ? submittedSourceMode
             : undefined,
-      });
+      }, { controller, sourcePreparationMs });
       if (!isTutorResponse(payload))
         throw new Error(
           "The tutor returned an incomplete lesson. Please try again.",
         );
+      if (lessonRequestRef.current?.controller !== controller) return;
+      const persistenceStartedAt = performance.now();
       setResponse(payload);
       localStorage.removeItem(tutorDraftStorageKey);
       setEvaluation(null);
@@ -697,16 +748,51 @@ export function TutorShell() {
           historyId: historyEntry.id,
         } satisfies StoredLessonSession),
       );
+      if (process.env.NODE_ENV === "development") {
+        console.info(JSON.stringify({
+          event: "ada_client_persistence_timing",
+          durationMs: Math.round((performance.now() - persistenceStartedAt) * 10) / 10,
+        }));
+      }
     } catch (requestError) {
+      if (lessonRequestRef.current?.controller !== controller) return;
+      if (
+        requestError instanceof Error
+        && requestError.message === "This Ada request was cancelled."
+      ) return;
       setError(
         requestError instanceof Error
           ? requestError.message
           : "Please check your connection and try again.",
       );
     } finally {
-      lessonRequestPendingRef.current = false;
-      setIsLoading(false);
+      if (lessonRequestRef.current?.controller === controller) {
+        lessonRequestRef.current = null;
+        setLoadingHasSource(false);
+        setIsLoading(false);
+      }
     }
+  }
+
+  function cancelLessonRequest() {
+    const pending = lessonRequestRef.current;
+    if (!pending) return;
+    pending.controller.abort();
+    lessonRequestRef.current = null;
+    setLoadingHasSource(false);
+    setIsLoading(false);
+  }
+
+  function retryLessonRequest() {
+    const pending = lessonRequestRef.current;
+    if (!pending) return;
+    void requestLesson(
+      pending.action,
+      pending.sources,
+      pending.sourceMode,
+      pending.sourcePreparationMs,
+      true,
+    );
   }
 
   async function requestFollowUp(
@@ -967,10 +1053,12 @@ export function TutorShell() {
   }
 
   function startNewLesson() {
+    lessonRequestRef.current?.controller.abort();
+    lessonRequestRef.current = null;
     for (const controller of activeRequestsRef.current) controller.abort();
     activeRequestsRef.current.clear();
-    lessonRequestPendingRef.current = false;
     setIsLoading(false);
+    setLoadingHasSource(false);
     setResponse(null);
     setError(null);
     setTopic("");
@@ -1214,13 +1302,14 @@ export function TutorShell() {
     if (!profile || !response || !topic.trim()) return;
     setIsQuizLoading(true);
     setQuizError(null);
+    setGeneratedQuiz(null);
     try {
-      const payload = (await postTutorRequest({
+      const payload = await postTutorRequest({
         topic: topic.trim(),
         subject,
         level,
         scores: profile.scores,
-        action: "generate-quiz" as TutorAction,
+        action: "generate-quiz",
         teachingMode,
         question: count.toString(),
         currentLesson: {
@@ -1229,9 +1318,17 @@ export function TutorShell() {
           explanation: response.lesson.explanation.slice(0, 360),
           stylesUsed: response.lesson.stylesUsed,
         },
-      })) as { quiz: GeneratedQuiz };
-      if (!payload.quiz) throw new Error("Failed to generate quiz.");
-      setGeneratedQuiz(payload.quiz);
+        sources: activeSources.length ? activeSources : undefined,
+        sourceMode: activeSources.length ? activeSourceMode : undefined,
+      });
+      const quizCandidate = typeof payload === "object" && payload !== null
+        ? (payload as Record<string, unknown>).quiz
+        : undefined;
+      const parsedQuiz = GeneratedQuizSchema.safeParse(quizCandidate);
+      if (!parsedQuiz.success) {
+        throw new Error("Ada couldn’t prepare this quiz correctly. Try generating it again.");
+      }
+      setGeneratedQuiz(parsedQuiz.data);
     } catch (e) {
       setQuizError(e instanceof Error ? e.message : "Failed to generate quiz.");
     } finally {
@@ -1257,11 +1354,19 @@ export function TutorShell() {
             onSubjectChange={setSubject}
             onLevelChange={setLevel}
             onTeachingModeChange={handleTeachingModeChange}
-            onSubmit={(sources, sourceMode) =>
-              requestLesson("initial", sources, sourceMode)
+            onSubmit={(sources, sourceMode, sourcePreparationMs) =>
+              requestLesson("initial", sources, sourceMode, sourcePreparationMs)
             }
           />
-          {isLoading && <div className="mt-8"><TutorLoadingState /></div>}
+          {isLoading && (
+            <div className="mt-8">
+              <TutorLoadingState
+                hasSource={loadingHasSource}
+                onCancel={cancelLessonRequest}
+                onTryAgain={retryLessonRequest}
+              />
+            </div>
+          )}
           {error && <div className="mt-8 max-w-2xl w-full"><TutorErrorState message={error} /></div>}
         </div>
       </PageShell>
@@ -1371,12 +1476,21 @@ export function TutorShell() {
 
           {error && <TutorErrorState message={error} />}
           
-          {isLoading && !response && <TutorLoadingState />}
+          {isLoading && !response && (
+            <TutorLoadingState
+              hasSource={loadingHasSource}
+              onCancel={cancelLessonRequest}
+              onTryAgain={retryLessonRequest}
+            />
+          )}
           
           {isLoading && response && (
-            <p className="mb-3 text-sm text-[var(--am-text-muted)]">
-              Ada is preparing the updated explanation. Your current lesson remains available.
-            </p>
+            <div className="mb-3 flex items-center gap-3 text-sm text-[var(--am-text-muted)]">
+              <p>Ada is preparing the updated explanation. Your current lesson remains available.</p>
+              <button type="button" className="am-btn am-btn-ghost text-xs" onClick={cancelLessonRequest}>
+                Cancel
+              </button>
+            </div>
           )}
 
           {response && activeTab === "learn" && (
@@ -1484,8 +1598,23 @@ export function TutorShell() {
               <h3 className="text-lg font-semibold text-[var(--am-text-primary)] mb-4">Lesson Sources</h3>
               {response.sources && response.sources.length > 0 ? (
                 <ul className="space-y-3">
-                  {response.sources.map(s => (
-                    <li key={s.id} className="text-sm text-[var(--am-text-secondary)] border-b border-[var(--am-border-light)] pb-2">{s.title} ({s.type})</li>
+                  {response.sources.map((source) => (
+                    <li key={source.id} className="text-sm text-[var(--am-text-secondary)] border-b border-[var(--am-border-light)] pb-3">
+                      <p className="font-medium text-[var(--am-text-primary)]">{source.title}</p>
+                      <p className="mt-1 text-xs text-[var(--am-text-muted)]">
+                        {source.type === "youtube" ? "YouTube video" : source.type} · Ready
+                      </p>
+                      {source.url && (
+                        <a
+                          href={source.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="mt-1 block truncate text-xs text-[var(--am-primary)] underline"
+                        >
+                          {source.url}
+                        </a>
+                      )}
+                    </li>
                   ))}
                 </ul>
               ) : (

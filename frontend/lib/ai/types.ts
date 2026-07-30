@@ -6,6 +6,10 @@ import type {
   TutorSourceAttribution,
 } from "@/lib/sources";
 import type { VisualLessonData } from "@/lib/visual-schema";
+import type {
+  GeneratedQuiz as ValidatedGeneratedQuiz,
+  QuizQuestion as ValidatedQuizQuestion,
+} from "@/lib/ai/generated-quiz";
 
 // ──────────────────────────────────────
 // Core actions
@@ -54,19 +58,8 @@ export type AIConfidence = "high" | "moderate" | "uncertain" | "verification-rec
 // New structured lesson response
 // ──────────────────────────────────────
 
-export interface QuizQuestion {
-  id: string;
-  type: "multiple-choice" | "short-answer";
-  question: string;
-  options?: string[]; // for multiple choice
-  correctAnswer: string;
-  explanation: string;
-}
-
-export interface GeneratedQuiz {
-  title: string;
-  questions: QuizQuestion[];
-}
+export type QuizQuestion = ValidatedQuizQuestion;
+export type GeneratedQuiz = ValidatedGeneratedQuiz;
 
 export interface QuizEvaluation {
   isCorrect: boolean;

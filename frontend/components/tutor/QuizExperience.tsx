@@ -5,17 +5,20 @@ import { Button } from "@/components/base/buttons/button";
 import type { GeneratedQuiz } from "@/lib/ai/types";
 import { LoaderCircle, ChevronDown, ChevronUp } from "lucide-react";
 
-interface QuizExperienceProps {
-  topic: string;
-  isLoading: boolean;
-  error: string | null;
-  quiz: GeneratedQuiz | null;
-  onGenerate: (count: number) => void;
-  // We can evaluate multiple-choice locally, but for short-answer we might need Ada. 
-  // Let's keep it simple: multiple choice is locally evaluated using correctAnswer.
-  // The prompt says "mix of multiple choice and short answer". If we must evaluate short-answer, 
-  // we could just do a simple string match or allow the user to self-grade, but wait, 
-  // we can just use the provided 'correctAnswer' and 'explanation' to show them.
+export function scoreMultipleChoice(
+  quiz: GeneratedQuiz,
+  answers: Record<string, string>,
+): { correct: number; total: number; selfAssessed: number } {
+  const multipleChoice = quiz.questions.filter(
+    (question) => question.type === "multiple-choice",
+  );
+  return {
+    correct: multipleChoice.filter(
+      (question) => answers[question.id] === String(question.correctOptionIndex),
+    ).length,
+    total: multipleChoice.length,
+    selfAssessed: quiz.questions.length - multipleChoice.length,
+  };
 }
 
 export function QuizExperience({
@@ -24,10 +27,15 @@ export function QuizExperience({
   error,
   quiz,
   onGenerate,
-}: QuizExperienceProps) {
-  const [showConfig, setShowSettings] = useState(false);
+}: {
+  topic: string;
+  isLoading: boolean;
+  error: string | null;
+  quiz: GeneratedQuiz | null;
+  onGenerate: (count: number) => void;
+}) {
+  const [showConfig, setShowConfig] = useState(false);
   const [count, setCount] = useState<3 | 5 | 10>(5);
-  
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [showFeedback, setShowFeedback] = useState(false);
@@ -41,7 +49,7 @@ export function QuizExperience({
         <p className="text-sm text-[var(--am-text-secondary)] mb-6">
           Generate a quick quiz to check your understanding of {topic}.
         </p>
-        
+
         <div className="flex flex-col items-center gap-4">
           <Button
             type="button"
@@ -53,21 +61,22 @@ export function QuizExperience({
             {isLoading ? <LoaderCircle size={18} className="animate-spin mr-2" /> : null}
             Generate {count}-question quiz
           </Button>
-
           <button
             type="button"
-            onClick={() => setShowSettings(!showConfig)}
+            onClick={() => setShowConfig((current) => !current)}
             className="flex items-center gap-1 text-xs font-medium text-[var(--am-text-secondary)] hover:text-[var(--am-text-primary)]"
           >
             Options {showConfig ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
-          
           {showConfig && (
             <div className="flex items-center gap-3 bg-[var(--am-warm-bg)] rounded-[var(--am-radius-md)] p-3 border border-[var(--am-border-light)]">
-              <label className="text-xs font-medium text-[var(--am-text-secondary)]">Questions:</label>
+              <label className="text-xs font-medium text-[var(--am-text-secondary)]" htmlFor="quiz-question-count">
+                Questions:
+              </label>
               <select
+                id="quiz-question-count"
                 value={count}
-                onChange={(e) => setCount(Number(e.target.value) as 3|5|10)}
+                onChange={(event) => setCount(Number(event.target.value) as 3 | 5 | 10)}
                 className="bg-[var(--am-surface)] border border-[var(--am-border-light)] rounded-[var(--am-radius-sm)] text-xs px-2 py-1 outline-none"
               >
                 <option value={3}>3</option>
@@ -78,7 +87,7 @@ export function QuizExperience({
           )}
         </div>
         {error && (
-          <p className="mt-4 text-sm text-[var(--am-error)] font-medium">
+          <p className="mt-4 text-sm text-[var(--am-error)] font-medium" role="alert">
             {error}
           </p>
         )}
@@ -86,46 +95,41 @@ export function QuizExperience({
     );
   }
 
-  // Quiz active state
   if (currentIndex >= quiz.questions.length) {
-    // Final result
-    const correctCount = quiz.questions.filter(q => {
-       const ans = answers[q.id] || "";
-       return q.type === "multiple-choice" ? ans === q.correctAnswer : ans.trim().length > 5;
-    }).length;
-
+    const result = scoreMultipleChoice(quiz, answers);
     return (
       <div className="am-card p-8 text-center max-w-lg mx-auto mt-8">
         <h3 className="am-heading-serif text-2xl text-[var(--am-text-primary)] mb-2">
-          Quiz Completed
+          Quiz completed
         </h3>
         <p className="text-lg font-medium text-[var(--am-text-secondary)] mb-2">
           You finished the quiz on {topic}.
         </p>
-        <p className="text-3xl font-serif text-[var(--am-primary)] font-bold mb-6">
-          {correctCount} / {quiz.questions.length} correct
+        <p className="text-3xl font-serif text-[var(--am-primary)] font-bold mb-3">
+          {result.correct} / {result.total} multiple-choice correct
         </p>
-        <p className="text-sm text-[var(--am-text-muted)] mb-6">
-          Ada found strong areas and concepts to review.
-        </p>
+        {result.selfAssessed > 0 && (
+          <p className="text-sm text-[var(--am-text-muted)] mb-6">
+            {result.selfAssessed} short-answer {result.selfAssessed === 1 ? "response was" : "responses were"} self-assessed and not counted as verified mastery.
+          </p>
+        )}
         <div className="flex justify-center gap-3">
           <Button color="primary" onClick={() => {
             setCurrentIndex(0);
-            setAnswers({});
             setShowFeedback(false);
           }}>
-            Review Answers
+            Review answers
           </Button>
           <Button color="secondary" onClick={() => onGenerate(count)}>
-            Generate New Quiz
+            Generate new quiz
           </Button>
         </div>
       </div>
     );
   }
 
-  const q = quiz.questions[currentIndex];
-  const currentAnswer = answers[q.id] || "";
+  const question = quiz.questions[currentIndex];
+  const currentAnswer = answers[question.id] ?? "";
 
   return (
     <div className="am-card p-6 max-w-2xl mx-auto mt-8">
@@ -134,88 +138,82 @@ export function QuizExperience({
           Question {currentIndex + 1} of {quiz.questions.length}
         </span>
         <span className="text-xs font-medium bg-[var(--am-primary-light)] text-[var(--am-primary)] px-2 py-1 rounded-[var(--am-radius-sm)]">
-          {q.type === "multiple-choice" ? "Multiple Choice" : "Short Answer"}
+          {question.type === "multiple-choice" ? "Multiple choice" : "Self-assessed short answer"}
         </span>
       </div>
 
       <h3 className="text-lg font-semibold text-[var(--am-text-primary)] mb-6">
-        {q.question}
+        {question.prompt}
       </h3>
 
       {!showFeedback ? (
         <div className="space-y-4">
-          {q.type === "multiple-choice" && q.options ? (
+          {question.type === "multiple-choice" ? (
             <div className="flex flex-col gap-2">
-              {q.options.map((opt, i) => (
+              {question.options.map((option, index) => (
                 <label
-                  key={i}
+                  key={option}
                   className={`flex items-center gap-3 p-3 rounded-[var(--am-radius-md)] border cursor-pointer transition-colors ${
-                    currentAnswer === opt
+                    currentAnswer === String(index)
                       ? "border-[var(--am-primary)] bg-[var(--am-primary-light)]"
                       : "border-[var(--am-border-light)] hover:bg-[var(--am-warm-bg)]"
                   }`}
                 >
                   <input
                     type="radio"
-                    name={q.id}
-                    value={opt}
-                    checked={currentAnswer === opt}
-                    onChange={() => setAnswers(prev => ({ ...prev, [q.id]: opt }))}
+                    name={question.id}
+                    value={index}
+                    checked={currentAnswer === String(index)}
+                    onChange={() => setAnswers((current) => ({ ...current, [question.id]: String(index) }))}
                     className="accent-[var(--am-primary)] w-4 h-4"
                   />
-                  <span className="text-sm text-[var(--am-text-primary)]">{opt}</span>
+                  <span className="text-sm text-[var(--am-text-primary)]">{option}</span>
                 </label>
               ))}
             </div>
           ) : (
             <textarea
               value={currentAnswer}
-              onChange={(e) => setAnswers(prev => ({ ...prev, [q.id]: e.target.value }))}
+              onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))}
               rows={4}
-              placeholder="Type your answer here..."
+              placeholder="Type your answer here…"
               className="w-full resize-y rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] p-3 text-sm outline-none focus:border-[var(--am-primary)] focus:ring-1 focus:ring-[var(--am-primary)]"
             />
           )}
-
           <div className="flex justify-end pt-4">
-            <Button
-              color="primary"
-              isDisabled={!currentAnswer.trim()}
-              onClick={() => setShowFeedback(true)}
-            >
-              Check Answer
+            <Button color="primary" isDisabled={!currentAnswer.trim()} onClick={() => setShowFeedback(true)}>
+              {question.type === "multiple-choice" ? "Check answer" : "Compare with model answer"}
             </Button>
           </div>
         </div>
       ) : (
         <div className="space-y-6">
           <div className="p-4 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-warm-bg)]">
-            <p className="text-sm font-medium text-[var(--am-text-primary)] mb-2">
-              {q.type === "multiple-choice" ? "Feedback" : "Model Answer & Guide"}
-            </p>
-            <p className="text-sm leading-relaxed text-[var(--am-text-secondary)]">
-              {q.explanation}
-            </p>
-            {q.type === "multiple-choice" ? (
-              <p className="mt-3 text-sm text-[var(--am-success)] font-medium">
-                Correct answer: {q.correctAnswer}
-              </p>
+            {question.type === "multiple-choice" ? (
+              <>
+                <p className="text-sm font-medium text-[var(--am-text-primary)] mb-2">Feedback</p>
+                <p className="text-sm leading-relaxed text-[var(--am-text-secondary)]">{question.explanation}</p>
+                <p className="mt-3 text-sm text-[var(--am-success)] font-medium">
+                  Correct answer: {question.options[question.correctOptionIndex]}
+                </p>
+              </>
             ) : (
-              <p className="mt-3 text-xs text-[var(--am-text-muted)] italic">
-                Self-assess your answer against the model explanation above.
-              </p>
+              <>
+                <p className="text-sm font-medium text-[var(--am-text-primary)] mb-2">Model answer</p>
+                <p className="text-sm leading-relaxed text-[var(--am-text-secondary)]">{question.modelAnswer}</p>
+                <p className="mt-3 text-sm text-[var(--am-text-secondary)]">{question.guidance}</p>
+                <p className="mt-3 text-xs text-[var(--am-text-muted)] italic">
+                  Self-assess only. Ada does not mark this response correct or incorrect, and it is not counted as verified mastery.
+                </p>
+              </>
             )}
           </div>
-
           <div className="flex justify-end pt-2">
-            <Button
-              color="primary"
-              onClick={() => {
-                setShowFeedback(false);
-                setCurrentIndex(prev => prev + 1);
-              }}
-            >
-              {currentIndex === quiz.questions.length - 1 ? "Finish Quiz" : "Next Question"}
+            <Button color="primary" onClick={() => {
+              setShowFeedback(false);
+              setCurrentIndex((current) => current + 1);
+            }}>
+              {currentIndex === quiz.questions.length - 1 ? "Finish quiz" : "Next question"}
             </Button>
           </div>
         </div>

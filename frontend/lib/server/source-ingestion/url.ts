@@ -12,6 +12,8 @@ import {
 } from "@/lib/sources";
 import { isPublicNetworkAddress } from "@/lib/url-security";
 import { normalizeExtractedText } from "./text";
+import { normalizeYouTubeUrl } from "@/lib/youtube";
+import { ingestYouTubeSource } from "./youtube";
 
 const MAX_REDIRECTS = 3;
 const MAX_RESPONSE_BYTES = 1024 * 1024;
@@ -210,4 +212,14 @@ export async function ingestWebsiteSource(
         ? "Readable page text was limited to the first 40,000 characters."
         : undefined,
   };
+}
+
+export async function ingestUrlSource(
+  input: string,
+  signal?: AbortSignal,
+): Promise<TutorSource> {
+  const youtube = normalizeYouTubeUrl(input);
+  if (youtube.kind === "youtube") return ingestYouTubeSource(input, signal);
+  if (youtube.kind === "invalid-youtube") throw new Error(youtube.error);
+  return ingestWebsiteSource(input, signal);
 }

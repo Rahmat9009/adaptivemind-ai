@@ -25,6 +25,7 @@ import {
   validateSourceUrl,
 } from "@/lib/sources";
 import { VoiceInput } from "./VoiceInput";
+import { normalizeYouTubeUrl } from "@/lib/youtube";
 
 type AttachmentStatus = "pending" | "processing" | "ready" | "error";
 
@@ -58,7 +59,21 @@ function sourceLabel(type: SourceType): string {
     markdown: "Markdown",
     image: "Image",
     website: "Website",
+    youtube: "YouTube video",
   }[type];
+}
+
+function attachmentStatusLabel(attachment: PendingAttachment): string {
+  if (attachment.status === "ready") return "Ready";
+  if (attachment.status === "error") return "Needs attention";
+  if (attachment.sourceType === "youtube") {
+    return attachment.status === "processing"
+      ? "Processing public video"
+      : "Validating YouTube link";
+  }
+  return attachment.status === "processing"
+    ? "Processing"
+    : "Ready to process on Send";
 }
 
 async function responseError(response: Response): Promise<string> {
@@ -72,6 +87,7 @@ async function responseError(response: Response): Promise<string> {
 
 async function processAttachment(
   attachment: PendingAttachment,
+  signal?: AbortSignal,
 ): Promise<TutorSource> {
   if (attachment.source) return attachment.source;
 
@@ -81,6 +97,7 @@ async function processAttachment(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url: attachment.url }),
       cache: "no-store",
+      signal,
     });
     if (!response.ok) throw new Error(await responseError(response));
     const payload = await response.json() as { source?: TutorSource };
@@ -99,6 +116,7 @@ async function processAttachment(
     method: "POST",
     body: formData,
     cache: "no-store",
+    signal,
   });
   if (!response.ok) throw new Error(await responseError(response));
   const payload = await response.json() as { source?: TutorSource };
@@ -120,16 +138,19 @@ export function AdaComposer({
   onSubmit: (
     sources: TutorSource[],
     sourceMode: SourceGroundingMode | undefined,
+    sourcePreparationMs: number,
   ) => Promise<void> | void;
 }) {
   const [attachments, setAttachments] = useState<PendingAttachment[]>(() => 
     initialSources.map((source) => ({
       id: source.id,
-      kind: source.type === "website" ? "url" : "file",
+      kind: source.type === "website" || source.type === "youtube" ? "url" : "file",
       title: source.title,
       sourceType: source.type,
       size: source.size,
-      url: source.type === "website" ? "existing-url" : undefined,
+      url: source.type === "website" || source.type === "youtube"
+        ? source.url ?? "existing-url"
+        : undefined,
       selected: true,
       status: "ready",
       source: source,
@@ -144,6 +165,8 @@ export function AdaComposer({
   const [isPreparing, setIsPreparing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previewUrlsRef = useRef(new Set<string>());
+  const submitPendingRef = useRef(false);
+  const preparationControllerRef = useRef<AbortController | null>(null);
   const hasUnsubmittedSource =
     Boolean(linkValue.trim())
     || attachments.some(
@@ -158,6 +181,7 @@ export function AdaComposer({
   );
 
   useEffect(() => () => {
+    preparationControllerRef.current?.abort();
     for (const url of previewUrlsRef.current) URL.revokeObjectURL(url);
     previewUrlsRef.current.clear();
   }, []);
@@ -241,14 +265,25 @@ export function AdaComposer({
       setComposerError(validation.error);
       return;
     }
+    const youtube = normalizeYouTubeUrl(validation.url.toString());
+    if (youtube.kind === "invalid-youtube") {
+      setComposerError(youtube.error);
+      return;
+    }
+    const sourceType: SourceType = youtube.kind === "youtube"
+      ? "youtube"
+      : "website";
+    const normalizedUrl = youtube.kind === "youtube"
+      ? youtube.canonicalUrl
+      : validation.url.toString();
     setAttachments((current) => [
       ...current,
       {
         id: crypto.randomUUID(),
         kind: "url",
-        title: validation.url.hostname,
-        sourceType: "website",
-        url: validation.url.toString(),
+        title: sourceType === "youtube" ? "YouTube video" : validation.url.hostname,
+        sourceType,
+        url: normalizedUrl,
         selected: true,
         status: "pending",
       },
@@ -268,9 +303,14 @@ export function AdaComposer({
   }
 
   async function submit() {
-    if (!topic.trim() || isLoading || isPreparing) return;
+    if (!topic.trim() || isLoading || isPreparing || submitPendingRef.current) return;
+    submitPendingRef.current = true;
+    const preparationController = new AbortController();
+    preparationControllerRef.current?.abort();
+    preparationControllerRef.current = preparationController;
     setComposerError(null);
     setIsPreparing(true);
+    const sourcePreparationStartedAt = performance.now();
     const selected = attachments.filter((attachment) => attachment.selected);
     const sources: TutorSource[] = [];
     let failed = false;
@@ -281,10 +321,20 @@ export function AdaComposer({
         error: undefined,
       });
       try {
-        const source = await processAttachment(attachment);
+        const source = await processAttachment(
+          attachment,
+          preparationController.signal,
+        );
         sources.push(source);
         updateAttachment(attachment.id, { status: "ready", source });
       } catch (error) {
+        if (preparationController.signal.aborted) {
+          updateAttachment(attachment.id, {
+            status: "pending",
+            error: undefined,
+          });
+          break;
+        }
         failed = true;
         updateAttachment(attachment.id, {
           selected: false,
@@ -297,20 +347,43 @@ export function AdaComposer({
     }
 
     setIsPreparing(false);
+    if (preparationControllerRef.current === preparationController) {
+      preparationControllerRef.current = null;
+    }
+    if (preparationController.signal.aborted) {
+      submitPendingRef.current = false;
+      return;
+    }
     if (failed) {
       if (sourceMode === "source-only") {
         setComposerError(
           "A source could not be processed. Fix or remove it before sending a source-only request.",
         );
+        submitPendingRef.current = false;
         return;
       }
       // If not source-only, we can proceed with text or valid sources, but maybe warn them? Actually prompt says "Do not block an unrelated text-only question merely because one optional attachment failed" so we just let it pass, but maybe we should still warn them? The prompt just says "Do not block".
       // Wait, if we proceed, do we submit? Yes.
     }
-    await onSubmit(sources, sources.length ? sourceMode : undefined);
+    try {
+      await onSubmit(
+        sources,
+        sources.length ? sourceMode : undefined,
+        performance.now() - sourcePreparationStartedAt,
+      );
+    } finally {
+      submitPendingRef.current = false;
+    }
   }
 
   const busy = isLoading || isPreparing;
+
+  function cancelPreparation() {
+    preparationControllerRef.current?.abort();
+    preparationControllerRef.current = null;
+    submitPendingRef.current = false;
+    setIsPreparing(false);
+  }
 
   return (
     <div className="mt-3">
@@ -361,8 +434,8 @@ export function AdaComposer({
             onClick={() => setShowLinkInput((current) => !current)}
             disabled={busy}
             className="am-icon-button"
-            title="Add website link"
-            aria-label="Add website link"
+            title="Add website or YouTube link"
+            aria-label="Add website or YouTube link"
             aria-expanded={showLinkInput}
           >
             <Link2 size={18} aria-hidden="true" />
@@ -378,25 +451,36 @@ export function AdaComposer({
           >
             <Mic size={18} aria-hidden="true" />
           </button>
-          <button
-            type="button"
-            onClick={() => void submit()}
-            disabled={busy || !topic.trim()}
-            className="am-btn am-btn-primary ml-auto"
-          >
-            {busy ? (
-              <LoaderCircle size={17} className="motion-safe:animate-spin" aria-hidden="true" />
-            ) : (
-              <Send size={17} aria-hidden="true" />
-            )}
-            {isPreparing ? "Preparing" : "Send"}
-          </button>
+          {isPreparing ? (
+            <button
+              type="button"
+              onClick={cancelPreparation}
+              className="am-btn am-btn-secondary ml-auto"
+            >
+              <X size={17} aria-hidden="true" />
+              Cancel
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => void submit()}
+              disabled={isLoading || !topic.trim()}
+              className="am-btn am-btn-primary ml-auto"
+            >
+              {isLoading ? (
+                <LoaderCircle size={17} className="motion-safe:animate-spin" aria-hidden="true" />
+              ) : (
+                <Send size={17} aria-hidden="true" />
+              )}
+              Send
+            </button>
+          )}
         </div>
       </div>
 
       {showLinkInput && (
         <div className="mt-2 flex gap-2">
-          <label htmlFor="source-link" className="sr-only">Website URL</label>
+          <label htmlFor="source-link" className="sr-only">Website or YouTube URL</label>
           <input
             id="source-link"
             type="url"
@@ -409,7 +493,7 @@ export function AdaComposer({
               }
             }}
             maxLength={2_048}
-            placeholder="https://example.org/article"
+            placeholder="https://example.org/article or youtube.com/watch?v=…"
             className="min-w-0 flex-1 rounded-[var(--am-radius-md)] border border-[var(--am-border-light)] bg-[var(--am-surface)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[var(--am-primary)]/20"
           />
           <button type="button" onClick={addLink} className="am-btn am-btn-secondary">
@@ -467,7 +551,7 @@ export function AdaComposer({
                   alt={`Preview of ${attachment.title}`}
                   className="h-12 w-12 shrink-0 rounded-[var(--am-radius-sm)] border border-[var(--am-border-light)] object-cover"
                 />
-              ) : attachment.sourceType === "website" ? (
+              ) : attachment.sourceType === "website" || attachment.sourceType === "youtube" ? (
                 <Link2 size={18} className="shrink-0 text-[var(--am-text-muted)]" aria-hidden="true" />
               ) : attachment.sourceType === "image" ? (
                 <ImageIcon size={18} className="shrink-0 text-[var(--am-text-muted)]" aria-hidden="true" />
@@ -482,13 +566,7 @@ export function AdaComposer({
                   {sourceLabel(attachment.sourceType)}
                   {attachment.size ? ` · ${formatBytes(attachment.size)}` : ""}
                   {" · "}
-                  {attachment.status === "pending"
-                    ? "Ready to process on Send"
-                    : attachment.status === "processing"
-                      ? "Processing"
-                      : attachment.status === "ready"
-                        ? "Ready"
-                        : "Needs attention"}
+                  {attachmentStatusLabel(attachment)}
                 </p>
                 {attachment.error && (
                   <p className="mt-1 text-xs text-[var(--am-error)]" role="alert">

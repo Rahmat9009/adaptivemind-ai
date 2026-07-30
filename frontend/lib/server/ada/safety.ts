@@ -1,6 +1,7 @@
 export const MAX_TUTOR_REQUEST_BYTES = 4 * 1024 * 1024;
 export const MAX_PROVIDER_RESPONSE_BYTES = 512 * 1024;
 export const PROVIDER_TIMEOUT_MS = 20_000;
+export const VIDEO_PROVIDER_TIMEOUT_MS = 45_000;
 
 export type AdaErrorCode =
   | "INVALID_REQUEST"
@@ -10,6 +11,7 @@ export type AdaErrorCode =
   | "PROVIDER_TIMEOUT"
   | "PROVIDER_UNAVAILABLE"
   | "PROVIDER_RESPONSE_INVALID"
+  | "QUIZ_SCHEMA_INVALID_AFTER_REPAIR"
   | "REQUEST_CANCELLED";
 
 export class AdaError extends Error {
