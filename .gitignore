@@ -9,3 +9,5 @@
 # Local build and test output.
 **/coverage/
 **/*.tsbuildinfo
+
+.claude/
