@@ -24,6 +24,13 @@ describe("UX Dashboard and Tutor changes", () => {
 
     expect(content).toContain('const [focusMode, setFocusMode] = useState(false);');
     expect(content).toContain('const [activeTab, setActiveTab] = useState("learn");');
-    expect(content).toContain('["learn", "visual", "quiz", "practice", "sources"]');
+    // The tab list is built conditionally so "recall" only appears when a
+    // spaced retrieval check is actually pending.
+    for (const tab of ["learn", "visual", "quiz", "practice", "sources"]) {
+      expect(content).toContain(`"${tab}",`);
+      expect(content).toContain(`activeTab === "${tab}"`);
+    }
+    expect(content).toContain('...(recallPanel ? ["recall"] : [])');
+    expect(content).toContain('activeTab === "recall"');
   });
 });

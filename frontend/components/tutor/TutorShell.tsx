@@ -72,8 +72,14 @@ import {
 import { ReadingPreferencesInline } from "./ReadingPreferencesInline";
 import { WhyThisMode } from "./WhyThisMode";
 import {
+  completeQuickRecall,
+  getQuickRecallStatus,
+  loadQuickRecalls,
   scheduleQuickRecall,
+  type QuickRecallStatus,
 } from "@/lib/quick-recall";
+import { QuickRecall } from "./QuickRecall";
+import { toRecallResult, type RecallResult } from "@/lib/recall-session";
 import { LearnerTransparency } from "./LearnerTransparency";
 import { PreferenceOverridesUI } from "./PreferenceOverridesUI";
 import { ExplanationHistoryView } from "./ExplanationHistoryView";
@@ -234,12 +240,13 @@ function isFollowUpApiResponse(
 
 function isEvaluationApiResponse(
   value: unknown,
+  expectedAction: "evaluate" | "retrieval-check" = "evaluate",
 ): value is UnderstandingEvaluationApiResponse {
   if (typeof value !== "object" || value === null) return false;
   const record = value as Record<string, unknown>;
   const evaluation = record.evaluation as Record<string, unknown> | undefined;
   return (
-    record.action === "evaluate" &&
+    record.action === expectedAction &&
     isTutorResponseSource(record.source) &&
     typeof evaluation === "object" &&
     evaluation !== null &&
@@ -421,6 +428,17 @@ export function TutorShell() {
   const [generatedQuiz, setGeneratedQuiz] = useState<GeneratedQuiz | null>(null);
   const [isQuizLoading, setIsQuizLoading] = useState(false);
   const [quizError, setQuizError] = useState<string | null>(null);
+
+  // --- Spaced retrieval practice ---
+  const [recallRequested, setRecallRequested] = useState(false);
+  const [recallStatus, setRecallStatus] =
+    useState<QuickRecallStatus>("not-due");
+  const [recallQuestion, setRecallQuestion] = useState<string | undefined>();
+  const [recallResult, setRecallResult] = useState<RecallResult | null>(null);
+  const [recallConfidence, setRecallConfidence] = useState<number | null>(null);
+  const [isRecallLoading, setIsRecallLoading] = useState(false);
+  const [recallError, setRecallError] = useState<string | null>(null);
+  const [recallAttempt, setRecallAttempt] = useState(0);
   const latestTurnRef = useRef<HTMLDivElement>(null);
   const activeRequestsRef = useRef(new Set<AbortController>());
   const lessonRequestRef = useRef<{
@@ -531,6 +549,20 @@ export function TutorShell() {
         const suggestedTopic = params.get("topic");
         const suggestedSubject = params.get("subject");
         const suggestedLevel = params.get("level");
+        const wantsReview = params.get("review") === "true";
+        if (wantsReview && suggestedTopic?.trim()) {
+          const recallTopic = suggestedTopic.trim().slice(0, 500);
+          setRecallRequested(true);
+          setRecallStatus(getQuickRecallStatus(recallTopic));
+          setRecallQuestion(
+            loadQuickRecalls().find(
+              (record) =>
+                record.skillId === normalizeTopicId(recallTopic)
+                && !record.completed,
+            )?.question,
+          );
+          setActiveTab("recall");
+        }
         const session = restoredLesson
           ? {
               response: restoredLesson.response,
@@ -1052,6 +1084,104 @@ export function TutorShell() {
     }
   }
 
+  /**
+   * Grade a spaced retrieval attempt and fold the outcome back into the
+   * existing quick-recall and SM-2 review stores.
+   *
+   * Exactly one AI call is made (the retrieval-check grading). The recall
+   * question itself is already stored locally, and completeQuickRecall()
+   * performs the SM-2 update, so no new scheduling logic lives here.
+   */
+  async function submitRecall(answer: string, confidence: number) {
+    const recallTopic = topic.trim();
+    if (!profile || !recallTopic) return;
+    setIsRecallLoading(true);
+    setRecallError(null);
+    setRecallConfidence(confidence);
+    try {
+      const question =
+        recallQuestion
+        || `Without looking back, explain the central idea of ${recallTopic} and give one consequence or use.`;
+      const historyEntry = readLearningHistory().find(
+        (entry) =>
+          normalizeTopicId(entry.topic) === normalizeTopicId(recallTopic),
+      );
+      const coreIdea =
+        response?.lesson.coreIdea
+        || historyEntry?.response.lesson.coreIdea
+        || `The central idea of ${recallTopic}.`;
+
+      const payload = await postTutorRequest({
+        topic: recallTopic,
+        subject,
+        level,
+        scores: profile.scores,
+        action: "retrieval-check",
+        teachingMode,
+        learnerAnswer: answer,
+        learnerConfidence: confidence,
+        checkQuestion: question,
+        lessonCoreIdea: coreIdea,
+      });
+
+      if (!isEvaluationApiResponse(payload, "retrieval-check")) {
+        throw new Error("Ada could not check this recall. Please try again.");
+      }
+
+      const result = toRecallResult(payload.evaluation);
+      setRecallResult(result);
+
+      // Persist through the existing recall store. A pending record is
+      // required, so re-schedule when an earlier recall already closed.
+      try {
+        const hasPending = loadQuickRecalls().some(
+          (record) =>
+            record.skillId === normalizeTopicId(recallTopic)
+            && !record.completed,
+        );
+        if (!hasPending) {
+          scheduleQuickRecall(recallTopic, recallTopic, subject, false, question);
+        }
+        completeQuickRecall(recallTopic, result.score);
+        setRecallStatus(getQuickRecallStatus(recallTopic));
+      } catch {
+        // The learner still sees the graded result if persistence fails.
+      }
+
+      try {
+        saveCalibrationRecord({
+          selfReported: confidence,
+          actualScore: result.score,
+          timestamp: new Date().toISOString(),
+          skillId: normalizeTopicId(recallTopic),
+          approach: teachingModeToDimension(teachingMode),
+        });
+      } catch { /* non-critical */ }
+    } catch (requestError) {
+      setRecallError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Ada could not check this recall. Please try again.",
+      );
+    } finally {
+      setIsRecallLoading(false);
+    }
+  }
+
+  function retryRecall() {
+    setRecallResult(null);
+    setRecallError(null);
+    setRecallConfidence(null);
+    setRecallAttempt((current) => current + 1);
+  }
+
+  function startFullReviewFromRecall() {
+    setRecallRequested(false);
+    setRecallResult(null);
+    setActiveTab("learn");
+    void requestLesson(response ? "different" : "initial");
+  }
+
   function startNewLesson() {
     lessonRequestRef.current?.controller.abort();
     lessonRequestRef.current = null;
@@ -1338,10 +1468,32 @@ export function TutorShell() {
 
   const hasLesson = Boolean(response);
 
+  const recallPanel = recallRequested && topic.trim()
+    ? (
+        <QuickRecall
+          key={`${normalizeTopicId(topic.trim())}-${recallAttempt}`}
+          topic={topic.trim()}
+          recallStatus={recallStatus === "not-due" ? "due" : recallStatus}
+          question={recallQuestion}
+          result={recallResult ?? undefined}
+          isLoading={isRecallLoading}
+          error={recallError}
+          confidence={recallConfidence}
+          onConfidenceChange={setRecallConfidence}
+          onSubmit={submitRecall}
+          onRetry={retryRecall}
+          onFullReview={startFullReviewFromRecall}
+        />
+      )
+    : null;
+
   if (!hasLesson) {
     return (
       <PageShell heading="Ada" subheading="Your adaptive tutor">
         <div className="flex flex-col min-h-[70vh] justify-center items-center px-4">
+          {recallPanel && (
+            <div className="mb-8 w-full max-w-2xl">{recallPanel}</div>
+          )}
           <TopicForm
             key={composerSessionId}
             topic={topic}
@@ -1446,7 +1598,14 @@ export function TutorShell() {
         <div className="flex flex-col min-w-0">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex space-x-1 bg-[var(--am-surface)] border border-[var(--am-border-light)] p-1 rounded-[var(--am-radius-lg)] overflow-x-auto">
-              {["learn", "visual", "quiz", "practice", "sources"].map((tab) => (
+              {[
+                "learn",
+                "visual",
+                "quiz",
+                "practice",
+                ...(recallPanel ? ["recall"] : []),
+                "sources",
+              ].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -1592,6 +1751,8 @@ export function TutorShell() {
               )}
             </div>
           )}
+
+          {response && activeTab === "recall" && recallPanel}
 
           {response && activeTab === "sources" && (
             <div className="am-card p-6 min-h-[300px]">
