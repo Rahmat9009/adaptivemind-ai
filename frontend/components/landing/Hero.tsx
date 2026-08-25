@@ -170,8 +170,7 @@ export function Hero() {
                       Teaching mode: analogy
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-full border border-[var(--am-glass-border)] bg-[var(--am-glass-bg)] px-2 py-0.5 text-[10px] font-medium text-[var(--am-text-muted)] backdrop-blur-sm">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--am-success)]" />
-                      LIVE
+                      Example
                     </span>
                   </div>
                   <p className="mt-2.5 text-sm leading-6 text-[var(--am-text-secondary)]">
