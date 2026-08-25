@@ -7,6 +7,7 @@ import { learningDimensionLabels, type LearningDimension } from "@/lib/learning-
 import type { TutorApiResponse } from "@/lib/ai/types";
 import type { LessonHistoryEntry } from "@/lib/dashboard-storage";
 import { LessonExportActions } from "./LessonExportActions";
+import { LessonRationale } from "./LessonRationale";
 
 const SpeechPlayer = dynamic(
   () => import("./SpeechPlayer").then((module) => module.SpeechPlayer),
@@ -108,6 +109,10 @@ export function LessonCard({
       >
         {lesson.title}
       </motion.h2>
+
+      <motion.div variants={slideUp}>
+        <LessonRationale teachingMode={response.teachingMode} />
+      </motion.div>
 
       {lesson.clarificationQuestion && (
         <motion.p

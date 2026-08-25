@@ -1,7 +1,18 @@
 # AdaptiveMind AI — Final Product Polish Report
 
 **Date:** 2026-07-19
-**Status:** All critical fixes applied. Build and lint pass with zero errors.
+**Status:** HISTORICAL SNAPSHOT — superseded by later work.
+
+> **This document describes the codebase as of 2026-07-19 and is kept for
+> history only. It is not a description of the current build.**
+>
+> Significant work landed after this report was written, including multimodal
+> source ingestion, the visual lesson engine, the offline/exports layer, the
+> privacy and accessibility controls, and the tutor UX refactor. Details below
+> that reference the old AI provider module (`lib/ai/provider.ts`, since
+> replaced by `lib/server/ada/`) or the feature matrix are out of date.
+>
+> For the current state, see `docs/PROJECT_SPEC.md` and the test suite.
 
 ---
 

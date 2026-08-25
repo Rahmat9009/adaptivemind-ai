@@ -177,7 +177,11 @@ export interface UnderstandingEvaluationApiResponse {
   evaluation: UnderstandingEvaluation;
   source: TutorResponseSource;
   teachingMode: TeachingMode;
-  action: "evaluate";
+  /**
+   * The orchestrator returns an evaluation for both the in-lesson
+   * understanding check and the spaced retrieval check.
+   */
+  action: "evaluate" | "retrieval-check";
   requestId?: string;
 }
 
