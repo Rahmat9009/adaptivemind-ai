@@ -55,6 +55,17 @@ export interface ProviderConfig {
   apiKey: string;
   baseUrl: string;
   model: string;
+  /** Safe short name for telemetry only. Never contains credentials. */
+  name: string;
+  /**
+   * How the provider is asked for JSON. Providers that support OpenAI
+   * strict JSON schema use "json-schema"; providers that only guarantee
+   * valid JSON use "json-object". Either way the response is validated
+   * against the authoritative Zod schema afterwards.
+   */
+  structuredOutput: "json-schema" | "json-object";
+  /** When true the provider is attempted once, with no network retry. */
+  singleAttempt: boolean;
 }
 
 interface ProviderEnvelope {
@@ -70,19 +81,70 @@ const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 const MAX_NETWORK_ATTEMPTS = 2;
 const MAX_RETRY_DELAY_MS = 2_000;
 
+/** Emergency text fallback. OpenAI-compatible Chat Completions. */
+const GROQ_BASE_URL = "https://api.groq.com/openai/v1";
+const GROQ_MODEL = "openai/gpt-oss-120b";
+
+/** Safe provider label for telemetry. Derived from host, never from the key. */
+function providerNameFromBaseUrl(baseUrl: string): string {
+  try {
+    const host = new URL(baseUrl).hostname;
+    if (host.endsWith("googleapis.com")) return "gemini";
+    if (host.endsWith("groq.com")) return "groq";
+    return "secondary";
+  } catch {
+    return "secondary";
+  }
+}
+
 function getProviderConfig(role: ProviderRole): ProviderConfig | null {
   const prefix = role === "primary" ? "AI" : "AI_FALLBACK";
   const apiKey = process.env[`${prefix}_API_KEY`]?.trim();
   const baseUrl = process.env[`${prefix}_BASE_URL`]?.trim();
   const model = process.env[`${prefix}_MODEL`]?.trim();
   if (!apiKey || !baseUrl || !model) return null;
-  return { role, apiKey, baseUrl, model };
+  return {
+    role,
+    apiKey,
+    baseUrl,
+    model,
+    name: providerNameFromBaseUrl(baseUrl),
+    structuredOutput: "json-schema",
+    singleAttempt: false,
+  };
+}
+
+/**
+ * Optional emergency text fallback.
+ *
+ * Returns null when GROQ_API_KEY is absent, so the existing providers keep
+ * working exactly as before and startup never fails without it. Groq only
+ * ever runs after the configured providers have failed with a retryable
+ * error, and is attempted once.
+ */
+function getGroqProviderConfig(): ProviderConfig | null {
+  const apiKey = process.env.GROQ_API_KEY?.trim();
+  if (!apiKey) return null;
+  return {
+    role: "fallback",
+    apiKey,
+    baseUrl: GROQ_BASE_URL,
+    model: GROQ_MODEL,
+    name: "groq",
+    // Groq is asked for a plain JSON object rather than a strict OpenAI
+    // JSON schema. Every Ada prompt already states its exact JSON shape,
+    // and the response is still validated against the authoritative Zod
+    // schema, so this never weakens validation.
+    structuredOutput: "json-object",
+    singleAttempt: true,
+  };
 }
 
 export function getConfiguredProviders(): ProviderConfig[] {
   return ([
     getProviderConfig("primary"),
     getProviderConfig("fallback"),
+    getGroqProviderConfig(),
   ] satisfies Array<ProviderConfig | null>).filter(
     (provider): provider is ProviderConfig => provider !== null,
   );
@@ -241,6 +303,23 @@ function isNativeGeminiProvider(provider: ProviderConfig): boolean {
   }
 }
 
+/**
+ * Only the native Gemini transport can process video. Every other provider,
+ * including the Groq text fallback, refuses video before any request is made.
+ */
+function canProcessVideo(provider: ProviderConfig): boolean {
+  return isNativeGeminiProvider(provider);
+}
+
+function videoUnsupportedError(): AdaError {
+  return new AdaError({
+    code: "PROVIDER_UNAVAILABLE",
+    message: "Ada could not process this video right now. Try another public video or upload your notes.",
+    status: 502,
+    retryable: false,
+  });
+}
+
 async function fetchNativeGeminiCompletion<T>({
   provider,
   prompt,
@@ -319,14 +398,9 @@ async function fetchOpenAiCompatibleCompletion({
   media: ProviderMedia;
   signal: AbortSignal;
 }): Promise<string> {
-  if (media.youtubeUrls.length) {
-    throw new AdaError({
-      code: "PROVIDER_UNAVAILABLE",
-      message: "Ada could not process this video right now. Try another public video or upload your notes.",
-      status: 502,
-      retryable: false,
-    });
-  }
+  // Defence in depth. fetchCompletion already refuses video for providers
+  // that cannot process it, before any attempt is recorded.
+  if (media.youtubeUrls.length) throw videoUnsupportedError();
   const response = await fetch(
     `${provider.baseUrl.replace(/\/$/, "")}/chat/completions`,
     {
@@ -355,14 +429,18 @@ async function fetchOpenAiCompatibleCompletion({
               : "Complete the requested Ada action and return only the required JSON object.",
           },
         ],
-        response_format: {
-          type: "json_schema",
-          json_schema: {
-            name: "ada_response",
-            strict: true,
-            schema: geminiJsonSchema(schema),
-          },
-        },
+        // The authoritative schema is always the Zod schema applied to the
+        // parsed response. This only changes how the provider is asked.
+        response_format: provider.structuredOutput === "json-object"
+          ? { type: "json_object" }
+          : {
+              type: "json_schema",
+              json_schema: {
+                name: "ada_response",
+                strict: true,
+                schema: geminiJsonSchema(schema),
+              },
+            },
         temperature,
         max_tokens: maxOutputTokens,
         ...(isNativeGeminiProvider(provider) ? { reasoning_effort: "low" } : {}),
@@ -427,10 +505,21 @@ async function fetchCompletion(
   repairAttempt = false,
 ): Promise<string> {
   let lastError: AdaError | null = null;
+
+  // Refuse video before recording an attempt. A provider that cannot process
+  // video is never contacted, so it must not appear in telemetry as though it
+  // were. The thrown error is non-retryable, so routing is unchanged: the
+  // orchestrator still stops here rather than advancing to another provider.
+  if (media.youtubeUrls.length && !canProcessVideo(provider)) {
+    throw videoUnsupportedError();
+  }
+
   const timeoutMs = media.youtubeUrls.length
     ? VIDEO_PROVIDER_TIMEOUT_MS
     : PROVIDER_TIMEOUT_MS;
-  const maxAttempts = media.youtubeUrls.length ? 1 : MAX_NETWORK_ATTEMPTS;
+  const maxAttempts = media.youtubeUrls.length || provider.singleAttempt
+    ? 1
+    : MAX_NETWORK_ATTEMPTS;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     if (signal?.aborted) throw abortError();
@@ -439,7 +528,7 @@ async function fetchCompletion(
     const onAbort = () => timeoutController.abort();
     signal?.addEventListener("abort", onAbort, { once: true });
     const isRetry = repairAttempt || attempt > 0;
-    telemetry?.providerCall({ retry: isRetry });
+    telemetry?.providerCall({ retry: isRetry, provider: provider.name });
     const providerStartedAt = performance.now();
 
     try {
