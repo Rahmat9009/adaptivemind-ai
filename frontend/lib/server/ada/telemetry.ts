@@ -13,6 +13,13 @@ export interface AdaTimingSnapshot extends Record<AdaTimingName, number> {
   total: number;
   providerCalls: number;
   retryCount: number;
+  /**
+   * Safe short name of the provider that served the last attempt.
+   * Named providerName because "provider" is already the duration key.
+   */
+  providerName: string | null;
+  /** True once a provider other than the first was attempted. */
+  fallbackUsed: boolean;
 }
 
 const timingNames: AdaTimingName[] = [
@@ -36,6 +43,8 @@ export class AdaTelemetry {
   private readonly durations = new Map<AdaTimingName, number>();
   private providerCalls = 0;
   private retryCount = 0;
+  private providerName: string | null = null;
+  private fallbackUsed = false;
 
   add(name: AdaTimingName, durationMs: number): void {
     const current = this.durations.get(name) ?? 0;
@@ -46,9 +55,17 @@ export class AdaTelemetry {
     this.durations.set(name, boundedDuration(durationMs));
   }
 
-  providerCall({ retry = false }: { retry?: boolean } = {}): void {
+  providerCall(
+    { retry = false, provider }: { retry?: boolean; provider?: string } = {},
+  ): void {
     this.providerCalls += 1;
     if (retry) this.retryCount += 1;
+    if (provider) {
+      if (this.providerName !== null && this.providerName !== provider) {
+        this.fallbackUsed = true;
+      }
+      this.providerName = provider;
+    }
   }
 
   snapshot(): AdaTimingSnapshot {
@@ -60,6 +77,8 @@ export class AdaTelemetry {
       total: Math.round(boundedDuration(performance.now() - this.startedAt) * 10) / 10,
       providerCalls: this.providerCalls,
       retryCount: this.retryCount,
+      providerName: this.providerName,
+      fallbackUsed: this.fallbackUsed,
     };
   }
 
@@ -76,7 +95,17 @@ export class AdaTelemetry {
       ["parse", timing.parse],
       ["persistence", timing.persistence],
       ["total", timing.total],
-    ].map(([name, duration]) => `${name};dur=${duration}`).join(", ");
+    ].map(([name, duration]) => {
+      // The provider entry carries a safe label so a production fallback is
+      // visible without a second log channel. Never a key or a prompt.
+      if (name === "provider" && timing.providerName) {
+        const description = timing.fallbackUsed
+          ? `${timing.providerName}-fallback`
+          : timing.providerName;
+        return `provider;dur=${duration};desc="${description}"`;
+      }
+      return `${name};dur=${duration}`;
+    }).join(", ");
   }
 }
 
