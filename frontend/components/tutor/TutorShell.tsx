@@ -43,9 +43,11 @@ import {
   loadLearningDNA2,
   saveLearningDNA2,
   recordCheckOutcome,
+  getEffectivenessRanking,
 } from "@/lib/learning-dna-v2";
 import {
   teachingModeToDimension,
+  dimensionToTeachingMode,
 } from "@/lib/mode-effectiveness";
 import {
   getReviewCard,
@@ -87,7 +89,16 @@ import { QuizExperience } from "./QuizExperience";
 import { VisualLessonEngine } from "@/components/visuals/VisualLessonEngine";
 import {
   addExplanationRecord,
+  getBestApproachForConcept,
 } from "@/lib/explanation-history";
+import { AdaptationNotice } from "./AdaptationNotice";
+import {
+  chooseAlternativeApproach,
+  detectStruggle,
+  normalizeAdaptationRecord,
+  type AdaptationRecord,
+  type StruggleReasonCode,
+} from "@/lib/struggle-adaptation";
 import { loadPreferenceOverrides } from "@/lib/preference-overrides";
 import { saveCalibrationRecord } from "@/lib/confidence-calibration";
 import { saveLearningActivity } from "@/lib/idb";
@@ -119,6 +130,11 @@ interface StoredLessonSession {
   level: string;
   teachingMode: TeachingMode;
   historyId?: string;
+  /**
+   * The struggle adaptation the learner accepted for this lesson, if any.
+   * Restored so a refresh does not lose the fact that Ada already switched.
+   */
+  adaptation?: AdaptationRecord;
 }
 
 function measureClientWork<T>(factory: () => T): {
@@ -331,6 +347,7 @@ function normalizeStoredLesson(
       typeof record.historyId === "string"
         ? record.historyId.slice(0, 120)
         : undefined,
+    adaptation: normalizeAdaptationRecord(record.adaptation) ?? undefined,
   };
 }
 
@@ -416,6 +433,30 @@ export function TutorShell() {
   const [masteryReason, setMasteryReason] = useState<string | null>(null);
   const [understandingRetries, setUnderstandingRetries] = useState(0);
   const [didSwitchMode, setDidSwitchMode] = useState(false);
+  /**
+   * Struggle-aware adaptation.
+   *
+   * `pendingAdaptation` is the proposal currently on screen. `appliedAdaptation`
+   * records one the learner accepted, and is kept separate from `didSwitchMode`
+   * on purpose: `didSwitchMode` feeds `switchAwayCount` in the Learning DNA
+   * evidence model and must keep meaning "the learner switched away", never
+   * "Ada proposed a switch".
+   *
+   * `lessonGeneration` increments once per generated lesson.
+   * `adaptationHandledGeneration` records the generation whose proposal was
+   * already accepted or dismissed, so at most one proposal is shown per
+   * lesson and no adaptation loop can form without a fresh check.
+   */
+  const [pendingAdaptation, setPendingAdaptation] = useState<{
+    from: LearningDimension;
+    to: LearningDimension;
+    reasonCode: StruggleReasonCode;
+    explanation: string;
+  } | null>(null);
+  const [appliedAdaptation, setAppliedAdaptation] = useState<AdaptationRecord | null>(null);
+  const [lessonGeneration, setLessonGeneration] = useState(0);
+  const [adaptationHandledGeneration, setAdaptationHandledGeneration] =
+    useState<number | null>(null);
   const [activeSources, setActiveSources] = useState<TutorSource[]>([]);
   const [activeSourceMode, setActiveSourceMode] =
     useState<SourceGroundingMode | undefined>(undefined);
@@ -587,6 +628,7 @@ export function TutorShell() {
           setSubject(session.subject);
           setLevel(session.level);
           setTeachingMode(session.teachingMode);
+          if (session.adaptation) setAppliedAdaptation(session.adaptation);
           if (session.historyId) setHistoryId(session.historyId);
           if (restoredLesson) {
             if (restoredLesson.conversation)
@@ -669,8 +711,18 @@ export function TutorShell() {
     submittedSourceMode: SourceGroundingMode | undefined = activeSourceMode,
     sourcePreparationMs = 0,
     force = false,
+    /**
+     * Used when an accepted struggle adaptation must take effect on THIS
+     * request. `setTeachingMode` only applies on the next render, so the
+     * chosen mode is threaded through explicitly rather than read from state.
+     */
+    teachingModeOverride?: TeachingMode,
+    /** Persisted with the session when this lesson came from an accepted adaptation. */
+    acceptedAdaptation?: AdaptationRecord,
   ) {
     if (!profile || !topic.trim()) return;
+    const effectiveTeachingMode = teachingModeOverride ?? teachingMode;
+    const pendingAcceptedAdaptation = acceptedAdaptation ?? appliedAdaptation;
     const requestKey = JSON.stringify({
       topic: topic.trim(),
       action,
@@ -703,7 +755,7 @@ export function TutorShell() {
           level,
           scores: profile.scores,
           action,
-          teachingMode,
+          teachingMode: effectiveTeachingMode,
           previousStyles: previousLesson?.stylesUsed,
           previousTeachingMode: response?.teachingMode,
           previousTitle: previousLesson?.title,
@@ -724,6 +776,13 @@ export function TutorShell() {
       const persistenceStartedAt = performance.now();
       setResponse(payload);
       localStorage.removeItem(tutorDraftStorageKey);
+      // A new lesson opens a fresh adaptation window: any proposal from the
+      // previous lesson is cleared, and one new proposal becomes possible
+      // once this lesson has been evaluated by a check.
+      setLessonGeneration((current) => current + 1);
+      setPendingAdaptation(null);
+      setAdaptationHandledGeneration(null);
+      if (acceptedAdaptation) setAppliedAdaptation(acceptedAdaptation);
       setEvaluation(null);
       setConfidenceBefore(null);
       setMasteryReason(null);
@@ -748,7 +807,7 @@ export function TutorShell() {
         recommendationReason =
           teachingMode === "adaptive"
             ? loadLearningDNA2().recommendationReason
-            : `You selected ${teachingMode} mode. Ada will use the outcome to improve later recommendations.`;
+            : `You selected ${effectiveTeachingMode} mode. Ada will use the outcome to improve later recommendations.`;
       } catch {
         // The lesson remains usable without Learning DNA metadata.
       }
@@ -756,7 +815,7 @@ export function TutorShell() {
         topic: topic.trim(),
         subject,
         level,
-        teachingMode,
+        teachingMode: effectiveTeachingMode,
         stylesUsed: payload.lesson.stylesUsed,
         response: payload,
         recommendationReason,
@@ -776,8 +835,9 @@ export function TutorShell() {
           topic: topic.trim(),
           subject,
           level,
-          teachingMode,
+          teachingMode: effectiveTeachingMode,
           historyId: historyEntry.id,
+          ...(pendingAcceptedAdaptation ? { adaptation: pendingAcceptedAdaptation } : {}),
         } satisfies StoredLessonSession),
       );
       if (process.env.NODE_ENV === "development") {
@@ -1059,6 +1119,53 @@ export function TutorShell() {
       } catch { /* non-critical */ }
 
       setDidSwitchMode(false);
+
+      // ── Struggle-aware adaptation ──
+      // Deliberately placed AFTER mastery, Learning DNA, calibration, review
+      // card and explanation-history recording. Every piece of evidence for
+      // this check is already attributed to the approach that produced it,
+      // so proposing a switch here cannot change that attribution.
+      //
+      // `understandingRetries` is read before the increment below, so it is
+      // the same retry count that was just recorded.
+      try {
+        if (adaptationHandledGeneration !== lessonGeneration) {
+          const struggle = detectStruggle({
+            status: payload.evaluation.status,
+            score: payload.evaluation.score,
+            confidenceBefore: confidence,
+            retries: understandingRetries,
+          });
+          if (struggle.struggling && struggle.reasonCode) {
+            const dna = loadLearningDNA2();
+            const currentDimension = teachingModeToDimension(
+              teachingMode,
+              dna.currentRecommendation,
+            );
+            const alternative = chooseAlternativeApproach({
+              currentDimension,
+              conceptBest: getBestApproachForConcept(topic.trim()),
+              effectivenessRanking: getEffectivenessRanking(dna),
+              totalEvidenceCount: Object.values(dna.observedEffectiveness).reduce(
+                (sum, evidence) => sum + evidence.evidenceCount,
+                0,
+              ),
+            });
+            setPendingAdaptation({
+              from: currentDimension,
+              to: alternative.dimension,
+              reasonCode: struggle.reasonCode,
+              explanation: struggle.explanation,
+            });
+            // Marks this lesson's single proposal as spent, whatever the
+            // learner then chooses.
+            setAdaptationHandledGeneration(lessonGeneration);
+          }
+        }
+      } catch {
+        // The lesson flow continues normally without an adaptation proposal.
+      }
+
       if (payload.evaluation.status !== "correct") {
         setUnderstandingRetries((current) => current + 1);
       }
@@ -1207,6 +1314,9 @@ export function TutorShell() {
     setMasteryReason(null);
     setUnderstandingRetries(0);
     setDidSwitchMode(false);
+    setPendingAdaptation(null);
+    setAppliedAdaptation(null);
+    setAdaptationHandledGeneration(null);
     setActiveSources([]);
     setActiveSourceMode(undefined);
     setComposerSessionId((current) => current + 1);
@@ -1216,8 +1326,54 @@ export function TutorShell() {
   }
 
   function handleTeachingModeChange(mode: TeachingMode) {
-    if (response && mode !== teachingMode) setDidSwitchMode(true);
+    if (response && mode !== teachingMode) {
+      setDidSwitchMode(true);
+      // The learner is choosing for themselves now, so the mode is no longer
+      // attributable to an Ada proposal.
+      setAppliedAdaptation(null);
+    }
     setTeachingMode(mode);
+  }
+
+  /**
+   * Apply an accepted struggle adaptation.
+   *
+   * Note this never touches `didSwitchMode`. That flag feeds `switchAwayCount`
+   * in the Learning DNA evidence model and must continue to mean "the learner
+   * chose to switch away", not "Ada proposed a switch and the learner agreed".
+   * The accepted adaptation is tracked in its own state instead.
+   */
+  function acceptAdaptation() {
+    if (!pendingAdaptation || isLoading) return;
+    const nextMode = dimensionToTeachingMode(pendingAdaptation.to);
+    const record: AdaptationRecord = {
+      from: pendingAdaptation.from,
+      to: pendingAdaptation.to,
+      reasonCode: pendingAdaptation.reasonCode,
+      at: new Date().toISOString(),
+    };
+    setPendingAdaptation(null);
+    setAppliedAdaptation(record);
+    setTeachingMode(nextMode);
+    // The mode is threaded through explicitly: setTeachingMode only lands on
+    // the next render, and this request must already carry the new mode.
+    // Sources and grounding mode keep their existing defaults.
+    void requestLesson(
+      "different",
+      activeSources,
+      activeSourceMode,
+      0,
+      true,
+      nextMode,
+      record,
+    );
+  }
+
+  function dismissAdaptation() {
+    // The proposal is spent for this lesson. `adaptationHandledGeneration`
+    // was already set when it was raised, so nothing re-proposes until a new
+    // lesson is generated and evaluated by a new check.
+    setPendingAdaptation(null);
   }
 
   async function requestExplainBack(
@@ -1579,6 +1735,7 @@ export function TutorShell() {
               activeMode={teachingMode}
               onModeChange={handleTeachingModeChange}
               availableModes={["adaptive", "visual", "example", "analogy", "story", "challenge"]}
+              adaptation={appliedAdaptation}
             />
 
             {topic.trim() && (
@@ -1650,6 +1807,23 @@ export function TutorShell() {
                 Cancel
               </button>
             </div>
+          )}
+
+          {/*
+            Rendered above the tab panels rather than inside the lesson tab.
+            The understanding check that raises the proposal lives in the
+            practice tab, so a notice scoped to the lesson tab would appear
+            where the learner is not looking.
+          */}
+          {response && pendingAdaptation && (
+            <AdaptationNotice
+              from={pendingAdaptation.from}
+              to={pendingAdaptation.to}
+              explanation={pendingAdaptation.explanation}
+              isLoading={isLoading}
+              onAccept={acceptAdaptation}
+              onDismiss={dismissAdaptation}
+            />
           )}
 
           {response && activeTab === "learn" && (
