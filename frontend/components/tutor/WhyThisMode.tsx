@@ -11,6 +11,10 @@ import {
 } from "@/lib/learning-dna-v2";
 import type { TeachingMode } from "@/lib/ai/types";
 import { teachingModeToDimension } from "@/lib/mode-effectiveness";
+import {
+  describeAcceptedAdaptation,
+  type AdaptationRecord,
+} from "@/lib/struggle-adaptation";
 
 const MODE_LABELS: Record<string, string> = {
   visual: "Visual",
@@ -42,10 +46,17 @@ export function WhyThisMode({
   activeMode,
   onModeChange,
   availableModes,
+  adaptation,
 }: {
   activeMode: TeachingMode;
   onModeChange: (mode: TeachingMode) => void;
   availableModes: TeachingMode[];
+  /**
+   * An accepted struggle adaptation, when the active mode came from one.
+   * Lets this panel distinguish an Ada-proposed switch from a manual
+   * selection instead of reporting both as "You selected this approach".
+   */
+  adaptation?: AdaptationRecord | null;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const dna: LearningDNA2 | null = (() => {
@@ -85,6 +96,14 @@ export function WhyThisMode({
     if (hasObserved) return "Observed outcomes";
     return "No data";
   }
+
+  // Only treat the mode as Ada-proposed while it still matches the approach
+  // the accepted adaptation actually switched to. A later manual change must
+  // fall back to the manual-selection wording.
+  const acceptedAdaptationReason =
+    adaptation && adaptation.to === activeDimension
+      ? describeAcceptedAdaptation(adaptation.reasonCode)
+      : null;
 
   const source = evidenceSource(dna, activeDimension);
   const totalEvidence = evidence?.evidenceCount ?? 0;
@@ -168,7 +187,8 @@ export function WhyThisMode({
                 <p className="text-xs leading-5 text-[var(--am-text-secondary)]">
                   {activeMode === "adaptive"
                     ? recommendation.reason
-                    : "You selected this approach. Ada will still record the outcome so future recommendations can improve."}
+                    : acceptedAdaptationReason
+                      ?? "You selected this approach. Ada will still record the outcome so future recommendations can improve."}
                 </p>
               </div>
             )}
